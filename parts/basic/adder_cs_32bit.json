@@ -1,0 +1,110 @@
+[
+    {
+        "inA": 0,
+        "inB": 0,
+        "inCarry": 0,
+        "expect": {
+            "outSum": 0,
+            "outCarry": 0
+        }
+    },
+    {
+        "inA": 0,
+        "inB": 0,
+        "inCarry": 1,
+        "expect": {
+            "outSum": 1,
+            "outCarry": 0
+        }
+    },
+    {
+        "inA": 1,
+        "inB": 1,
+        "inCarry": 0,
+        "expect": {
+            "outSum": 2,
+            "outCarry": 0
+        }
+    },
+    {
+        "inA": 65535,
+        "inB": 1,
+        "inCarry": 0,
+        "expect": {
+            "outSum": 65536,
+            "outCarry": 0
+        }
+    },
+    {
+        "inA": 4294967295,
+        "inB": 1,
+        "inCarry": 0,
+        "expect": {
+            "outSum": 0,
+            "outCarry": 1
+        }
+    },
+    {
+        "inA": 4294967295,
+        "inB": 4294967295,
+        "inCarry": 0,
+        "expect": {
+            "outSum": 4294967294,
+            "outCarry": 1
+        }
+    },
+    {
+        "inA": 4294967295,
+        "inB": 4294967295,
+        "inCarry": 1,
+        "expect": {
+            "outSum": 4294967295,
+            "outCarry": 1
+        }
+    },
+    {
+        "inA": 2147483648,
+        "inB": 1073741824,
+        "inCarry": 0,
+        "expect": {
+            "outSum": 3221225472,
+            "outCarry": 0
+        }
+    },
+    {
+        "inA": 2147483647,
+        "inB": 2147483648,
+        "inCarry": 0,
+        "expect": {
+            "outSum": 4294967295,
+            "outCarry": 0
+        }
+    },
+    {
+        "inA": 2863311530,
+        "inB": 1431655765,
+        "inCarry": 0,
+        "expect": {
+            "outSum": 4294967295,
+            "outCarry": 0
+        }
+    },
+    {
+        "inA": 65535,
+        "inB": 65535,
+        "inCarry": 1,
+        "expect": {
+            "outSum": 131071,
+            "outCarry": 0
+        }
+    },
+    {
+        "inA": 16777215,
+        "inB": 16777215,
+        "inCarry": 1,
+        "expect": {
+            "outSum": 33554431,
+            "outCarry": 0
+        }
+    }
+]

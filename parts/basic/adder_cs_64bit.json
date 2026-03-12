@@ -1,0 +1,74 @@
+[
+    {
+        "inA": 0,
+        "inB": 0,
+        "inCarry": 0,
+        "expect": {
+            "outSum": 0,
+            "outCarry": 0
+        }
+    },
+    {
+        "inA": 0,
+        "inB": 0,
+        "inCarry": 1,
+        "expect": {
+            "outSum": 1,
+            "outCarry": 0
+        }
+    },
+    {
+        "inA": 1,
+        "inB": 1,
+        "inCarry": 0,
+        "expect": {
+            "outSum": 2,
+            "outCarry": 0
+        }
+    },
+    {
+        "inA": 4294967295,
+        "inB": 1,
+        "inCarry": 0,
+        "expect": {
+            "outSum": 4294967296,
+            "outCarry": 0
+        }
+    },
+    {
+        "inA": 18446744073709551615,
+        "inB": 1,
+        "inCarry": 0,
+        "expect": {
+            "outSum": 0,
+            "outCarry": 1
+        }
+    },
+    {
+        "inA": 18446744073709551615,
+        "inB": 18446744073709551615,
+        "inCarry": 0,
+        "expect": {
+            "outSum": 18446744073709551614,
+            "outCarry": 1
+        }
+    },
+    {
+        "inA": 18446744073709551615,
+        "inB": 18446744073709551615,
+        "inCarry": 1,
+        "expect": {
+            "outSum": 18446744073709551615,
+            "outCarry": 1
+        }
+    },
+    {
+        "inA": 9223372036854775808,
+        "inB": 4611686018427387904,
+        "inCarry": 0,
+        "expect": {
+            "outSum": 13835058055282163712,
+            "outCarry": 0
+        }
+    }
+]

@@ -1,0 +1,58 @@
+[
+  {
+    "instr": 5,
+    "expect": {
+      "is_immediate": 1,
+      "is_calculate": 0,
+      "is_copy": 0,
+      "is_condition": 0,
+      "imm_value": 5,
+      "alu_op": 5,
+      "src_sel": 0,
+      "dst_sel": 5,
+      "cond_sel": 5
+    }
+  },
+  {
+    "instr": 68,
+    "expect": {
+      "is_immediate": 0,
+      "is_calculate": 1,
+      "is_copy": 0,
+      "is_condition": 0,
+      "imm_value": 4,
+      "alu_op": 4,
+      "src_sel": 0,
+      "dst_sel": 4,
+      "cond_sel": 4
+    }
+  },
+  {
+    "instr": 158,
+    "expect": {
+      "is_immediate": 0,
+      "is_calculate": 0,
+      "is_copy": 1,
+      "is_condition": 0,
+      "imm_value": 30,
+      "alu_op": 6,
+      "src_sel": 3,
+      "dst_sel": 6,
+      "cond_sel": 6
+    }
+  },
+  {
+    "instr": 199,
+    "expect": {
+      "is_immediate": 0,
+      "is_calculate": 0,
+      "is_copy": 0,
+      "is_condition": 1,
+      "imm_value": 7,
+      "alu_op": 7,
+      "src_sel": 0,
+      "dst_sel": 7,
+      "cond_sel": 7
+    }
+  }
+]

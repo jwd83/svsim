@@ -1,0 +1,33 @@
+{
+    "sequential": true,
+    "memory_files": {
+        "rom": [
+            {
+                "type": "rom",
+                "module": "memory_cpu_stub",
+                "memory": "rom",
+                "file": "memory_cpu_stub_rom.txt"
+            }
+        ],
+        "ram": [
+            {
+                "type": "ram",
+                "module": "memory_cpu_stub",
+                "memory": "ram",
+                "file": "memory_cpu_stub_ram.txt"
+            }
+        ]
+    },
+    "test_cases": [
+        {
+            "name": "Program executes with ROM decode and RAM write",
+            "sequence": [
+                {"inputs": {"clk": 1, "reset": 1, "run": 0}, "expected": {"pc": 0, "acc": 0, "ram_out": 0}},
+                {"inputs": {"clk": 1, "reset": 0, "run": 1}, "expected": {"pc": 1, "acc": 3, "ram_out": 0}},
+                {"inputs": {"clk": 1, "reset": 0, "run": 1}, "expected": {"pc": 2, "acc": 5, "ram_out": 0}},
+                {"inputs": {"clk": 1, "reset": 0, "run": 1}, "expected": {"pc": 3, "acc": 5, "ram_out": 5}},
+                {"inputs": {"clk": 1, "reset": 0, "run": 1}, "expected": {"pc": 4, "acc": 5, "ram_out": 5}}
+            ]
+        }
+    ]
+}

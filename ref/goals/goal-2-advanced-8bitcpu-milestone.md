@@ -1,0 +1,2 @@
+improve the goal 1 cpu with to use 32 bit instruction words like the second "LEG" CPU from the game turing complete. 8 bit cpu core but longer 32 bit instruction words to overcome limitations of the goal-1 cpu.
+ram module support

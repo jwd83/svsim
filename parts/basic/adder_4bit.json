@@ -1,0 +1,62 @@
+[
+    {
+        "inA": 0, "inB": 0, "inCarry": 0,
+        "expect": {
+            "outSum": 0, "outCarry": 0
+        }
+    },
+    {
+        "inA": 0, "inB": 0, "inCarry": 1,
+        "expect": {
+            "outSum": 1, "outCarry": 0
+        }
+    },
+    {
+        "inA": 1, "inB": 2, "inCarry": 0,
+        "expect": {
+            "outSum": 3, "outCarry": 0
+        }
+    },
+    {
+        "inA": 7, "inB": 1, "inCarry": 0,
+        "expect": {
+            "outSum": 8, "outCarry": 0
+        }
+    },
+    {
+        "inA": 8, "inB": 8, "inCarry": 0,
+        "expect": {
+            "outSum": 0, "outCarry": 1
+        }
+    },
+    {
+        "inA": 15, "inB": 15, "inCarry": 0,
+        "expect": {
+            "outSum": 14, "outCarry": 1
+        }
+    },
+    {
+        "inA": 15, "inB": 15, "inCarry": 1,
+        "expect": {
+            "outSum": 15, "outCarry": 1
+        }
+    },
+    {
+        "inA": 5, "inB": 3, "inCarry": 1,
+        "expect": {
+            "outSum": 9, "outCarry": 0
+        }
+    },
+    {
+        "inA": 12, "inB": 5, "inCarry": 1,
+        "expect": {
+            "outSum": 2, "outCarry": 1
+        }
+    },
+    {
+        "inA": 0, "inB": 15, "inCarry": 1,
+        "expect": {
+            "outSum": 0, "outCarry": 1
+        }
+    }
+]

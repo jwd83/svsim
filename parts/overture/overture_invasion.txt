@@ -1,0 +1,14 @@
+177   // 0: R1 <- in_port (sensor)
+33    // 1: R0 <- 33 (enemy code)
+130   // 2: R2 <- R0
+69    // 3: SUB  R3 <- R1 - R2 (sensor - 33)
+0x0A  // 4: R0 <- 10 (shoot addr)
+193   // 5: eq: if R3==0 jump to R0 (addr 10)
+1     // 6: R0 <- 1 (MOVE command)
+134   // 7: out_port <- R0
+0     // 8: R0 <- 0 (restart addr)
+196   // 9: always: jump to R0 (addr 0)
+5     // 10: R0 <- 5 (SHOOT command)
+134   // 11: out_port <- R0
+0     // 12: R0 <- 0 (restart addr)
+196   // 13: always: jump to R0 (addr 0)

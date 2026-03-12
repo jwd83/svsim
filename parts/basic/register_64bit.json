@@ -1,0 +1,109 @@
+{
+  "sequential": true,
+  "clock": "clk",
+  "test_cases": [
+    {
+      "name": "Initialize to zero",
+      "description": "First load zeros into register",
+      "inputs": {"clk": 1, "enable": 1, "data": 0},
+      "expected": {"q": 0}
+    },
+    {
+      "name": "Store 0xAAAAAAAAAAAAAAAA pattern",
+      "description": "Store alternating bit pattern",
+      "inputs": {"clk": 1, "enable": 1, "data": 12297829382473034410},
+      "expected": {"q": 12297829382473034410}
+    },
+    {
+      "name": "Hold test - enable low",
+      "description": "Data changes but enable is low",
+      "inputs": {"clk": 1, "enable": 0, "data": 6148914691236517205},
+      "expected": {"q": 12297829382473034410}
+    },
+    {
+      "name": "Store 0x5555555555555555 pattern",
+      "description": "Store opposite alternating pattern",
+      "inputs": {"clk": 1, "enable": 1, "data": 6148914691236517205},
+      "expected": {"q": 6148914691236517205}
+    },
+    {
+      "name": "Store max value 0xFFFFFFFFFFFFFFFF",
+      "description": "Store all ones",
+      "inputs": {"clk": 1, "enable": 1, "data": 18446744073709551615},
+      "expected": {"q": 18446744073709551615}
+    },
+    {
+      "name": "Comprehensive sequence test",
+      "description": "Test enable hold, boundary values, and state transitions",
+      "sequence": [
+        {"inputs": {"clk": 1, "enable": 1, "data": 0}, "expected": {"q": 0}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 1}, "expected": {"q": 1}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 4294967295}, "expected": {"q": 4294967295}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 4294967296}, "expected": {"q": 4294967296}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 9223372036854775807}, "expected": {"q": 9223372036854775807}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 9223372036854775808}, "expected": {"q": 9223372036854775808}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 18446744073709551615}, "expected": {"q": 18446744073709551615}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 0}, "expected": {"q": 18446744073709551615}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 1234567890123456789}, "expected": {"q": 18446744073709551615}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 0}, "expected": {"q": 0}}
+      ]
+    },
+    {
+      "name": "Extended hold test",
+      "description": "Multiple cycles with enable low",
+      "sequence": [
+        {"inputs": {"clk": 1, "enable": 1, "data": 1311768467463790320}, "expected": {"q": 1311768467463790320}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 0}, "expected": {"q": 1311768467463790320}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 1000000000000}, "expected": {"q": 1311768467463790320}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 10000000000000000000}, "expected": {"q": 1311768467463790320}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 18446744073709551615}, "expected": {"q": 1311768467463790320}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 18364758544493064720}, "expected": {"q": 18364758544493064720}}
+      ]
+    },
+    {
+      "name": "Rapid toggle test",
+      "description": "Quick enable toggling with different data",
+      "sequence": [
+        {"inputs": {"clk": 1, "enable": 1, "data": 100000000000}, "expected": {"q": 100000000000}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 200000000000}, "expected": {"q": 100000000000}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 300000000000}, "expected": {"q": 300000000000}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 400000000000}, "expected": {"q": 300000000000}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 500000000000}, "expected": {"q": 500000000000}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 600000000000}, "expected": {"q": 500000000000}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 700000000000}, "expected": {"q": 700000000000}}
+      ]
+    },
+    {
+      "name": "Dword boundary test",
+      "description": "Test values at 32-bit boundaries",
+      "sequence": [
+        {"inputs": {"clk": 1, "enable": 1, "data": 4294967295}, "expected": {"q": 4294967295}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 4294967296}, "expected": {"q": 4294967296}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 4294967297}, "expected": {"q": 4294967297}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 281474976710655}, "expected": {"q": 281474976710655}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 281474976710656}, "expected": {"q": 281474976710656}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 281474976710657}, "expected": {"q": 281474976710657}}
+      ]
+    },
+    {
+      "name": "Hex pattern tests",
+      "description": "Common 64-bit hex patterns",
+      "sequence": [
+        {"inputs": {"clk": 1, "enable": 1, "data": 1311768467463790320}, "expected": {"q": 1311768467463790320}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 18364758544493064720}, "expected": {"q": 18364758544493064720}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 81985529216486895}, "expected": {"q": 81985529216486895}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 13527612320720337851}, "expected": {"q": 13527612320720337851}}
+      ]
+    },
+    {
+      "name": "MSB/LSB test",
+      "description": "Test most and least significant bits",
+      "sequence": [
+        {"inputs": {"clk": 1, "enable": 1, "data": 1}, "expected": {"q": 1}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 9223372036854775808}, "expected": {"q": 9223372036854775808}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 9223372036854775809}, "expected": {"q": 9223372036854775809}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 9223372036854775807}, "expected": {"q": 9223372036854775807}}
+      ]
+    }
+  ]
+}

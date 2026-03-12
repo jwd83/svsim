@@ -1,0 +1,30 @@
+[
+    {
+        "inA": 0,
+        "inB": 0,
+        "expect": {
+            "outY": 1
+        }
+    },
+    {
+        "inA": 0,
+        "inB": 1,
+        "expect": {
+            "outY": 1
+        }
+    },
+    {
+        "inA": 1,
+        "inB": 0,
+        "expect": {
+            "outY": 1
+        }
+    },
+    {
+        "inA": 1,
+        "inB": 1,
+        "expect": {
+            "outY": 0
+        }
+    }
+]

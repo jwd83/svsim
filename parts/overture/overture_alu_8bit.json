@@ -1,0 +1,11 @@
+[
+  {"inA": 0, "inB": 0, "op": 0, "expect": {"outY": 0}},
+  {"inA": 5, "inB": 3, "op": 0, "expect": {"outY": 7}},
+  {"inA": 5, "inB": 3, "op": 1, "expect": {"outY": 254}},
+  {"inA": 5, "inB": 3, "op": 2, "expect": {"outY": 248}},
+  {"inA": 5, "inB": 3, "op": 3, "expect": {"outY": 1}},
+  {"inA": 5, "inB": 3, "op": 4, "expect": {"outY": 8}},
+  {"inA": 5, "inB": 3, "op": 5, "expect": {"outY": 2}},
+  {"inA": 200, "inB": 100, "op": 4, "expect": {"outY": 44}},
+  {"inA": 10, "inB": 1, "op": 6, "expect": {"outY": 0}}
+]

@@ -1,0 +1,74 @@
+[
+    {
+        "inA": 0,
+        "inB": 0,
+        "inCarry": 0,
+        "expect": {
+            "outSum": 0,
+            "outCarry": 0
+        }
+    },
+    {
+        "inA": 1,
+        "inB": 0,
+        "inCarry": 0,
+        "expect": {
+            "outSum": 1,
+            "outCarry": 0
+        }
+    },
+    {
+        "inA": 0,
+        "inB": 1,
+        "inCarry": 1,
+        "expect": {
+            "outSum": 2,
+            "outCarry": 0
+        }
+    },
+    {
+        "inA": 4294967295,
+        "inB": 1,
+        "inCarry": 0,
+        "expect": {
+            "outSum": 4294967296,
+            "outCarry": 0
+        }
+    },
+    {
+        "inA": 1099511627775,
+        "inB": 1,
+        "inCarry": 0,
+        "expect": {
+            "outSum": 1099511627776,
+            "outCarry": 0
+        }
+    },
+    {
+        "inA": 9223372036854775807,
+        "inB": 1,
+        "inCarry": 0,
+        "expect": {
+            "outSum": 9223372036854775808,
+            "outCarry": 0
+        }
+    },
+    {
+        "inA": 9223372036854775808,
+        "inB": 9223372036854775808,
+        "inCarry": 0,
+        "expect": {
+            "outSum": 0,
+            "outCarry": 1
+        }
+    },
+    {
+        "inA": 12345678901234567890,
+        "inB": 6543210987654321098,
+        "inCarry": 1,
+        "expect": {
+            "outSum": 442145815179337373,
+            "outCarry": 1
+        }
+    }
+]

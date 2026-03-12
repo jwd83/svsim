@@ -1,0 +1,104 @@
+{
+  "sequential": true,
+  "clock": "clk",
+  "test_cases": [
+    {
+      "name": "Write and read each register",
+      "description": "Write unique values to all 8 registers, read back via port 1",
+      "sequence": [
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 0, "write_data": 10, "read_addr1": 0, "read_addr2": 0}, "expected": {"read_data1": 10}},
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 1, "write_data": 20, "read_addr1": 1, "read_addr2": 0}, "expected": {"read_data1": 20}},
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 2, "write_data": 30, "read_addr1": 2, "read_addr2": 0}, "expected": {"read_data1": 30}},
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 3, "write_data": 40, "read_addr1": 3, "read_addr2": 0}, "expected": {"read_data1": 40}},
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 4, "write_data": 50, "read_addr1": 4, "read_addr2": 0}, "expected": {"read_data1": 50}},
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 5, "write_data": 60, "read_addr1": 5, "read_addr2": 0}, "expected": {"read_data1": 60}},
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 6, "write_data": 70, "read_addr1": 6, "read_addr2": 0}, "expected": {"read_data1": 70}},
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 7, "write_data": 80, "read_addr1": 7, "read_addr2": 0}, "expected": {"read_data1": 80}}
+      ]
+    },
+    {
+      "name": "Dual port simultaneous read",
+      "description": "Write values then read two different registers simultaneously",
+      "sequence": [
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 0, "write_data": 100, "read_addr1": 0, "read_addr2": 0}, "expected": {"read_data1": 100}},
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 1, "write_data": 200, "read_addr1": 1, "read_addr2": 0}, "expected": {"read_data1": 200}},
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 2, "write_data": 150, "read_addr1": 2, "read_addr2": 0}, "expected": {"read_data1": 150}},
+        {"inputs": {"clk": 1, "write_en": 0, "write_addr": 0, "write_data": 0, "read_addr1": 0, "read_addr2": 1}, "expected": {"read_data1": 100, "read_data2": 200}},
+        {"inputs": {"clk": 1, "write_en": 0, "write_addr": 0, "write_data": 0, "read_addr1": 1, "read_addr2": 2}, "expected": {"read_data1": 200, "read_data2": 150}},
+        {"inputs": {"clk": 1, "write_en": 0, "write_addr": 0, "write_data": 0, "read_addr1": 2, "read_addr2": 0}, "expected": {"read_data1": 150, "read_data2": 100}},
+        {"inputs": {"clk": 1, "write_en": 0, "write_addr": 0, "write_data": 0, "read_addr1": 0, "read_addr2": 0}, "expected": {"read_data1": 100, "read_data2": 100}}
+      ]
+    },
+    {
+      "name": "Write enable gating",
+      "description": "Verify write_en=0 prevents writes",
+      "sequence": [
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 3, "write_data": 42, "read_addr1": 3, "read_addr2": 0}, "expected": {"read_data1": 42}},
+        {"inputs": {"clk": 1, "write_en": 0, "write_addr": 3, "write_data": 99, "read_addr1": 3, "read_addr2": 0}, "expected": {"read_data1": 42}},
+        {"inputs": {"clk": 1, "write_en": 0, "write_addr": 3, "write_data": 255, "read_addr1": 3, "read_addr2": 0}, "expected": {"read_data1": 42}},
+        {"inputs": {"clk": 1, "write_en": 0, "write_addr": 3, "write_data": 0, "read_addr1": 3, "read_addr2": 0}, "expected": {"read_data1": 42}},
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 3, "write_data": 99, "read_addr1": 3, "read_addr2": 0}, "expected": {"read_data1": 99}}
+      ]
+    },
+    {
+      "name": "Register independence",
+      "description": "Writing one register does not affect others",
+      "sequence": [
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 0, "write_data": 11, "read_addr1": 0, "read_addr2": 0}, "expected": {"read_data1": 11}},
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 1, "write_data": 22, "read_addr1": 1, "read_addr2": 0}, "expected": {"read_data1": 22, "read_data2": 11}},
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 2, "write_data": 33, "read_addr1": 2, "read_addr2": 0}, "expected": {"read_data1": 33, "read_data2": 11}},
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 7, "write_data": 77, "read_addr1": 7, "read_addr2": 1}, "expected": {"read_data1": 77, "read_data2": 22}},
+        {"inputs": {"clk": 1, "write_en": 0, "write_addr": 0, "write_data": 0, "read_addr1": 0, "read_addr2": 2}, "expected": {"read_data1": 11, "read_data2": 33}}
+      ]
+    },
+    {
+      "name": "Overwrite test",
+      "description": "Overwriting a register replaces the old value",
+      "sequence": [
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 5, "write_data": 111, "read_addr1": 5, "read_addr2": 0}, "expected": {"read_data1": 111}},
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 5, "write_data": 222, "read_addr1": 5, "read_addr2": 0}, "expected": {"read_data1": 222}},
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 5, "write_data": 0, "read_addr1": 5, "read_addr2": 0}, "expected": {"read_data1": 0}},
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 5, "write_data": 255, "read_addr1": 5, "read_addr2": 0}, "expected": {"read_data1": 255}}
+      ]
+    },
+    {
+      "name": "Read while writing different register",
+      "description": "Reading one register while writing another",
+      "sequence": [
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 0, "write_data": 50, "read_addr1": 0, "read_addr2": 0}, "expected": {"read_data1": 50}},
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 1, "write_data": 60, "read_addr1": 0, "read_addr2": 1}, "expected": {"read_data1": 50, "read_data2": 60}},
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 2, "write_data": 70, "read_addr1": 1, "read_addr2": 2}, "expected": {"read_data1": 60, "read_data2": 70}},
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 3, "write_data": 80, "read_addr1": 2, "read_addr2": 3}, "expected": {"read_data1": 70, "read_data2": 80}},
+        {"inputs": {"clk": 1, "write_en": 0, "write_addr": 0, "write_data": 0, "read_addr1": 0, "read_addr2": 3}, "expected": {"read_data1": 50, "read_data2": 80}}
+      ]
+    },
+    {
+      "name": "Boundary value patterns",
+      "description": "Test with 0x00, 0xFF, 0xAA, 0x55",
+      "sequence": [
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 0, "write_data": 0, "read_addr1": 0, "read_addr2": 0}, "expected": {"read_data1": 0}},
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 1, "write_data": 255, "read_addr1": 1, "read_addr2": 0}, "expected": {"read_data1": 255, "read_data2": 0}},
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 2, "write_data": 170, "read_addr1": 2, "read_addr2": 1}, "expected": {"read_data1": 170, "read_data2": 255}},
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 3, "write_data": 85, "read_addr1": 3, "read_addr2": 2}, "expected": {"read_data1": 85, "read_data2": 170}},
+        {"inputs": {"clk": 1, "write_en": 0, "write_addr": 0, "write_data": 0, "read_addr1": 0, "read_addr2": 1}, "expected": {"read_data1": 0, "read_data2": 255}},
+        {"inputs": {"clk": 1, "write_en": 0, "write_addr": 0, "write_data": 0, "read_addr1": 2, "read_addr2": 3}, "expected": {"read_data1": 170, "read_data2": 85}}
+      ]
+    },
+    {
+      "name": "Walking ones across all registers",
+      "description": "Write walking-one pattern to each register, verify all",
+      "sequence": [
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 0, "write_data": 1, "read_addr1": 0, "read_addr2": 0}, "expected": {"read_data1": 1}},
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 1, "write_data": 2, "read_addr1": 1, "read_addr2": 0}, "expected": {"read_data1": 2, "read_data2": 1}},
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 2, "write_data": 4, "read_addr1": 2, "read_addr2": 0}, "expected": {"read_data1": 4, "read_data2": 1}},
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 3, "write_data": 8, "read_addr1": 3, "read_addr2": 0}, "expected": {"read_data1": 8, "read_data2": 1}},
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 4, "write_data": 16, "read_addr1": 4, "read_addr2": 0}, "expected": {"read_data1": 16, "read_data2": 1}},
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 5, "write_data": 32, "read_addr1": 5, "read_addr2": 0}, "expected": {"read_data1": 32, "read_data2": 1}},
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 6, "write_data": 64, "read_addr1": 6, "read_addr2": 0}, "expected": {"read_data1": 64, "read_data2": 1}},
+        {"inputs": {"clk": 1, "write_en": 1, "write_addr": 7, "write_data": 128, "read_addr1": 7, "read_addr2": 0}, "expected": {"read_data1": 128, "read_data2": 1}},
+        {"inputs": {"clk": 1, "write_en": 0, "write_addr": 0, "write_data": 0, "read_addr1": 3, "read_addr2": 5}, "expected": {"read_data1": 8, "read_data2": 32}},
+        {"inputs": {"clk": 1, "write_en": 0, "write_addr": 0, "write_data": 0, "read_addr1": 6, "read_addr2": 7}, "expected": {"read_data1": 64, "read_data2": 128}}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+[
+    {
+        "in": 0,
+        "expect": {
+            "out_hi": 0,
+            "out_lo": 0
+        }
+    },
+    {
+        "in": 255,
+        "expect": {
+            "out_hi": 0,
+            "out_lo": 255
+        }
+    },
+    {
+        "in": 65280,
+        "expect": {
+            "out_hi": 255,
+            "out_lo": 0
+        }
+    },
+    {
+        "in": 65535,
+        "expect": {
+            "out_hi": 255,
+            "out_lo": 255
+        }
+    },
+    {
+        "in": 4660,
+        "expect": {
+            "out_hi": 18,
+            "out_lo": 52
+        }
+    },
+    {
+        "in": 43981,
+        "expect": {
+            "out_hi": 171,
+            "out_lo": 205
+        }
+    },
+    {
+        "in": 23130,
+        "expect": {
+            "out_hi": 90,
+            "out_lo": 90
+        }
+    },
+    {
+        "in": 42405,
+        "expect": {
+            "out_hi": 165,
+            "out_lo": 165
+        }
+    }
+]

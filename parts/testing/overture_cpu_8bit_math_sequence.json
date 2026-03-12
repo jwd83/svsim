@@ -1,0 +1,24 @@
+{
+    "sequential": true,
+    "test_cases": [
+        {
+            "name": "Overture 8-bit math sequence",
+            "sequence": [
+                {"inputs": {"clk": 1, "reset": 1, "run": 0}, "expected": {"pc": 0, "acc": 0, "halted": 0}},
+                {"inputs": {"clk": 1, "reset": 0, "run": 1}, "expected": {"pc": 1, "acc": 3, "halted": 0}},
+                {"inputs": {"clk": 1, "reset": 0, "run": 1}, "expected": {"pc": 2, "acc": 8, "halted": 0}},
+                {"inputs": {"clk": 1, "reset": 0, "run": 1}, "expected": {"pc": 3, "acc": 10, "halted": 0}},
+                {"inputs": {"clk": 1, "reset": 0, "run": 1}, "expected": {"pc": 4, "acc": 10, "halted": 1}},
+                {"inputs": {"clk": 1, "reset": 0, "run": 1}, "expected": {"pc": 4, "acc": 10, "halted": 1}}
+            ]
+        },
+        {
+            "name": "Reset and rerun program",
+            "sequence": [
+                {"inputs": {"clk": 1, "reset": 1, "run": 0}, "expected": {"pc": 0, "acc": 0, "halted": 0}},
+                {"inputs": {"clk": 1, "reset": 0, "run": 1}, "expected": {"pc": 1, "acc": 3, "halted": 0}},
+                {"inputs": {"clk": 1, "reset": 0, "run": 0}, "expected": {"pc": 1, "acc": 3, "halted": 0}}
+            ]
+        }
+    ]
+}

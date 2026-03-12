@@ -1,0 +1,50 @@
+[
+    {
+        "inA": 0,
+        "expect": {
+            "outY": 255
+        }
+    },
+    {
+        "inA": 255,
+        "expect": {
+            "outY": 0
+        }
+    },
+    {
+        "inA": 170,
+        "expect": {
+            "outY": 85
+        }
+    },
+    {
+        "inA": 85,
+        "expect": {
+            "outY": 170
+        }
+    },
+    {
+        "inA": 240,
+        "expect": {
+            "outY": 15
+        }
+    },
+    {
+        "inA": 15,
+        "expect": {
+            "outY": 240
+        }
+    },
+    {
+        "inA": 18,
+        "expect": {
+            "outY": 237
+        }
+    },
+    {
+        "inA": 135,
+        "expect": {
+            "outY": 120
+        }
+    }
+]

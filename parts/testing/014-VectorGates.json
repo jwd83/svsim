@@ -1,0 +1,50 @@
+[
+    {
+        "a": 0, "b": 0,
+        "expect": {
+            "out_or_bitwise": 0, "out_or_logical": 0, "out_not": 63
+        }
+    },
+    {
+        "a": 1, "b": 0,
+        "expect": {
+            "out_or_bitwise": 1, "out_or_logical": 1, "out_not": 62
+        }
+    },
+    {
+        "a": 0, "b": 1,
+        "expect": {
+            "out_or_bitwise": 1, "out_or_logical": 1, "out_not": 55
+        }
+    },
+    {
+        "a": 7, "b": 0,
+        "expect": {
+            "out_or_bitwise": 7, "out_or_logical": 1, "out_not": 56
+        }
+    },
+    {
+        "a": 0, "b": 7,
+        "expect": {
+            "out_or_bitwise": 7, "out_or_logical": 1, "out_not": 7
+        }
+    },
+    {
+        "a": 3, "b": 5,
+        "expect": {
+            "out_or_bitwise": 7, "out_or_logical": 1, "out_not": 20
+        }
+    },
+    {
+        "a": 7, "b": 7,
+        "expect": {
+            "out_or_bitwise": 7, "out_or_logical": 1, "out_not": 0
+        }
+    },
+    {
+        "a": 2, "b": 4,
+        "expect": {
+            "out_or_bitwise": 6, "out_or_logical": 1, "out_not": 29
+        }
+    }
+]

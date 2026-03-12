@@ -1,0 +1,110 @@
+[
+    {
+        "inA": 0,
+        "inB": 0,
+        "inCarry": 0,
+        "expect": {
+            "outSum": 0,
+            "outCarry": 0
+        }
+    },
+    {
+        "inA": 0,
+        "inB": 0,
+        "inCarry": 1,
+        "expect": {
+            "outSum": 1,
+            "outCarry": 0
+        }
+    },
+    {
+        "inA": 1,
+        "inB": 1,
+        "inCarry": 0,
+        "expect": {
+            "outSum": 2,
+            "outCarry": 0
+        }
+    },
+    {
+        "inA": 255,
+        "inB": 1,
+        "inCarry": 0,
+        "expect": {
+            "outSum": 256,
+            "outCarry": 0
+        }
+    },
+    {
+        "inA": 65535,
+        "inB": 1,
+        "inCarry": 0,
+        "expect": {
+            "outSum": 0,
+            "outCarry": 1
+        }
+    },
+    {
+        "inA": 65535,
+        "inB": 65535,
+        "inCarry": 0,
+        "expect": {
+            "outSum": 65534,
+            "outCarry": 1
+        }
+    },
+    {
+        "inA": 65535,
+        "inB": 65535,
+        "inCarry": 1,
+        "expect": {
+            "outSum": 65535,
+            "outCarry": 1
+        }
+    },
+    {
+        "inA": 32768,
+        "inB": 16384,
+        "inCarry": 0,
+        "expect": {
+            "outSum": 49152,
+            "outCarry": 0
+        }
+    },
+    {
+        "inA": 32767,
+        "inB": 32768,
+        "inCarry": 0,
+        "expect": {
+            "outSum": 65535,
+            "outCarry": 0
+        }
+    },
+    {
+        "inA": 43690,
+        "inB": 21845,
+        "inCarry": 0,
+        "expect": {
+            "outSum": 65535,
+            "outCarry": 0
+        }
+    },
+    {
+        "inA": 255,
+        "inB": 255,
+        "inCarry": 1,
+        "expect": {
+            "outSum": 511,
+            "outCarry": 0
+        }
+    },
+    {
+        "inA": 4095,
+        "inB": 4095,
+        "inCarry": 1,
+        "expect": {
+            "outSum": 8191,
+            "outCarry": 0
+        }
+    }
+]

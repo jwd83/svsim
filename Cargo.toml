@@ -1,0 +1,20 @@
+[workspace]
+members = [
+    "crates/svsim",
+    "crates/svsim-cli",
+    "crates/svsim-render",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2024"
+version = "0.1.0"
+license = "MIT OR Apache-2.0"
+authors = ["Codex"]
+
+[workspace.dependencies]
+clap = { version = "4.5", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sv-parser = "0.13"
+thiserror = "2"

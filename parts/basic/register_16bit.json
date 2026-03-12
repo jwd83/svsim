@@ -1,0 +1,106 @@
+{
+  "sequential": true,
+  "clock": "clk",
+  "test_cases": [
+    {
+      "name": "Initialize to zero",
+      "description": "First load zeros into register",
+      "inputs": {"clk": 1, "enable": 1, "data": 0},
+      "expected": {"q": 0}
+    },
+    {
+      "name": "Store 0xAAAA pattern",
+      "description": "Store alternating bit pattern 1010101010101010",
+      "inputs": {"clk": 1, "enable": 1, "data": 43690},
+      "expected": {"q": 43690}
+    },
+    {
+      "name": "Hold test - enable low",
+      "description": "Data changes but enable is low, should hold 0xAAAA",
+      "inputs": {"clk": 1, "enable": 0, "data": 21845},
+      "expected": {"q": 43690}
+    },
+    {
+      "name": "Store 0x5555 pattern",
+      "description": "Store opposite alternating pattern 0101010101010101",
+      "inputs": {"clk": 1, "enable": 1, "data": 21845},
+      "expected": {"q": 21845}
+    },
+    {
+      "name": "Store max value 0xFFFF",
+      "description": "Store all ones (65535)",
+      "inputs": {"clk": 1, "enable": 1, "data": 65535},
+      "expected": {"q": 65535}
+    },
+    {
+      "name": "Comprehensive sequence test",
+      "description": "Test enable hold, boundary values, and state transitions",
+      "sequence": [
+        {"inputs": {"clk": 1, "enable": 1, "data": 0}, "expected": {"q": 0}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 1}, "expected": {"q": 1}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 255}, "expected": {"q": 255}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 256}, "expected": {"q": 256}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 32767}, "expected": {"q": 32767}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 32768}, "expected": {"q": 32768}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 65535}, "expected": {"q": 65535}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 0}, "expected": {"q": 65535}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 12345}, "expected": {"q": 65535}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 0}, "expected": {"q": 0}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 65535}, "expected": {"q": 0}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 43690}, "expected": {"q": 43690}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 21845}, "expected": {"q": 21845}}
+      ]
+    },
+    {
+      "name": "Extended hold test",
+      "description": "Multiple cycles with enable low",
+      "sequence": [
+        {"inputs": {"clk": 1, "enable": 1, "data": 4660}, "expected": {"q": 4660}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 0}, "expected": {"q": 4660}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 1000}, "expected": {"q": 4660}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 50000}, "expected": {"q": 4660}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 65535}, "expected": {"q": 4660}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 43981}, "expected": {"q": 43981}}
+      ]
+    },
+    {
+      "name": "Rapid toggle test",
+      "description": "Quick enable toggling with different data",
+      "sequence": [
+        {"inputs": {"clk": 1, "enable": 1, "data": 1000}, "expected": {"q": 1000}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 2000}, "expected": {"q": 1000}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 3000}, "expected": {"q": 3000}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 4000}, "expected": {"q": 3000}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 5000}, "expected": {"q": 5000}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 6000}, "expected": {"q": 5000}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 7000}, "expected": {"q": 7000}}
+      ]
+    },
+    {
+      "name": "Byte boundary test",
+      "description": "Test values at byte boundaries",
+      "sequence": [
+        {"inputs": {"clk": 1, "enable": 1, "data": 255}, "expected": {"q": 255}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 256}, "expected": {"q": 256}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 257}, "expected": {"q": 257}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 65279}, "expected": {"q": 65279}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 65280}, "expected": {"q": 65280}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 65281}, "expected": {"q": 65281}}
+      ]
+    },
+    {
+      "name": "Walking ones - high byte",
+      "description": "Test individual bit positions in high byte",
+      "sequence": [
+        {"inputs": {"clk": 1, "enable": 1, "data": 256}, "expected": {"q": 256}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 512}, "expected": {"q": 512}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 1024}, "expected": {"q": 1024}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 2048}, "expected": {"q": 2048}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 4096}, "expected": {"q": 4096}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 8192}, "expected": {"q": 8192}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 16384}, "expected": {"q": 16384}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 32768}, "expected": {"q": 32768}}
+      ]
+    }
+  ]
+}

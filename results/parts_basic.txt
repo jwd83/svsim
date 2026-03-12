@@ -1,0 +1,1759 @@
+SystemVerilog Test Runner
+==================================================
+Target: parts/basic/
+Max combinations: 16
+Parallel processing: 3 workers
+
+Found 44 SystemVerilog file(s) to test
+
+Running tests in parallel with 3 workers...
+
+================================================================================
+FILE: parts/basic/adder_cs_16bit.sv
+================================================================================
+Status: [PASS]
+Module: adder_cs_16bit
+Inputs: ['inA', 'inB', 'inCarry']
+Outputs: ['outSum', 'outCarry']
+NAND Gates: 732
+Execution Time: 1.899s
+PNG Output: parts/basic/adder_cs_16bit.png
+JSON Test File: parts/basic/adder_cs_16bit.json
+Test Results: 12/12 passed (100.0%)
+Warnings: Warning: Too many input combinations (8589934592). Limiting to first 16 combinations.
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+  Test 5 passed
+  Test 6 passed
+  Test 7 passed
+  Test 8 passed
+  Test 9 passed
+  Test 10 passed
+  Test 11 passed
+  Test 12 passed
+
+Truth Table:
+inA[15:0] inB[15:0] inCarry | outSum[15:0] outCarry
+---------------------------------------------------
+     0      0      0 |      0      0
+     0      0      1 |      1      0
+     0      1      0 |      1      0
+     0      1      1 |      2      0
+     0      2      0 |      2      0
+     0      2      1 |      3      0
+     0      3      0 |      3      0
+     0      3      1 |      4      0
+     0      4      0 |      4      0
+     0      4      1 |      5      0
+     0      5      0 |      5      0
+     0      5      1 |      6      0
+     0      6      0 |      6      0
+     0      6      1 |      7      0
+     0      7      0 |      7      0
+     0      7      1 |      8      0
+
+================================================================================
+FILE: parts/basic/adder_32bit.sv
+================================================================================
+Status: [PASS]
+Module: adder_32bit
+Inputs: ['inA', 'inB', 'inCarry']
+Outputs: ['outSum', 'outCarry']
+NAND Gates: 480
+Execution Time: 0.965s
+PNG Output: parts/basic/adder_32bit.png
+JSON Test File: parts/basic/adder_32bit.json
+Test Results: 8/8 passed (100.0%)
+Warnings: Warning: Too many input combinations (36893488147419103232). Limiting to first 16 combinations.
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+  Test 5 passed
+  Test 6 passed
+  Test 7 passed
+  Test 8 passed
+
+Truth Table:
+inA[31:0] inB[31:0] inCarry | outSum[31:0] outCarry
+---------------------------------------------------
+     0      0      0 |      0      0
+     0      0      1 |      1      0
+     0      1      0 |      1      0
+     0      1      1 |      2      0
+     0      2      0 |      2      0
+     0      2      1 |      3      0
+     0      3      0 |      3      0
+     0      3      1 |      4      0
+     0      4      0 |      4      0
+     0      4      1 |      5      0
+     0      5      0 |      5      0
+     0      5      1 |      6      0
+     0      6      0 |      6      0
+     0      6      1 |      7      0
+     0      7      0 |      7      0
+     0      7      1 |      8      0
+
+================================================================================
+FILE: parts/basic/mux_2to1_8bit.sv
+================================================================================
+Status: [PASS]
+Module: mux_2to1_8bit
+Inputs: ['in0', 'in1', 'sel']
+Outputs: ['out']
+NAND Gates: 64
+Execution Time: 0.323s
+PNG Output: parts/basic/mux_2to1_8bit.png
+JSON Test File: parts/basic/mux_2to1_8bit.json
+Test Results: 12/12 passed (100.0%)
+Warnings: Warning: Too many input combinations (131072). Limiting to first 16 combinations.
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+  Test 5 passed
+  Test 6 passed
+  Test 7 passed
+  Test 8 passed
+  Test 9 passed
+  Test 10 passed
+  Test 11 passed
+  Test 12 passed
+
+Truth Table:
+in0[7:0] in1[7:0]    sel | out[7:0]
+-----------------------------------
+     0      0      0 |      0
+     0      0      1 |      0
+     0      1      0 |      0
+     0      1      1 |      1
+     0      2      0 |      0
+     0      2      1 |      2
+     0      3      0 |      0
+     0      3      1 |      3
+     0      4      0 |      0
+     0      4      1 |      4
+     0      5      0 |      0
+     0      5      1 |      5
+     0      6      0 |      0
+     0      6      1 |      6
+     0      7      0 |      0
+     0      7      1 |      7
+
+================================================================================
+FILE: parts/basic/xnor_gate_8bit.sv
+================================================================================
+Status: [PASS]
+Module: xnor_gate_8bit
+Inputs: ['inA', 'inB']
+Outputs: ['outY']
+NAND Gates: 40
+Execution Time: 0.237s
+PNG Output: parts/basic/xnor_gate_8bit.png
+JSON Test File: parts/basic/xnor_gate_8bit.json
+Test Results: 12/12 passed (100.0%)
+Warnings: Warning: Too many input combinations (65536). Limiting to first 16 combinations.
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+  Test 5 passed
+  Test 6 passed
+  Test 7 passed
+  Test 8 passed
+  Test 9 passed
+  Test 10 passed
+  Test 11 passed
+  Test 12 passed
+
+Truth Table:
+inA[7:0] inB[7:0] | outY[7:0]
+-----------------------------
+     0      0 |    255
+     0      1 |    254
+     0      2 |    253
+     0      3 |    252
+     0      4 |    251
+     0      5 |    250
+     0      6 |    249
+     0      7 |    248
+     0      8 |    247
+     0      9 |    246
+     0     10 |    245
+     0     11 |    244
+     0     12 |    243
+     0     13 |    242
+     0     14 |    241
+     0     15 |    240
+
+================================================================================
+FILE: parts/basic/adder_cs_64bit.sv
+================================================================================
+Status: [PASS]
+Module: adder_cs_64bit
+Inputs: ['inA', 'inB', 'inCarry']
+Outputs: ['outSum', 'outCarry']
+NAND Gates: 7260
+Execution Time: 16.397s
+PNG Output: parts/basic/adder_cs_64bit.png
+JSON Test File: parts/basic/adder_cs_64bit.json
+Test Results: 8/8 passed (100.0%)
+Warnings: Warning: Too many input combinations (680564733841876926926749214863536422912). Limiting to first 16 combinations.
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+  Test 5 passed
+  Test 6 passed
+  Test 7 passed
+  Test 8 passed
+
+Truth Table:
+inA[63:0] inB[63:0] inCarry | outSum[63:0] outCarry
+---------------------------------------------------
+     0      0      0 |      0      0
+     0      0      1 |      1      0
+     0      1      0 |      1      0
+     0      1      1 |      2      0
+     0      2      0 |      2      0
+     0      2      1 |      3      0
+     0      3      0 |      3      0
+     0      3      1 |      4      0
+     0      4      0 |      4      0
+     0      4      1 |      5      0
+     0      5      0 |      5      0
+     0      5      1 |      6      0
+     0      6      0 |      6      0
+     0      6      1 |      7      0
+     0      7      0 |      7      0
+     0      7      1 |      8      0
+
+================================================================================
+FILE: parts/basic/nor_gate_8bit.sv
+================================================================================
+Status: [PASS]
+Module: nor_gate_8bit
+Inputs: ['inA', 'inB']
+Outputs: ['outY']
+NAND Gates: 32
+Execution Time: 0.121s
+PNG Output: parts/basic/nor_gate_8bit.png
+JSON Test File: parts/basic/nor_gate_8bit.json
+Test Results: 12/12 passed (100.0%)
+Warnings: Warning: Too many input combinations (65536). Limiting to first 16 combinations.
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+  Test 5 passed
+  Test 6 passed
+  Test 7 passed
+  Test 8 passed
+  Test 9 passed
+  Test 10 passed
+  Test 11 passed
+  Test 12 passed
+
+Truth Table:
+inA[7:0] inB[7:0] | outY[7:0]
+-----------------------------
+     0      0 |    255
+     0      1 |    254
+     0      2 |    253
+     0      3 |    252
+     0      4 |    251
+     0      5 |    250
+     0      6 |    249
+     0      7 |    248
+     0      8 |    247
+     0      9 |    246
+     0     10 |    245
+     0     11 |    244
+     0     12 |    243
+     0     13 |    242
+     0     14 |    241
+     0     15 |    240
+
+================================================================================
+FILE: parts/basic/and_gate_8bit.sv
+================================================================================
+Status: [PASS]
+Module: and_gate_8bit
+Inputs: ['inA', 'inB']
+Outputs: ['outY']
+NAND Gates: 16
+Execution Time: 0.097s
+PNG Output: parts/basic/and_gate_8bit.png
+JSON Test File: parts/basic/and_gate_8bit.json
+Test Results: 12/12 passed (100.0%)
+Warnings: Warning: Too many input combinations (65536). Limiting to first 16 combinations.
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+  Test 5 passed
+  Test 6 passed
+  Test 7 passed
+  Test 8 passed
+  Test 9 passed
+  Test 10 passed
+  Test 11 passed
+  Test 12 passed
+
+Truth Table:
+inA[7:0] inB[7:0] | outY[7:0]
+-----------------------------
+     0      0 |      0
+     0      1 |      0
+     0      2 |      0
+     0      3 |      0
+     0      4 |      0
+     0      5 |      0
+     0      6 |      0
+     0      7 |      0
+     0      8 |      0
+     0      9 |      0
+     0     10 |      0
+     0     11 |      0
+     0     12 |      0
+     0     13 |      0
+     0     14 |      0
+     0     15 |      0
+
+================================================================================
+FILE: parts/basic/not_gate.sv
+================================================================================
+Status: [PASS]
+Module: not_gate
+Inputs: ['inA']
+Outputs: ['outY']
+NAND Gates: 1
+Execution Time: 0.010s
+PNG Output: parts/basic/not_gate.png
+JSON Test File: parts/basic/not_gate.json
+Test Results: 2/2 passed (100.0%)
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+
+Truth Table:
+   inA |   outY
+---------------
+     0 |      1
+     1 |      0
+
+================================================================================
+FILE: parts/basic/rom_deadbeef.sv
+================================================================================
+Status: [PASS]
+Module: rom_deadbeef
+Inputs: ['addr']
+Outputs: ['data']
+NAND Gates: 0
+Execution Time: 0.019s
+PNG Output: parts/basic/rom_deadbeef.png
+JSON Test File: parts/basic/rom_deadbeef.json
+Test Results: 4/4 passed (100.0%)
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+
+Truth Table:
+addr[1:0] | data[7:0]
+---------------------
+     0 |    222
+     1 |    173
+     2 |    190
+     3 |    239
+
+================================================================================
+FILE: parts/basic/adder_cs_32bit.sv
+================================================================================
+Status: [PASS]
+Module: adder_cs_32bit
+Inputs: ['inA', 'inB', 'inCarry']
+Outputs: ['outSum', 'outCarry']
+NAND Gates: 2332
+Execution Time: 4.789s
+PNG Output: parts/basic/adder_cs_32bit.png
+JSON Test File: parts/basic/adder_cs_32bit.json
+Test Results: 12/12 passed (100.0%)
+Warnings: Warning: Too many input combinations (36893488147419103232). Limiting to first 16 combinations.
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+  Test 5 passed
+  Test 6 passed
+  Test 7 passed
+  Test 8 passed
+  Test 9 passed
+  Test 10 passed
+  Test 11 passed
+  Test 12 passed
+
+Truth Table:
+inA[31:0] inB[31:0] inCarry | outSum[31:0] outCarry
+---------------------------------------------------
+     0      0      0 |      0      0
+     0      0      1 |      1      0
+     0      1      0 |      1      0
+     0      1      1 |      2      0
+     0      2      0 |      2      0
+     0      2      1 |      3      0
+     0      3      0 |      3      0
+     0      3      1 |      4      0
+     0      4      0 |      4      0
+     0      4      1 |      5      0
+     0      5      0 |      5      0
+     0      5      1 |      6      0
+     0      6      0 |      6      0
+     0      6      1 |      7      0
+     0      7      0 |      7      0
+     0      7      1 |      8      0
+
+================================================================================
+FILE: parts/basic/adder_cs_8bit.sv
+================================================================================
+Status: [PASS]
+Module: adder_cs_8bit
+Inputs: ['inA', 'inB', 'inCarry']
+Outputs: ['outSum', 'outCarry']
+NAND Gates: 220
+Execution Time: 0.491s
+PNG Output: parts/basic/adder_cs_8bit.png
+JSON Test File: parts/basic/adder_cs_8bit.json
+Test Results: 10/10 passed (100.0%)
+Warnings: Warning: Too many input combinations (131072). Limiting to first 16 combinations.
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+  Test 5 passed
+  Test 6 passed
+  Test 7 passed
+  Test 8 passed
+  Test 9 passed
+  Test 10 passed
+
+Truth Table:
+inA[7:0] inB[7:0] inCarry | outSum[7:0] outCarry
+------------------------------------------------
+     0      0      0 |      0      0
+     0      0      1 |      1      0
+     0      1      0 |      1      0
+     0      1      1 |      2      0
+     0      2      0 |      2      0
+     0      2      1 |      3      0
+     0      3      0 |      3      0
+     0      3      1 |      4      0
+     0      4      0 |      4      0
+     0      4      1 |      5      0
+     0      5      0 |      5      0
+     0      5      1 |      6      0
+     0      6      0 |      6      0
+     0      6      1 |      7      0
+     0      7      0 |      7      0
+     0      7      1 |      8      0
+
+================================================================================
+FILE: parts/basic/xnor_gate.sv
+================================================================================
+Status: [PASS]
+Module: xnor_gate
+Inputs: ['inA', 'inB']
+Outputs: ['outY']
+NAND Gates: 5
+Execution Time: 0.028s
+PNG Output: parts/basic/xnor_gate.png
+JSON Test File: parts/basic/xnor_gate.json
+Test Results: 4/4 passed (100.0%)
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+
+Truth Table:
+   inA    inB |   outY
+----------------------
+     0      0 |      1
+     0      1 |      0
+     1      0 |      0
+     1      1 |      1
+
+================================================================================
+FILE: parts/basic/mux_2to1_4bit.sv
+================================================================================
+Status: [PASS]
+Module: mux_2to1_4bit
+Inputs: ['in0', 'in1', 'sel']
+Outputs: ['out']
+NAND Gates: 32
+Execution Time: 0.116s
+PNG Output: parts/basic/mux_2to1_4bit.png
+JSON Test File: parts/basic/mux_2to1_4bit.json
+Test Results: 8/8 passed (100.0%)
+Warnings: Warning: Too many input combinations (512). Limiting to first 16 combinations.
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+  Test 5 passed
+  Test 6 passed
+  Test 7 passed
+  Test 8 passed
+
+Truth Table:
+in0[3:0] in1[3:0]    sel | out[3:0]
+-----------------------------------
+     0      0      0 |      0
+     0      0      1 |      0
+     0      1      0 |      0
+     0      1      1 |      1
+     0      2      0 |      0
+     0      2      1 |      2
+     0      3      0 |      0
+     0      3      1 |      3
+     0      4      0 |      0
+     0      4      1 |      4
+     0      5      0 |      0
+     0      5      1 |      5
+     0      6      0 |      0
+     0      6      1 |      6
+     0      7      0 |      0
+     0      7      1 |      7
+
+================================================================================
+FILE: parts/basic/alu_1bit.sv
+================================================================================
+Status: [PASS]
+Module: alu_1bit
+Inputs: ['a', 'b', 'op']
+Outputs: ['out']
+NAND Gates: 0
+Execution Time: 0.077s
+PNG Output: parts/basic/alu_1bit.png
+JSON Test File: parts/basic/alu_1bit.json
+Test Results: 12/12 passed (100.0%)
+Warnings: Warning: Too many input combinations (262144). Limiting to first 16 combinations.
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+  Test 5 passed
+  Test 6 passed
+  Test 7 passed
+  Test 8 passed
+  Test 9 passed
+  Test 10 passed
+  Test 11 passed
+  Test 12 passed
+
+Truth Table:
+a[7:0] b[7:0] op[1:0] | out[7:0]
+--------------------------------
+     0      0      0 |      0
+     0      0      1 |      0
+     0      0      2 |      0
+     0      0      3 |    255
+     0      1      0 |      0
+     0      1      1 |      1
+     0      1      2 |      1
+     0      1      3 |    255
+     0      2      0 |      0
+     0      2      1 |      2
+     0      2      2 |      2
+     0      2      3 |    255
+     0      3      0 |      0
+     0      3      1 |      3
+     0      3      2 |      3
+     0      3      3 |    255
+
+================================================================================
+FILE: parts/basic/nand_gate_8bit.sv
+================================================================================
+Status: [PASS]
+Module: nand_gate_8bit
+Inputs: ['inA', 'inB']
+Outputs: ['outY']
+NAND Gates: 8
+Execution Time: 0.098s
+PNG Output: parts/basic/nand_gate_8bit.png
+JSON Test File: parts/basic/nand_gate_8bit.json
+Test Results: 12/12 passed (100.0%)
+Warnings: Warning: Too many input combinations (65536). Limiting to first 16 combinations.
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+  Test 5 passed
+  Test 6 passed
+  Test 7 passed
+  Test 8 passed
+  Test 9 passed
+  Test 10 passed
+  Test 11 passed
+  Test 12 passed
+
+Truth Table:
+inA[7:0] inB[7:0] | outY[7:0]
+-----------------------------
+     0      0 |    255
+     0      1 |    255
+     0      2 |    255
+     0      3 |    255
+     0      4 |    255
+     0      5 |    255
+     0      6 |    255
+     0      7 |    255
+     0      8 |    255
+     0      9 |    255
+     0     10 |    255
+     0     11 |    255
+     0     12 |    255
+     0     13 |    255
+     0     14 |    255
+     0     15 |    255
+
+================================================================================
+FILE: parts/basic/adder_8bit.sv
+================================================================================
+Status: [PASS]
+Module: adder_8bit
+Inputs: ['inA', 'inB', 'inCarry']
+Outputs: ['outSum', 'outCarry']
+NAND Gates: 120
+Execution Time: 0.469s
+PNG Output: parts/basic/adder_8bit.png
+JSON Test File: parts/basic/adder_8bit.json
+Test Results: 10/10 passed (100.0%)
+Warnings: Warning: Too many input combinations (131072). Limiting to first 16 combinations.
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+  Test 5 passed
+  Test 6 passed
+  Test 7 passed
+  Test 8 passed
+  Test 9 passed
+  Test 10 passed
+
+Truth Table:
+inA[7:0] inB[7:0] inCarry | outSum[7:0] outCarry
+------------------------------------------------
+     0      0      0 |      0      0
+     0      0      1 |      1      0
+     0      1      0 |      1      0
+     0      1      1 |      2      0
+     0      2      0 |      2      0
+     0      2      1 |      3      0
+     0      3      0 |      3      0
+     0      3      1 |      4      0
+     0      4      0 |      4      0
+     0      4      1 |      5      0
+     0      5      0 |      5      0
+     0      5      1 |      6      0
+     0      6      0 |      6      0
+     0      6      1 |      7      0
+     0      7      0 |      7      0
+     0      7      1 |      8      0
+
+================================================================================
+FILE: parts/basic/register_32bit.sv
+================================================================================
+Status: [PASS]
+Module: register_32bit
+Inputs: ['clk', 'enable', 'data']
+Outputs: ['q']
+NAND Gates: 0
+Execution Time: 0.109s
+PNG Output: parts/basic/register_32bit.png
+JSON Test File: parts/basic/register_32bit.json
+Test Results: 11/11 passed (100.0%)
+Warnings: Truth table skipped for sequential logic module
+
+Test Execution:
+  Initialize to zero passed
+  Store 0xAAAAAAAA pattern passed
+  Hold test - enable low passed
+  Store 0x55555555 pattern passed
+  Store max value 0xFFFFFFFF passed
+  Comprehensive sequence test passed
+  Extended hold test passed
+  Rapid toggle test passed
+  Word boundary test passed
+  Walking ones - upper bits passed
+  Hex pattern tests passed
+
+Truth Table: Skipped (sequential logic module)
+
+================================================================================
+FILE: parts/basic/xor_gate_8bit.sv
+================================================================================
+Status: [PASS]
+Module: xor_gate_8bit
+Inputs: ['inA', 'inB']
+Outputs: ['outY']
+NAND Gates: 32
+Execution Time: 0.199s
+PNG Output: parts/basic/xor_gate_8bit.png
+JSON Test File: parts/basic/xor_gate_8bit.json
+Test Results: 12/12 passed (100.0%)
+Warnings: Warning: Too many input combinations (65536). Limiting to first 16 combinations.
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+  Test 5 passed
+  Test 6 passed
+  Test 7 passed
+  Test 8 passed
+  Test 9 passed
+  Test 10 passed
+  Test 11 passed
+  Test 12 passed
+
+Truth Table:
+inA[7:0] inB[7:0] | outY[7:0]
+-----------------------------
+     0      0 |      0
+     0      1 |      1
+     0      2 |      2
+     0      3 |      3
+     0      4 |      4
+     0      5 |      5
+     0      6 |      6
+     0      7 |      7
+     0      8 |      8
+     0      9 |      9
+     0     10 |     10
+     0     11 |     11
+     0     12 |     12
+     0     13 |     13
+     0     14 |     14
+     0     15 |     15
+
+================================================================================
+FILE: parts/basic/or_gate.sv
+================================================================================
+Status: [PASS]
+Module: or_gate
+Inputs: ['inA', 'inB']
+Outputs: ['outY']
+NAND Gates: 3
+Execution Time: 0.025s
+PNG Output: parts/basic/or_gate.png
+JSON Test File: parts/basic/or_gate.json
+Test Results: 4/4 passed (100.0%)
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+
+Truth Table:
+   inA    inB |   outY
+----------------------
+     0      0 |      0
+     0      1 |      1
+     1      0 |      1
+     1      1 |      1
+
+================================================================================
+FILE: parts/basic/not_gate_8bit.sv
+================================================================================
+Status: [PASS]
+Module: not_gate_8bit
+Inputs: ['inA']
+Outputs: ['outY']
+NAND Gates: 8
+Execution Time: 0.108s
+PNG Output: parts/basic/not_gate_8bit.png
+JSON Test File: parts/basic/not_gate_8bit.json
+Test Results: 8/8 passed (100.0%)
+Warnings: Warning: Too many input combinations (256). Limiting to first 16 combinations.
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+  Test 5 passed
+  Test 6 passed
+  Test 7 passed
+  Test 8 passed
+
+Truth Table:
+inA[7:0] | outY[7:0]
+--------------------
+     0 |    255
+     1 |    254
+     2 |    253
+     3 |    252
+     4 |    251
+     5 |    250
+     6 |    249
+     7 |    248
+     8 |    247
+     9 |    246
+    10 |    245
+    11 |    244
+    12 |    243
+    13 |    242
+    14 |    241
+    15 |    240
+
+================================================================================
+FILE: parts/basic/or_gate_8bit.sv
+================================================================================
+Status: [PASS]
+Module: or_gate_8bit
+Inputs: ['inA', 'inB']
+Outputs: ['outY']
+NAND Gates: 24
+Execution Time: 0.183s
+PNG Output: parts/basic/or_gate_8bit.png
+JSON Test File: parts/basic/or_gate_8bit.json
+Test Results: 12/12 passed (100.0%)
+Warnings: Warning: Too many input combinations (65536). Limiting to first 16 combinations.
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+  Test 5 passed
+  Test 6 passed
+  Test 7 passed
+  Test 8 passed
+  Test 9 passed
+  Test 10 passed
+  Test 11 passed
+  Test 12 passed
+
+Truth Table:
+inA[7:0] inB[7:0] | outY[7:0]
+-----------------------------
+     0      0 |      0
+     0      1 |      1
+     0      2 |      2
+     0      3 |      3
+     0      4 |      4
+     0      5 |      5
+     0      6 |      6
+     0      7 |      7
+     0      8 |      8
+     0      9 |      9
+     0     10 |     10
+     0     11 |     11
+     0     12 |     12
+     0     13 |     13
+     0     14 |     14
+     0     15 |     15
+
+================================================================================
+FILE: parts/basic/counter8.sv
+================================================================================
+Status: [PASS]
+Module: counter8
+Inputs: ['clk', 'reset', 'enable']
+Outputs: ['count']
+NAND Gates: 0
+Execution Time: 0.127s
+PNG Output: parts/basic/counter8.png
+JSON Test File: parts/basic/counter8.json
+Test Results: 11/11 passed (100.0%)
+Warnings: Truth table skipped for sequential logic module
+
+Test Execution:
+  Reset functionality passed
+  Basic increment passed
+  Hold when disabled passed
+  Complete counter sequence passed
+  Mid-count reset passed
+  Extended hold test passed
+  Count to 10 passed
+  Multiple reset cycles passed
+  Enable toggle test passed
+  Overflow test - 255 to 0 passed
+  Count high values passed
+
+Truth Table: Skipped (sequential logic module)
+
+================================================================================
+FILE: parts/basic/half_adder.sv
+================================================================================
+Status: [PASS]
+Module: half_adder
+Inputs: ['inA', 'inB']
+Outputs: ['outSum', 'outCarry']
+NAND Gates: 6
+Execution Time: 0.036s
+PNG Output: parts/basic/half_adder.png
+JSON Test File: parts/basic/half_adder.json
+Test Results: 4/4 passed (100.0%)
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+
+Truth Table:
+   inA    inB | outSum outCarry
+-------------------------------
+     0      0 |      0      0
+     0      1 |      1      0
+     1      0 |      1      0
+     1      1 |      0      1
+
+================================================================================
+FILE: parts/basic/adder_64bit.sv
+================================================================================
+Status: [PASS]
+Module: adder_64bit
+Inputs: ['inA', 'inB', 'inCarry']
+Outputs: ['outSum', 'outCarry']
+NAND Gates: 960
+Execution Time: 2.869s
+PNG Output: parts/basic/adder_64bit.png
+JSON Test File: parts/basic/adder_64bit.json
+Test Results: 8/8 passed (100.0%)
+Warnings: Warning: Too many input combinations (680564733841876926926749214863536422912). Limiting to first 16 combinations.
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+  Test 5 passed
+  Test 6 passed
+  Test 7 passed
+  Test 8 passed
+
+Truth Table:
+inA[63:0] inB[63:0] inCarry | outSum[63:0] outCarry
+---------------------------------------------------
+     0      0      0 |      0      0
+     0      0      1 |      1      0
+     0      1      0 |      1      0
+     0      1      1 |      2      0
+     0      2      0 |      2      0
+     0      2      1 |      3      0
+     0      3      0 |      3      0
+     0      3      1 |      4      0
+     0      4      0 |      4      0
+     0      4      1 |      5      0
+     0      5      0 |      5      0
+     0      5      1 |      6      0
+     0      6      0 |      6      0
+     0      6      1 |      7      0
+     0      7      0 |      7      0
+     0      7      1 |      8      0
+
+================================================================================
+FILE: parts/basic/adder_4bit.sv
+================================================================================
+Status: [PASS]
+Module: adder_4bit
+Inputs: ['inA', 'inB', 'inCarry']
+Outputs: ['outSum', 'outCarry']
+NAND Gates: 60
+Execution Time: 0.162s
+PNG Output: parts/basic/adder_4bit.png
+JSON Test File: parts/basic/adder_4bit.json
+Test Results: 10/10 passed (100.0%)
+Warnings: Warning: Too many input combinations (512). Limiting to first 16 combinations.
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+  Test 5 passed
+  Test 6 passed
+  Test 7 passed
+  Test 8 passed
+  Test 9 passed
+  Test 10 passed
+
+Truth Table:
+inA[3:0] inB[3:0] inCarry | outSum[3:0] outCarry
+------------------------------------------------
+     0      0      0 |      0      0
+     0      0      1 |      1      0
+     0      1      0 |      1      0
+     0      1      1 |      2      0
+     0      2      0 |      2      0
+     0      2      1 |      3      0
+     0      3      0 |      3      0
+     0      3      1 |      4      0
+     0      4      0 |      4      0
+     0      4      1 |      5      0
+     0      5      0 |      5      0
+     0      5      1 |      6      0
+     0      6      0 |      6      0
+     0      6      1 |      7      0
+     0      7      0 |      7      0
+     0      7      1 |      8      0
+
+================================================================================
+FILE: parts/basic/nor_gate.sv
+================================================================================
+Status: [PASS]
+Module: nor_gate
+Inputs: ['inA', 'inB']
+Outputs: ['outY']
+NAND Gates: 4
+Execution Time: 0.030s
+PNG Output: parts/basic/nor_gate.png
+JSON Test File: parts/basic/nor_gate.json
+Test Results: 4/4 passed (100.0%)
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+
+Truth Table:
+   inA    inB |   outY
+----------------------
+     0      0 |      1
+     0      1 |      0
+     1      0 |      0
+     1      1 |      0
+
+================================================================================
+FILE: parts/basic/ternary_mux.sv
+================================================================================
+Status: [PASS]
+Module: ternary_mux
+Inputs: ['a', 'b', 'sel']
+Outputs: ['out']
+NAND Gates: 0
+Execution Time: 0.071s
+PNG Output: parts/basic/ternary_mux.png
+JSON Test File: parts/basic/ternary_mux.json
+Test Results: 8/8 passed (100.0%)
+Warnings: Warning: Too many input combinations (131072). Limiting to first 16 combinations.
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+  Test 5 passed
+  Test 6 passed
+  Test 7 passed
+  Test 8 passed
+
+Truth Table:
+a[7:0] b[7:0]    sel | out[7:0]
+-------------------------------
+     0      0      0 |      0
+     0      0      1 |      0
+     0      1      0 |      1
+     0      1      1 |      0
+     0      2      0 |      2
+     0      2      1 |      0
+     0      3      0 |      3
+     0      3      1 |      0
+     0      4      0 |      4
+     0      4      1 |      0
+     0      5      0 |      5
+     0      5      1 |      0
+     0      6      0 |      6
+     0      6      1 |      0
+     0      7      0 |      7
+     0      7      1 |      0
+
+================================================================================
+FILE: parts/basic/mux_4to1_comb.sv
+================================================================================
+Status: [PASS]
+Module: mux_4to1_comb
+Inputs: ['d0', 'd1', 'd2', 'd3', 'sel']
+Outputs: ['out']
+NAND Gates: 0
+Execution Time: 0.119s
+PNG Output: parts/basic/mux_4to1_comb.png
+JSON Test File: parts/basic/mux_4to1_comb.json
+Test Results: 8/8 passed (100.0%)
+Warnings: Warning: Too many input combinations (17179869184). Limiting to first 16 combinations.
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+  Test 5 passed
+  Test 6 passed
+  Test 7 passed
+  Test 8 passed
+
+Truth Table:
+d0[7:0] d1[7:0] d2[7:0] d3[7:0] sel[1:0] | out[7:0]
+---------------------------------------------------
+     0      0      0      0      0 |      0
+     0      0      0      0      1 |      0
+     0      0      0      0      2 |      0
+     0      0      0      0      3 |      0
+     0      0      0      1      0 |      0
+     0      0      0      1      1 |      0
+     0      0      0      1      2 |      0
+     0      0      0      1      3 |      1
+     0      0      0      2      0 |      0
+     0      0      0      2      1 |      0
+     0      0      0      2      2 |      0
+     0      0      0      2      3 |      2
+     0      0      0      3      0 |      0
+     0      0      0      3      1 |      0
+     0      0      0      3      2 |      0
+     0      0      0      3      3 |      3
+
+================================================================================
+FILE: parts/basic/full_adder.sv
+================================================================================
+Status: [PASS]
+Module: full_adder
+Inputs: ['inA', 'inB', 'inCarry']
+Outputs: ['outSum', 'outCarry']
+NAND Gates: 15
+Execution Time: 0.053s
+PNG Output: parts/basic/full_adder.png
+JSON Test File: parts/basic/full_adder.json
+Test Results: 8/8 passed (100.0%)
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+  Test 5 passed
+  Test 6 passed
+  Test 7 passed
+  Test 8 passed
+
+Truth Table:
+   inA    inB inCarry | outSum outCarry
+---------------------------------------
+     0      0      0 |      0      0
+     0      0      1 |      1      0
+     0      1      0 |      1      0
+     0      1      1 |      0      1
+     1      0      0 |      1      0
+     1      0      1 |      0      1
+     1      1      0 |      0      1
+     1      1      1 |      1      1
+
+================================================================================
+FILE: parts/basic/mux_2to1_1bit.sv
+================================================================================
+Status: [PASS]
+Module: mux_2to1_1bit
+Inputs: ['in0', 'in1', 'sel']
+Outputs: ['out']
+NAND Gates: 8
+Execution Time: 0.029s
+PNG Output: parts/basic/mux_2to1_1bit.png
+JSON Test File: parts/basic/mux_2to1_1bit.json
+Test Results: 8/8 passed (100.0%)
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+  Test 5 passed
+  Test 6 passed
+  Test 7 passed
+  Test 8 passed
+
+Truth Table:
+   in0    in1    sel |    out
+-----------------------------
+     0      0      0 |      0
+     0      0      1 |      0
+     0      1      0 |      0
+     0      1      1 |      1
+     1      0      0 |      1
+     1      0      1 |      0
+     1      1      0 |      1
+     1      1      1 |      1
+
+================================================================================
+FILE: parts/basic/mux_8to1_8bit.sv
+================================================================================
+Status: [PASS]
+Module: mux_8to1_8bit
+Inputs: ['in0', 'in1', 'in2', 'in3', 'in4', 'in5', 'in6', 'in7', 'sel']
+Outputs: ['out']
+NAND Gates: 448
+Execution Time: 1.395s
+PNG Output: parts/basic/mux_8to1_8bit.png
+JSON Test File: parts/basic/mux_8to1_8bit.json
+Test Results: 28/28 passed (100.0%)
+Warnings: Warning: Too many input combinations (147573952589676412928). Limiting to first 16 combinations.
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+  Test 5 passed
+  Test 6 passed
+  Test 7 passed
+  Test 8 passed
+  Test 9 passed
+  Test 10 passed
+  Test 11 passed
+  Test 12 passed
+  Test 13 passed
+  Test 14 passed
+  Test 15 passed
+  Test 16 passed
+  Test 17 passed
+  Test 18 passed
+  Test 19 passed
+  Test 20 passed
+  Test 21 passed
+  Test 22 passed
+  Test 23 passed
+  Test 24 passed
+  Test 25 passed
+  Test 26 passed
+  Test 27 passed
+  Test 28 passed
+
+Truth Table:
+in0[7:0] in1[7:0] in2[7:0] in3[7:0] in4[7:0] in5[7:0] in6[7:0] in7[7:0] sel[2:0] | out[7:0]
+-------------------------------------------------------------------------------------------
+     0      0      0      0      0      0      0      0      0 |      0
+     0      0      0      0      0      0      0      0      1 |      0
+     0      0      0      0      0      0      0      0      2 |      0
+     0      0      0      0      0      0      0      0      3 |      0
+     0      0      0      0      0      0      0      0      4 |      0
+     0      0      0      0      0      0      0      0      5 |      0
+     0      0      0      0      0      0      0      0      6 |      0
+     0      0      0      0      0      0      0      0      7 |      0
+     0      0      0      0      0      0      0      1      0 |      0
+     0      0      0      0      0      0      0      1      1 |      0
+     0      0      0      0      0      0      0      1      2 |      0
+     0      0      0      0      0      0      0      1      3 |      0
+     0      0      0      0      0      0      0      1      4 |      0
+     0      0      0      0      0      0      0      1      5 |      0
+     0      0      0      0      0      0      0      1      6 |      0
+     0      0      0      0      0      0      0      1      7 |      1
+
+================================================================================
+FILE: parts/basic/mux_4to1_8bit.sv
+================================================================================
+Status: [PASS]
+Module: mux_4to1_8bit
+Inputs: ['in0', 'in1', 'in2', 'in3', 'sel']
+Outputs: ['out']
+NAND Gates: 192
+Execution Time: 0.966s
+PNG Output: parts/basic/mux_4to1_8bit.png
+JSON Test File: parts/basic/mux_4to1_8bit.json
+Test Results: 24/24 passed (100.0%)
+Warnings: Warning: Too many input combinations (17179869184). Limiting to first 16 combinations.
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+  Test 5 passed
+  Test 6 passed
+  Test 7 passed
+  Test 8 passed
+  Test 9 passed
+  Test 10 passed
+  Test 11 passed
+  Test 12 passed
+  Test 13 passed
+  Test 14 passed
+  Test 15 passed
+  Test 16 passed
+  Test 17 passed
+  Test 18 passed
+  Test 19 passed
+  Test 20 passed
+  Test 21 passed
+  Test 22 passed
+  Test 23 passed
+  Test 24 passed
+
+Truth Table:
+in0[7:0] in1[7:0] in2[7:0] in3[7:0] sel[1:0] | out[7:0]
+-------------------------------------------------------
+     0      0      0      0      0 |      0
+     0      0      0      0      1 |      0
+     0      0      0      0      2 |      0
+     0      0      0      0      3 |      0
+     0      0      0      1      0 |      0
+     0      0      0      1      1 |      0
+     0      0      0      1      2 |      0
+     0      0      0      1      3 |      1
+     0      0      0      2      0 |      0
+     0      0      0      2      1 |      0
+     0      0      0      2      2 |      0
+     0      0      0      2      3 |      2
+     0      0      0      3      0 |      0
+     0      0      0      3      1 |      0
+     0      0      0      3      2 |      0
+     0      0      0      3      3 |      3
+
+================================================================================
+FILE: parts/basic/register_64bit.sv
+================================================================================
+Status: [PASS]
+Module: register_64bit
+Inputs: ['clk', 'enable', 'data']
+Outputs: ['q']
+NAND Gates: 0
+Execution Time: 0.124s
+PNG Output: parts/basic/register_64bit.png
+JSON Test File: parts/basic/register_64bit.json
+Test Results: 11/11 passed (100.0%)
+Warnings: Truth table skipped for sequential logic module
+
+Test Execution:
+  Initialize to zero passed
+  Store 0xAAAAAAAAAAAAAAAA pattern passed
+  Hold test - enable low passed
+  Store 0x5555555555555555 pattern passed
+  Store max value 0xFFFFFFFFFFFFFFFF passed
+  Comprehensive sequence test passed
+  Extended hold test passed
+  Rapid toggle test passed
+  Dword boundary test passed
+  Hex pattern tests passed
+  MSB/LSB test passed
+
+Truth Table: Skipped (sequential logic module)
+
+================================================================================
+FILE: parts/basic/register_8bit.sv
+================================================================================
+Status: [PASS]
+Module: register_8bit
+Inputs: ['clk', 'enable', 'data']
+Outputs: ['q']
+NAND Gates: 0
+Execution Time: 0.061s
+PNG Output: parts/basic/register_8bit.png
+JSON Test File: parts/basic/register_8bit.json
+Test Results: 10/10 passed (100.0%)
+Warnings: Truth table skipped for sequential logic module
+
+Test Execution:
+  Initialize to zero passed
+  Store 0xAA pattern passed
+  Hold test - enable low passed
+  Store 0x55 pattern passed
+  Store max value 0xFF passed
+  Comprehensive sequence test passed
+  Extended hold test passed
+  Rapid toggle test passed
+  Bit pattern walking ones passed
+  Bit pattern walking zeros passed
+
+Truth Table: Skipped (sequential logic module)
+
+================================================================================
+FILE: parts/basic/adder_16bit.sv
+================================================================================
+Status: [PASS]
+Module: adder_16bit
+Inputs: ['inA', 'inB', 'inCarry']
+Outputs: ['outSum', 'outCarry']
+NAND Gates: 240
+Execution Time: 0.565s
+PNG Output: parts/basic/adder_16bit.png
+JSON Test File: parts/basic/adder_16bit.json
+Test Results: 8/8 passed (100.0%)
+Warnings: Warning: Too many input combinations (8589934592). Limiting to first 16 combinations.
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+  Test 5 passed
+  Test 6 passed
+  Test 7 passed
+  Test 8 passed
+
+Truth Table:
+inA[15:0] inB[15:0] inCarry | outSum[15:0] outCarry
+---------------------------------------------------
+     0      0      0 |      0      0
+     0      0      1 |      1      0
+     0      1      0 |      1      0
+     0      1      1 |      2      0
+     0      2      0 |      2      0
+     0      2      1 |      3      0
+     0      3      0 |      3      0
+     0      3      1 |      4      0
+     0      4      0 |      4      0
+     0      4      1 |      5      0
+     0      5      0 |      5      0
+     0      5      1 |      6      0
+     0      6      0 |      6      0
+     0      6      1 |      7      0
+     0      7      0 |      7      0
+     0      7      1 |      8      0
+
+================================================================================
+FILE: parts/basic/mux_2to1_32bit.sv
+================================================================================
+Status: [PASS]
+Module: mux_2to1_32bit
+Inputs: ['in0', 'in1', 'sel']
+Outputs: ['out']
+NAND Gates: 256
+Execution Time: 0.996s
+PNG Output: parts/basic/mux_2to1_32bit.png
+JSON Test File: parts/basic/mux_2to1_32bit.json
+Test Results: 12/12 passed (100.0%)
+Warnings: Warning: Too many input combinations (36893488147419103232). Limiting to first 16 combinations.
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+  Test 5 passed
+  Test 6 passed
+  Test 7 passed
+  Test 8 passed
+  Test 9 passed
+  Test 10 passed
+  Test 11 passed
+  Test 12 passed
+
+Truth Table:
+in0[31:0] in1[31:0]    sel | out[31:0]
+--------------------------------------
+     0      0      0 |      0
+     0      0      1 |      0
+     0      1      0 |      0
+     0      1      1 |      1
+     0      2      0 |      0
+     0      2      1 |      2
+     0      3      0 |      0
+     0      3      1 |      3
+     0      4      0 |      0
+     0      4      1 |      4
+     0      5      0 |      0
+     0      5      1 |      5
+     0      6      0 |      0
+     0      6      1 |      6
+     0      7      0 |      0
+     0      7      1 |      7
+
+================================================================================
+FILE: parts/basic/nand_gate.sv
+================================================================================
+Status: [PASS]
+Module: nand_gate
+Inputs: ['inA', 'inB']
+Outputs: ['outY']
+NAND Gates: 0
+Execution Time: 0.027s
+PNG Output: parts/basic/nand_gate.png
+JSON Test File: parts/basic/nand_gate.json
+Test Results: 4/4 passed (100.0%)
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+
+Truth Table:
+   inA    inB |   outY
+----------------------
+     0      0 |      1
+     0      1 |      1
+     1      0 |      1
+     1      1 |      0
+
+================================================================================
+FILE: parts/basic/regfile_8x8.sv
+================================================================================
+Status: [PASS]
+Module: regfile_8x8
+Inputs: ['clk', 'write_en', 'write_addr', 'write_data', 'read_addr1', 'read_addr2']
+Outputs: ['read_data1', 'read_data2']
+NAND Gates: 939
+Execution Time: 7.810s
+PNG Output: parts/basic/regfile_8x8.png
+JSON Test File: parts/basic/regfile_8x8.json
+Test Results: 8/8 passed (100.0%)
+Warnings: Truth table skipped for sequential logic module
+
+Test Execution:
+  Write and read each register passed
+  Dual port simultaneous read passed
+  Write enable gating passed
+  Register independence passed
+  Overwrite test passed
+  Read while writing different register passed
+  Boundary value patterns passed
+  Walking ones across all registers passed
+
+Truth Table: Skipped (sequential logic module)
+
+================================================================================
+FILE: parts/basic/mux_2to1_16bit.sv
+================================================================================
+Status: [PASS]
+Module: mux_2to1_16bit
+Inputs: ['in0', 'in1', 'sel']
+Outputs: ['out']
+NAND Gates: 128
+Execution Time: 0.526s
+PNG Output: parts/basic/mux_2to1_16bit.png
+JSON Test File: parts/basic/mux_2to1_16bit.json
+Test Results: 12/12 passed (100.0%)
+Warnings: Warning: Too many input combinations (8589934592). Limiting to first 16 combinations.
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+  Test 5 passed
+  Test 6 passed
+  Test 7 passed
+  Test 8 passed
+  Test 9 passed
+  Test 10 passed
+  Test 11 passed
+  Test 12 passed
+
+Truth Table:
+in0[15:0] in1[15:0]    sel | out[15:0]
+--------------------------------------
+     0      0      0 |      0
+     0      0      1 |      0
+     0      1      0 |      0
+     0      1      1 |      1
+     0      2      0 |      0
+     0      2      1 |      2
+     0      3      0 |      0
+     0      3      1 |      3
+     0      4      0 |      0
+     0      4      1 |      4
+     0      5      0 |      0
+     0      5      1 |      5
+     0      6      0 |      0
+     0      6      1 |      6
+     0      7      0 |      0
+     0      7      1 |      7
+
+================================================================================
+FILE: parts/basic/register_1bit.sv
+================================================================================
+Status: [PASS]
+Module: register_1bit
+Inputs: ['clk', 'enable', 'data']
+Outputs: ['q']
+NAND Gates: 0
+Execution Time: 0.052s
+PNG Output: parts/basic/register_1bit.png
+JSON Test File: parts/basic/register_1bit.json
+Test Results: 7/7 passed (100.0%)
+Warnings: Truth table skipped for sequential logic module
+
+Test Execution:
+  Initialize to zero passed
+  Store one passed
+  Hold when disabled passed
+  Comprehensive 1-bit test passed
+  Extended hold test passed
+  Rapid toggle test passed
+  Toggle value continuously passed
+
+Truth Table: Skipped (sequential logic module)
+
+================================================================================
+FILE: parts/basic/and_gate.sv
+================================================================================
+Status: [PASS]
+Module: and_gate
+Inputs: ['inA', 'inB']
+Outputs: ['outY']
+NAND Gates: 2
+Execution Time: 0.024s
+PNG Output: parts/basic/and_gate.png
+JSON Test File: parts/basic/and_gate.json
+Test Results: 4/4 passed (100.0%)
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+
+Truth Table:
+   inA    inB |   outY
+----------------------
+     0      0 |      0
+     0      1 |      0
+     1      0 |      0
+     1      1 |      1
+
+================================================================================
+FILE: parts/basic/decoder_3to8.sv
+================================================================================
+Status: [PASS]
+Module: decoder_3to8
+Inputs: ['addr']
+Outputs: ['out']
+NAND Gates: 27
+Execution Time: 0.096s
+PNG Output: parts/basic/decoder_3to8.png
+JSON Test File: parts/basic/decoder_3to8.json
+Test Results: 8/8 passed (100.0%)
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+  Test 5 passed
+  Test 6 passed
+  Test 7 passed
+  Test 8 passed
+
+Truth Table:
+addr[2:0] | out[7:0]
+--------------------
+     0 |      1
+     1 |      2
+     2 |      4
+     3 |      8
+     4 |     16
+     5 |     32
+     6 |     64
+     7 |    128
+
+================================================================================
+FILE: parts/basic/register_16bit.sv
+================================================================================
+Status: [PASS]
+Module: register_16bit
+Inputs: ['clk', 'enable', 'data']
+Outputs: ['q']
+NAND Gates: 0
+Execution Time: 0.093s
+PNG Output: parts/basic/register_16bit.png
+JSON Test File: parts/basic/register_16bit.json
+Test Results: 10/10 passed (100.0%)
+Warnings: Truth table skipped for sequential logic module
+
+Test Execution:
+  Initialize to zero passed
+  Store 0xAAAA pattern passed
+  Hold test - enable low passed
+  Store 0x5555 pattern passed
+  Store max value 0xFFFF passed
+  Comprehensive sequence test passed
+  Extended hold test passed
+  Rapid toggle test passed
+  Byte boundary test passed
+  Walking ones - high byte passed
+
+Truth Table: Skipped (sequential logic module)
+
+================================================================================
+FILE: parts/basic/xor_gate.sv
+================================================================================
+Status: [PASS]
+Module: xor_gate
+Inputs: ['inA', 'inB']
+Outputs: ['outY']
+NAND Gates: 4
+Execution Time: 0.026s
+PNG Output: parts/basic/xor_gate.png
+JSON Test File: parts/basic/xor_gate.json
+Test Results: 4/4 passed (100.0%)
+
+Test Execution:
+  Test 1 passed
+  Test 2 passed
+  Test 3 passed
+  Test 4 passed
+
+Truth Table:
+   inA    inB |   outY
+----------------------
+     0      0 |      0
+     0      1 |      1
+     1      0 |      1
+     1      1 |      0
+
+
+============================================================
+SUMMARY REPORT
+============================================================
+Files Tested:           44
+Overall Success:        44/44 (100.0%)
+Parse Failures:         0
+Truth Table Failures:   0
+Files with JSON Tests:  44
+Test Case Failures:     0
+Total Test Cases:       416
+Passed Test Cases:      416/416 (100.0%)
+Total Execution Time:   43.014s
+Average Time per File:  0.978s
+Total NAND Gates:       14698
+Average NAND per File:  334.0
+============================================================
+
+Total runtime: 16.984s
+
+All tests passed! Exiting with code 0

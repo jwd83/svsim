@@ -1,0 +1,33 @@
+{
+  "sequential": true,
+  "test_cases": [
+    {
+      "name": "Invasion: no enemy (0), move forward",
+      "sequence": [
+        {"inputs": {"clk": 1, "reset": 1, "run": 0, "in_port": 0}, "expected": {"pc": 0, "out_port": 0}},
+        {"inputs": {"clk": 1, "reset": 0, "run": 1, "in_port": 0}, "expected": {"pc": 1, "r1_out": 0}},
+        {"inputs": {"clk": 1, "reset": 0, "run": 1, "in_port": 0}, "expected": {"pc": 2, "r0_out": 33}},
+        {"inputs": {"clk": 1, "reset": 0, "run": 1, "in_port": 0}, "expected": {"pc": 3, "r2_out": 33}},
+        {"inputs": {"clk": 1, "reset": 0, "run": 1, "in_port": 0}, "expected": {"pc": 4, "r3_out": 223}},
+        {"inputs": {"clk": 1, "reset": 0, "run": 1, "in_port": 0}, "expected": {"pc": 5, "r0_out": 10}},
+        {"inputs": {"clk": 1, "reset": 0, "run": 1, "in_port": 0}, "expected": {"pc": 6}},
+        {"inputs": {"clk": 1, "reset": 0, "run": 1, "in_port": 0}, "expected": {"pc": 7, "r0_out": 1}},
+        {"inputs": {"clk": 1, "reset": 0, "run": 1, "in_port": 0}, "expected": {"pc": 8, "out_port": 1}}
+      ]
+    },
+    {
+      "name": "Invasion: enemy (33), shoot",
+      "sequence": [
+        {"inputs": {"clk": 1, "reset": 1, "run": 0, "in_port": 0}, "expected": {"pc": 0, "out_port": 0}},
+        {"inputs": {"clk": 1, "reset": 0, "run": 1, "in_port": 33}, "expected": {"pc": 1, "r1_out": 33}},
+        {"inputs": {"clk": 1, "reset": 0, "run": 1, "in_port": 33}, "expected": {"pc": 2, "r0_out": 33}},
+        {"inputs": {"clk": 1, "reset": 0, "run": 1, "in_port": 33}, "expected": {"pc": 3, "r2_out": 33}},
+        {"inputs": {"clk": 1, "reset": 0, "run": 1, "in_port": 33}, "expected": {"pc": 4, "r3_out": 0}},
+        {"inputs": {"clk": 1, "reset": 0, "run": 1, "in_port": 33}, "expected": {"pc": 5, "r0_out": 10}},
+        {"inputs": {"clk": 1, "reset": 0, "run": 1, "in_port": 33}, "expected": {"pc": 10}},
+        {"inputs": {"clk": 1, "reset": 0, "run": 1, "in_port": 33}, "expected": {"pc": 11, "r0_out": 5}},
+        {"inputs": {"clk": 1, "reset": 0, "run": 1, "in_port": 33}, "expected": {"pc": 12, "out_port": 5}}
+      ]
+    }
+  ]
+}

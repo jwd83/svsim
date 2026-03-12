@@ -1,0 +1,10 @@
+[
+    {"addr": 0, "expect": {"out": 1}},
+    {"addr": 1, "expect": {"out": 2}},
+    {"addr": 2, "expect": {"out": 4}},
+    {"addr": 3, "expect": {"out": 8}},
+    {"addr": 4, "expect": {"out": 16}},
+    {"addr": 5, "expect": {"out": 32}},
+    {"addr": 6, "expect": {"out": 64}},
+    {"addr": 7, "expect": {"out": 128}}
+]

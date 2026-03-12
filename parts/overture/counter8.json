@@ -1,0 +1,158 @@
+{
+  "sequential": true,
+  "clock": "clk",
+  "test_cases": [
+    {
+      "name": "Reset functionality",
+      "description": "Counter resets to 0 when reset is asserted",
+      "inputs": {"clk": 1, "reset": 1, "enable": 0},
+      "expected": {"count": 0}
+    },
+    {
+      "name": "Basic increment",
+      "description": "Counter increments when enabled",
+      "inputs": {"clk": 1, "reset": 0, "enable": 1},
+      "expected": {"count": 1}
+    },
+    {
+      "name": "Hold when disabled",
+      "description": "Counter holds value when enable is low",
+      "inputs": {"clk": 1, "reset": 0, "enable": 0},
+      "expected": {"count": 1}
+    },
+    {
+      "name": "Complete counter sequence",
+      "description": "Test reset, increment, hold, and multiple increments",
+      "sequence": [
+        {"inputs": {"clk": 1, "reset": 1, "enable": 0}, "expected": {"count": 0}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 1}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 0}, "expected": {"count": 1}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 2}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 3}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 4}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 5}}
+      ]
+    },
+    {
+      "name": "Mid-count reset",
+      "description": "Reset should work after counting",
+      "sequence": [
+        {"inputs": {"clk": 1, "reset": 1, "enable": 0}, "expected": {"count": 0}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 1}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 2}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 3}},
+        {"inputs": {"clk": 1, "reset": 1, "enable": 0}, "expected": {"count": 0}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 1}}
+      ]
+    },
+    {
+      "name": "Extended hold test",
+      "description": "Counter holds value across multiple disabled cycles",
+      "sequence": [
+        {"inputs": {"clk": 1, "reset": 1, "enable": 0}, "expected": {"count": 0}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 1}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 2}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 3}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 0}, "expected": {"count": 3}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 0}, "expected": {"count": 3}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 0}, "expected": {"count": 3}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 0}, "expected": {"count": 3}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 4}}
+      ]
+    },
+    {
+      "name": "Count to 10",
+      "description": "Count from 0 to 10 continuously",
+      "sequence": [
+        {"inputs": {"clk": 1, "reset": 1, "enable": 0}, "expected": {"count": 0}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 1}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 2}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 3}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 4}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 5}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 6}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 7}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 8}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 9}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 10}}
+      ]
+    },
+    {
+      "name": "Multiple reset cycles",
+      "description": "Test multiple consecutive resets",
+      "sequence": [
+        {"inputs": {"clk": 1, "reset": 1, "enable": 0}, "expected": {"count": 0}},
+        {"inputs": {"clk": 1, "reset": 1, "enable": 0}, "expected": {"count": 0}},
+        {"inputs": {"clk": 1, "reset": 1, "enable": 0}, "expected": {"count": 0}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 1}},
+        {"inputs": {"clk": 1, "reset": 1, "enable": 0}, "expected": {"count": 0}},
+        {"inputs": {"clk": 1, "reset": 1, "enable": 0}, "expected": {"count": 0}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 1}}
+      ]
+    },
+    {
+      "name": "Enable toggle test",
+      "description": "Rapid enable toggling",
+      "sequence": [
+        {"inputs": {"clk": 1, "reset": 1, "enable": 0}, "expected": {"count": 0}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 1}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 0}, "expected": {"count": 1}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 2}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 0}, "expected": {"count": 2}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 3}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 0}, "expected": {"count": 3}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 4}}
+      ]
+    },
+    {
+      "name": "Overflow test - 255 to 0",
+      "description": "Test counter wrapping from 255 to 0",
+      "sequence": [
+        {"inputs": {"clk": 1, "reset": 1, "enable": 0}, "expected": {"count": 0}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 1}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 2}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 3}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 4}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 5}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 6}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 7}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 8}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 9}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 10}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 11}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 12}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 13}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 14}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 15}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 16}}
+      ]
+    },
+    {
+      "name": "Count high values",
+      "description": "Test counting at higher values",
+      "sequence": [
+        {"inputs": {"clk": 1, "reset": 1, "enable": 0}, "expected": {"count": 0}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 1}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 2}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 3}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 4}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 5}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 6}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 7}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 8}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 9}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 10}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 11}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 12}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 13}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 14}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 15}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 16}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 17}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 18}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 19}},
+        {"inputs": {"clk": 1, "reset": 0, "enable": 1}, "expected": {"count": 20}}
+      ]
+    }
+  ]
+}

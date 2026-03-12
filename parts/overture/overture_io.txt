@@ -1,0 +1,24 @@
+177   // 0: R1 <- in_port
+178   // 1: R2 <- in_port
+67    // 2: AND  R3 <- R1 & R2
+0x0A  // 3: R0 <- 10
+193   // 4: eq: if R3==0 jump to R0 (addr 10)
+1     // 5: R0 <- 1
+134   // 6: out_port <- R0
+12    // 7: R0 <- 12
+196   // 8: always: jump to R0 (addr 12)
+192   // 9: never (nop)
+0     // 10: R0 <- 0
+134   // 11: out_port <- R0
+7     // 12: R0 <- 7
+129   // 13: R1 <- R0
+7     // 14: R0 <- 7
+130   // 15: R2 <- R0
+69    // 16: SUB  R3 <- R1 - R2 (7-7 = 0)
+21    // 17: R0 <- 21
+195   // 18: less_eq: if R3[7] || R3==0 jump to R0 (addr 21)
+2     // 19: R0 <- 2 (failure, should be skipped)
+132   // 20: R4 <- R0 (failure marker)
+55    // 21: R0 <- 55
+133   // 22: R5 <- R0
+192   // 23: never (nop)

@@ -1,0 +1,5 @@
+[
+    {"addr": 0, "expect": {"data": 0}},
+    {"addr": 1, "expect": {"data": 0}},
+    {"addr": 255, "expect": {"data": 0}}
+]

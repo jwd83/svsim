@@ -1,0 +1,81 @@
+{
+  "sequential": true,
+  "clock": "clk",
+  "test_cases": [
+    {
+      "name": "Initialize to zero",
+      "description": "First load zero into register",
+      "inputs": {"clk": 1, "enable": 1, "data": 0},
+      "expected": {"q": 0}
+    },
+    {
+      "name": "Store one",
+      "description": "Store 1 in register",
+      "inputs": {"clk": 1, "enable": 1, "data": 1},
+      "expected": {"q": 1}
+    },
+    {
+      "name": "Hold when disabled",
+      "description": "Value should hold when enable is low",
+      "inputs": {"clk": 1, "enable": 0, "data": 0},
+      "expected": {"q": 1}
+    },
+    {
+      "name": "Comprehensive 1-bit test",
+      "description": "Test all transitions and hold states",
+      "sequence": [
+        {"inputs": {"clk": 1, "enable": 1, "data": 0}, "expected": {"q": 0}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 1}, "expected": {"q": 1}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 0}, "expected": {"q": 1}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 1}, "expected": {"q": 1}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 0}, "expected": {"q": 0}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 1}, "expected": {"q": 0}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 0}, "expected": {"q": 0}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 1}, "expected": {"q": 1}}
+      ]
+    },
+    {
+      "name": "Extended hold test",
+      "description": "Multiple cycles with enable low",
+      "sequence": [
+        {"inputs": {"clk": 1, "enable": 1, "data": 1}, "expected": {"q": 1}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 0}, "expected": {"q": 1}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 0}, "expected": {"q": 1}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 1}, "expected": {"q": 1}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 0}, "expected": {"q": 1}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 0}, "expected": {"q": 0}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 1}, "expected": {"q": 0}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 1}, "expected": {"q": 0}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 0}, "expected": {"q": 0}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 1}, "expected": {"q": 1}}
+      ]
+    },
+    {
+      "name": "Rapid toggle test",
+      "description": "Quick enable toggling",
+      "sequence": [
+        {"inputs": {"clk": 1, "enable": 1, "data": 0}, "expected": {"q": 0}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 1}, "expected": {"q": 0}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 1}, "expected": {"q": 1}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 0}, "expected": {"q": 1}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 0}, "expected": {"q": 0}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 1}, "expected": {"q": 0}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 1}, "expected": {"q": 1}}
+      ]
+    },
+    {
+      "name": "Toggle value continuously",
+      "description": "Alternate between 0 and 1 with enable always high",
+      "sequence": [
+        {"inputs": {"clk": 1, "enable": 1, "data": 0}, "expected": {"q": 0}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 1}, "expected": {"q": 1}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 0}, "expected": {"q": 0}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 1}, "expected": {"q": 1}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 0}, "expected": {"q": 0}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 1}, "expected": {"q": 1}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 0}, "expected": {"q": 0}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 1}, "expected": {"q": 1}}
+      ]
+    }
+  ]
+}

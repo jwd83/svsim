@@ -1,0 +1,112 @@
+{
+  "sequential": true,
+  "clock": "clk",
+  "test_cases": [
+    {
+      "name": "Initialize to zero",
+      "description": "First load zeros into register",
+      "inputs": {"clk": 1, "enable": 1, "data": 0},
+      "expected": {"q": 0}
+    },
+    {
+      "name": "Store 0xAA pattern",
+      "description": "Store alternating bit pattern 10101010",
+      "inputs": {"clk": 1, "enable": 1, "data": 170},
+      "expected": {"q": 170}
+    },
+    {
+      "name": "Hold test - enable low",
+      "description": "Data changes but enable is low, should hold 0xAA",
+      "inputs": {"clk": 1, "enable": 0, "data": 85},
+      "expected": {"q": 170}
+    },
+    {
+      "name": "Store 0x55 pattern",
+      "description": "Store opposite alternating pattern 01010101",
+      "inputs": {"clk": 1, "enable": 1, "data": 85},
+      "expected": {"q": 85}
+    },
+    {
+      "name": "Store max value 0xFF",
+      "description": "Store all ones (255)",
+      "inputs": {"clk": 1, "enable": 1, "data": 255},
+      "expected": {"q": 255}
+    },
+    {
+      "name": "Comprehensive sequence test",
+      "description": "Test enable hold, boundary values, and state transitions",
+      "sequence": [
+        {"inputs": {"clk": 1, "enable": 1, "data": 0}, "expected": {"q": 0}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 1}, "expected": {"q": 1}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 2}, "expected": {"q": 2}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 127}, "expected": {"q": 127}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 128}, "expected": {"q": 128}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 255}, "expected": {"q": 255}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 0}, "expected": {"q": 255}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 100}, "expected": {"q": 255}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 200}, "expected": {"q": 255}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 0}, "expected": {"q": 0}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 255}, "expected": {"q": 0}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 170}, "expected": {"q": 170}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 85}, "expected": {"q": 85}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 170}, "expected": {"q": 85}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 15}, "expected": {"q": 15}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 240}, "expected": {"q": 240}}
+      ]
+    },
+    {
+      "name": "Extended hold test",
+      "description": "Multiple cycles with enable low",
+      "sequence": [
+        {"inputs": {"clk": 1, "enable": 1, "data": 42}, "expected": {"q": 42}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 0}, "expected": {"q": 42}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 100}, "expected": {"q": 42}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 200}, "expected": {"q": 42}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 255}, "expected": {"q": 42}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 1}, "expected": {"q": 42}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 99}, "expected": {"q": 99}}
+      ]
+    },
+    {
+      "name": "Rapid toggle test",
+      "description": "Quick enable toggling with different data",
+      "sequence": [
+        {"inputs": {"clk": 1, "enable": 1, "data": 10}, "expected": {"q": 10}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 20}, "expected": {"q": 10}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 30}, "expected": {"q": 30}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 40}, "expected": {"q": 30}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 50}, "expected": {"q": 50}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 60}, "expected": {"q": 50}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 70}, "expected": {"q": 70}}
+      ]
+    },
+    {
+      "name": "Bit pattern walking ones",
+      "description": "Test individual bit positions",
+      "sequence": [
+        {"inputs": {"clk": 1, "enable": 1, "data": 1}, "expected": {"q": 1}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 2}, "expected": {"q": 2}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 4}, "expected": {"q": 4}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 8}, "expected": {"q": 8}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 16}, "expected": {"q": 16}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 32}, "expected": {"q": 32}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 64}, "expected": {"q": 64}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 128}, "expected": {"q": 128}}
+      ]
+    },
+    {
+      "name": "Bit pattern walking zeros",
+      "description": "Test complement of individual bit positions",
+      "sequence": [
+        {"inputs": {"clk": 1, "enable": 1, "data": 254}, "expected": {"q": 254}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 253}, "expected": {"q": 253}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 251}, "expected": {"q": 251}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 247}, "expected": {"q": 247}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 239}, "expected": {"q": 239}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 223}, "expected": {"q": 223}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 191}, "expected": {"q": 191}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 127}, "expected": {"q": 127}}
+      ]
+    }
+  ]
+}
