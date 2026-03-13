@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use sv_parser::{Define, Defines, Locate, RefNode, SyntaxTree, parse_sv, unwrap_node};
 
 use crate::diag::{Error, Result};
-use crate::hir::{ModuleDeclStyle, ModuleSummary, SourceFile};
+use crate::hir::{ModuleDeclStyle, ModuleInstanceSummary, ModuleSummary, SourceFile};
 
 #[derive(Debug, Clone, Default)]
 pub struct SvParserFrontend {
@@ -22,10 +22,20 @@ impl SvParserFrontend {
             .map_err(|error| {
                 Error::Parse(format!("failed to parse {}: {error}", path.display()))
             })?;
+        let mut modules = collect_modules(&syntax_tree, path);
+        let instantiations = collect_module_instantiations(&syntax_tree, path);
+
+        for instantiation in instantiations {
+            if let Some(module) =
+                find_enclosing_module_mut(&mut modules, instantiation.span.as_ref())
+            {
+                module.instantiations.push(instantiation);
+            }
+        }
 
         Ok(SourceFile {
             path: path.to_path_buf(),
-            modules: collect_modules(&syntax_tree, path),
+            modules,
         })
     }
 }
@@ -47,6 +57,7 @@ fn collect_modules(syntax_tree: &SyntaxTree, path: &Path) -> Vec<ModuleSummary> 
                             line: locate.line as usize,
                             column: 1,
                         }),
+                        instantiations: Vec::new(),
                     });
                 }
             }
@@ -62,6 +73,7 @@ fn collect_modules(syntax_tree: &SyntaxTree, path: &Path) -> Vec<ModuleSummary> 
                             line: locate.line as usize,
                             column: 1,
                         }),
+                        instantiations: Vec::new(),
                     });
                 }
             }
@@ -72,9 +84,73 @@ fn collect_modules(syntax_tree: &SyntaxTree, path: &Path) -> Vec<ModuleSummary> 
     modules
 }
 
+fn collect_module_instantiations(
+    syntax_tree: &SyntaxTree,
+    path: &Path,
+) -> Vec<ModuleInstanceSummary> {
+    let mut instantiations = Vec::new();
+
+    for node in syntax_tree {
+        if let RefNode::ModuleInstantiation(instantiation) = node {
+            let Some((module_name, _)) =
+                identifier_name_from_node(syntax_tree, RefNode::from(&instantiation.nodes.0))
+            else {
+                continue;
+            };
+
+            for hierarchical_instance in instantiation.nodes.2.contents() {
+                let Some((instance_name, locate)) = identifier_name_from_node(
+                    syntax_tree,
+                    RefNode::from(&hierarchical_instance.nodes.0.nodes.0),
+                ) else {
+                    continue;
+                };
+
+                instantiations.push(ModuleInstanceSummary {
+                    module_name: module_name.clone(),
+                    instance_name,
+                    span: Some(crate::diag::SourceSpan {
+                        path: path.to_path_buf(),
+                        line: locate.line as usize,
+                        column: 1,
+                    }),
+                });
+            }
+        }
+    }
+
+    instantiations
+}
+
+fn find_enclosing_module_mut<'a>(
+    modules: &'a mut [ModuleSummary],
+    span: Option<&crate::diag::SourceSpan>,
+) -> Option<&'a mut ModuleSummary> {
+    let line = span?.line;
+    let mut selected_index = None;
+
+    for (index, module) in modules.iter().enumerate() {
+        let Some(module_span) = module.span.as_ref() else {
+            continue;
+        };
+        if module_span.line <= line {
+            selected_index = Some(index);
+        }
+    }
+
+    selected_index.map(|index| &mut modules[index])
+}
+
 fn module_name_from_node(syntax_tree: &SyntaxTree, node: RefNode<'_>) -> Option<(String, Locate)> {
     let identifier = unwrap_node!(node, ModuleIdentifier)?;
-    let locate = get_identifier(identifier)?;
+    identifier_name_from_node(syntax_tree, identifier)
+}
+
+fn identifier_name_from_node(
+    syntax_tree: &SyntaxTree,
+    node: RefNode<'_>,
+) -> Option<(String, Locate)> {
+    let locate = get_identifier(node)?;
     let name = syntax_tree.get_str(&locate)?.to_owned();
     Some((name, locate))
 }
@@ -110,5 +186,11 @@ mod tests {
 
         assert_eq!(source.modules.len(), 1);
         assert_eq!(source.modules[0].name, "full_adder");
+        assert_eq!(source.modules[0].instantiations.len(), 3);
+        assert_eq!(
+            source.modules[0].instantiations[0].module_name,
+            "half_adder"
+        );
+        assert_eq!(source.modules[0].instantiations[0].instance_name, "u_half1");
     }
 }

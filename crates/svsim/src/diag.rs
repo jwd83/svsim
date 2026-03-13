@@ -23,6 +23,8 @@ pub enum Error {
     #[error("{0}")]
     Parse(String),
     #[error("{0}")]
+    Resolve(String),
+    #[error("{0}")]
     Unsupported(String),
     #[error(transparent)]
     Io(#[from] std::io::Error),

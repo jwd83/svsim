@@ -8,17 +8,16 @@ use crate::sim::SimulationSession;
 pub struct CompiledDesign {
     hir: HirDesign,
     search_paths: Vec<PathBuf>,
-    top_module: Option<String>,
+    top_module: String,
 }
 
 impl CompiledDesign {
-    pub(crate) fn new(search_paths: Vec<PathBuf>, files: Vec<SourceFile>) -> Self {
+    pub(crate) fn new(
+        search_paths: Vec<PathBuf>,
+        files: Vec<SourceFile>,
+        top_module: String,
+    ) -> Self {
         let hir = HirDesign::new(files);
-        let top_module = hir
-            .files()
-            .last()
-            .and_then(|file| file.modules.last())
-            .map(|module| module.name.clone());
 
         Self {
             hir,
@@ -36,15 +35,10 @@ impl CompiledDesign {
     }
 
     pub fn top_module(&self) -> Option<&str> {
-        self.top_module.as_deref()
+        Some(self.top_module.as_str())
     }
 
     pub fn instantiate_top(&self) -> Result<SimulationSession> {
-        let top_module = self
-            .top_module
-            .clone()
-            .ok_or_else(|| crate::diag::Error::Parse("design contains no modules".into()))?;
-
-        Ok(SimulationSession::new(top_module))
+        Ok(SimulationSession::new(self.top_module.clone()))
     }
 }
