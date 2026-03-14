@@ -13,7 +13,7 @@ use sv_parser::{
     PsOrHierarchicalNetIdentifier, RefNode, Select, SeqBlock, Statement, StatementItem,
     StatementOrNull, SyntaxTree, UnaryOperator, UnpackedDimension, VariableAssignment,
     VariableDeclAssignment, VariableDimension, VariableLvalue, VariablePortType, parse_sv,
-    unwrap_node,
+    parse_sv_str, unwrap_node,
 };
 
 use crate::diag::{Diagnostic, Error, Result, SourceSpan};
@@ -62,24 +62,39 @@ impl SvParserFrontend {
                 Error::Parse(format!("failed to parse {}: {error}", path.display()))
             })?;
 
-        let mut modules = Vec::new();
-        for node in &syntax_tree {
-            match node {
-                RefNode::ModuleDeclarationAnsi(decl) => {
-                    modules.push(lower_ansi_module(&syntax_tree, decl, path)?);
-                }
-                RefNode::ModuleDeclarationNonansi(decl) => {
-                    modules.push(lower_nonansi_module(&syntax_tree, decl, path)?);
-                }
-                _ => {}
-            }
-        }
-
-        Ok(SourceFile {
-            path: path.to_path_buf(),
-            modules,
-        })
+        lower_source_file(&syntax_tree, path)
     }
+
+    pub fn parse_str(&self, virtual_path: impl AsRef<Path>, source: &str) -> Result<SourceFile> {
+        let path = virtual_path.as_ref();
+        let defines: Defines = HashMap::<String, Option<Define>>::new();
+        let (syntax_tree, _) =
+            parse_sv_str(source, path, &defines, &self.include_paths, false, false).map_err(
+                |error| Error::Parse(format!("failed to parse {}: {error}", path.display())),
+            )?;
+
+        lower_source_file(&syntax_tree, path)
+    }
+}
+
+fn lower_source_file(syntax_tree: &SyntaxTree, path: &Path) -> Result<SourceFile> {
+    let mut modules = Vec::new();
+    for node in syntax_tree {
+        match node {
+            RefNode::ModuleDeclarationAnsi(decl) => {
+                modules.push(lower_ansi_module(syntax_tree, decl, path)?);
+            }
+            RefNode::ModuleDeclarationNonansi(decl) => {
+                modules.push(lower_nonansi_module(syntax_tree, decl, path)?);
+            }
+            _ => {}
+        }
+    }
+
+    Ok(SourceFile {
+        path: path.to_path_buf(),
+        modules,
+    })
 }
 
 fn lower_ansi_module(
@@ -1898,6 +1913,25 @@ mod tests {
         assert_eq!(module.ports.len(), 4);
         assert_eq!(module.continuous_assignments.len(), 1);
         assert!(module.unsupported.is_empty());
+    }
+
+    #[test]
+    fn parse_str_lowers_modules_from_virtual_path() {
+        let frontend = SvParserFrontend::default();
+        let source = frontend
+            .parse_str(
+                PathBuf::from("/virtual/design/top.sv"),
+                "module top(input logic a, output logic y); assign y = ~a; endmodule\n",
+            )
+            .expect("parse virtual source");
+
+        assert_eq!(source.path, PathBuf::from("/virtual/design/top.sv"));
+        assert_eq!(source.modules.len(), 1);
+        let module = &source.modules[0];
+        assert_eq!(module.name, "top");
+        assert!(module.unsupported.is_empty());
+        assert_eq!(module.ports.len(), 2);
+        assert_eq!(module.continuous_assignments.len(), 1);
     }
 
     #[test]

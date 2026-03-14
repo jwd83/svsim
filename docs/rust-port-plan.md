@@ -21,15 +21,16 @@ These product decisions are fixed for the first Rust pass:
 Current implementation status as of March 14, 2026:
 
 - Cargo workspace created with `svsim`, `svsim-cli`, and `svsim-render`
-- `sv-parser` integrated for file-based parsing
+- `sv-parser` integrated for file-based parsing and in-memory source parsing via virtual paths
 - owned HIR covers source files, module summaries, continuous assignments, instantiations, `always_comb`, a first `always_ff @(posedge ...)` subset, concatenation/replication expressions, and concatenated assignment targets
-- library API started with `Compiler`, `CompiledDesign`, and `SimulationSession`
+- library API now exposes `Compiler`, `CompiledDesign`, and `SimulationSession`, including `compile_file` and `compile_str`
 - CLI can parse a SystemVerilog file and emit JSON describing discovered modules
 - `SimulationSession::eval_once` can execute hierarchical combinational designs with fixed-point convergence across continuous assignments, module instances, and a basic `always_comb` subset
 - `SimulationSession::step` now maintains per-instance state and can advance hierarchical designs using `always_ff @(posedge <clock>)` blocks with blocking immediate updates and nonblocking assignment staging
 - current procedural subset: blocking assignments in combinational blocks and `always_ff`, nonblocking assignments in `always_ff`, `if` / `else`, `case` / `default`, and `begin` / `end` statement blocks
 - current expression subset adds concatenation, replication, logical `&&` / `||`, equality `==` / `!=`, arithmetic `+` / `-`, and single-dimension memory reads on top of literals, identifiers, slices, ternary expressions, and bitwise operators
 - frontend lowering now accepts grouped ANSI port declarations such as `input [4:0] a, b, c` and lowers net declaration initializers like `wire [24:0] v = expr;` into signal declarations plus continuous assignments
+- `compile_str` can seed a design from an in-memory top module while still resolving instantiated dependencies from the virtual path's directory and configured search paths
 - current sequential limits: only `posedge` event controls are lowered, `always_ff` clock expressions must be local identifiers, and cross-block race semantics are not modeled beyond deterministic source order
 - current memory subset supports fixed-size unpacked `reg` / `logic` arrays with zero-initialized reads, explicit programmatic preload/read access by instance path, text-file ROM/RAM loading, and procedural single-element writes; explicit elaboration, JSON regression execution, general event controls, and test-runner/render integration are still pending
 - known compatibility gap: `parts/testing/019-Vector5` now lowers and evaluates with standard concatenation/replication bit ordering, but its checked-in JSON reflects a Python reference parser bug for multi-expression replication (`{5{a, b, c, d, e}}`), so Rust and JSON parity still diverge there until the compatibility policy is decided
@@ -170,6 +171,7 @@ Elaboration should turn HIR modules into a compiled design:
 This is also where the current Python naming conventions should become explicit policies instead of hidden behavior:
 
 - same-directory module resolution
+- virtual-top-module directory resolution for `compile_str`
 
 Make resolution and memory binding explicit through the library API rather than hardcoded globals.
 
@@ -244,7 +246,7 @@ let outputs = sim.step(inputs)?;
 Useful embedded surfaces:
 
 - compile from file
-- compile from string
+- compile from string with a virtual path that anchors relative dependency resolution
 - configure module search paths
 - preload or inspect ROM/RAM contents explicitly by instance path, including text-file initialization
 - inspect ports, widths, and instance hierarchy
@@ -340,6 +342,7 @@ Exit criterion:
 Current progress:
 - hierarchical combinational evaluation is implemented across continuous assignments, instances, `always_comb`, concatenation, replication, and concatenated lvalues
 - grouped ANSI port declarations and initialized net declarations from the vector corpus are now lowered
+- in-memory top-level compilation via `compile_str` is implemented, with dependency lookup anchored at the virtual path plus explicit search paths
 - remaining work is JSON-backed combinational regression execution and deciding whether to preserve or retire the Python reference bug encoded in `parts/testing/019-Vector5.json`
 
 Exit criterion:

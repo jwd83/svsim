@@ -34,81 +34,19 @@ impl Compiler {
     pub fn compile_file(&self, path: impl AsRef<Path>) -> Result<CompiledDesign> {
         let frontend = SvParserFrontend::new(self.search_paths.clone());
         let root_path = fs::canonicalize(path.as_ref())?;
-        let mut seen_paths = HashSet::new();
-        let mut provided_modules = HashMap::<String, PathBuf>::new();
-        let mut files = Vec::<SourceFile>::new();
-        let mut pending_paths = vec![root_path.clone()];
-        let mut top_module = None;
-
-        while let Some(next_path) = pending_paths.pop() {
-            if !seen_paths.insert(next_path.clone()) {
-                continue;
-            }
-
-            let source_file = frontend.parse_file(&next_path)?;
-            if top_module.is_none() {
-                top_module = source_file.modules.last().map(|module| module.name.clone());
-            }
-
-            for module in &source_file.modules {
-                if let Some(existing_path) =
-                    provided_modules.insert(module.name.clone(), next_path.clone())
-                {
-                    if existing_path != next_path {
-                        return Err(Error::Resolve(format!(
-                            "module '{}' is defined in both {} and {}",
-                            module.name,
-                            existing_path.display(),
-                            next_path.display()
-                        )));
-                    }
-                }
-            }
-
-            let mut pending_modules = Vec::new();
-            for module in &source_file.modules {
-                for instantiation in &module.instantiations {
-                    if !provided_modules.contains_key(&instantiation.module_name) {
-                        pending_modules.push(instantiation.module_name.clone());
-                    }
-                }
-            }
-
-            let current_dir = next_path
-                .parent()
-                .map(Path::to_path_buf)
-                .unwrap_or_else(|| PathBuf::from("."));
-            for module_name in pending_modules {
-                let module_path = self.resolve_module_path(&module_name, &current_dir)?;
-                if !seen_paths.contains(&module_path) {
-                    pending_paths.push(module_path);
-                }
-            }
-
-            files.push(source_file);
-        }
-
-        let top_module = top_module.ok_or_else(|| {
-            Error::Parse(format!(
-                "design contains no modules: {}",
-                root_path.display()
-            ))
-        })?;
-        Ok(CompiledDesign::new(
-            self.search_paths.clone(),
-            files,
-            top_module,
-        ))
+        let source_file = frontend.parse_file(&root_path)?;
+        self.compile_from_source_file(root_path, source_file)
     }
 
     pub fn compile_str(
         &self,
-        _virtual_path: impl Into<PathBuf>,
-        _source: &str,
+        virtual_path: impl Into<PathBuf>,
+        source: &str,
     ) -> Result<CompiledDesign> {
-        Err(crate::diag::Error::Unsupported(
-            "compile_str is not wired yet; the first implementation slice is file-based".into(),
-        ))
+        let frontend = SvParserFrontend::new(self.search_paths.clone());
+        let virtual_path = virtual_path.into();
+        let source_file = frontend.parse_str(&virtual_path, source)?;
+        self.compile_from_source_file(virtual_path, source_file)
     }
 
     fn resolve_module_path(&self, module_name: &str, current_dir: &Path) -> Result<PathBuf> {
@@ -134,6 +72,107 @@ impl Compiler {
                 .collect::<Vec<_>>()
                 .join(", ")
         )))
+    }
+
+    fn compile_from_source_file(
+        &self,
+        root_path: PathBuf,
+        root_source_file: SourceFile,
+    ) -> Result<CompiledDesign> {
+        let frontend = SvParserFrontend::new(self.search_paths.clone());
+        let mut seen_paths = HashSet::new();
+        let mut provided_modules = HashMap::<String, PathBuf>::new();
+        let mut files = Vec::<SourceFile>::new();
+        let mut pending_paths = Vec::new();
+
+        let top_module = root_source_file
+            .modules
+            .last()
+            .map(|module| module.name.clone())
+            .ok_or_else(|| {
+                Error::Parse(format!(
+                    "design contains no modules: {}",
+                    root_path.display()
+                ))
+            })?;
+
+        let current_dir = root_path
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| PathBuf::from("."));
+        seen_paths.insert(root_path.clone());
+        self.register_source_file(
+            &root_path,
+            &root_source_file,
+            &current_dir,
+            &mut provided_modules,
+            &mut seen_paths,
+            &mut pending_paths,
+        )?;
+        files.push(root_source_file);
+
+        while let Some(next_path) = pending_paths.pop() {
+            let source_file = frontend.parse_file(&next_path)?;
+            let current_dir = next_path
+                .parent()
+                .map(Path::to_path_buf)
+                .unwrap_or_else(|| PathBuf::from("."));
+            self.register_source_file(
+                &next_path,
+                &source_file,
+                &current_dir,
+                &mut provided_modules,
+                &mut seen_paths,
+                &mut pending_paths,
+            )?;
+            files.push(source_file);
+        }
+
+        Ok(CompiledDesign::new(
+            self.search_paths.clone(),
+            files,
+            top_module,
+        ))
+    }
+
+    fn register_source_file(
+        &self,
+        source_path: &Path,
+        source_file: &SourceFile,
+        current_dir: &Path,
+        provided_modules: &mut HashMap<String, PathBuf>,
+        seen_paths: &mut HashSet<PathBuf>,
+        pending_paths: &mut Vec<PathBuf>,
+    ) -> Result<()> {
+        for module in &source_file.modules {
+            if let Some(existing_path) =
+                provided_modules.insert(module.name.clone(), source_path.to_path_buf())
+            {
+                if existing_path != source_path {
+                    return Err(Error::Resolve(format!(
+                        "module '{}' is defined in both {} and {}",
+                        module.name,
+                        existing_path.display(),
+                        source_path.display()
+                    )));
+                }
+            }
+        }
+
+        for module in &source_file.modules {
+            for instantiation in &module.instantiations {
+                if provided_modules.contains_key(&instantiation.module_name) {
+                    continue;
+                }
+                let module_path =
+                    self.resolve_module_path(&instantiation.module_name, current_dir)?;
+                if seen_paths.insert(module_path.clone()) {
+                    pending_paths.push(module_path);
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -250,6 +289,81 @@ mod tests {
             .expect("overture_fetch module");
         assert!(fetch.unsupported.is_empty());
         assert_eq!(fetch.memories.len(), 1);
+    }
+
+    #[test]
+    fn compile_str_finds_top_module() {
+        let design = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                "module top(input logic a, output logic y); assign y = ~a; endmodule\n",
+            )
+            .expect("compile virtual design");
+
+        assert_eq!(design.top_module(), Some("top"));
+        assert_eq!(
+            design
+                .hir()
+                .module_names()
+                .into_iter()
+                .collect::<BTreeSet<_>>(),
+            BTreeSet::from(["top"]),
+        );
+    }
+
+    #[test]
+    fn compile_str_uses_virtual_path_directory_for_dependencies() {
+        let temp_dir = unique_temp_dir("compile-str-neighbor");
+        fs::write(
+            temp_dir.join("child.sv"),
+            "module child(output logic outY); assign outY = 1'b1; endmodule\n",
+        )
+        .expect("write child");
+
+        let design = Compiler::new()
+            .compile_str(
+                temp_dir.join("top.sv"),
+                "module top(output logic outY); child u_child (.outY(outY)); endmodule\n",
+            )
+            .expect("compile design");
+
+        assert_eq!(
+            design
+                .hir()
+                .module_names()
+                .into_iter()
+                .collect::<BTreeSet<_>>(),
+            BTreeSet::from(["child", "top"]),
+        );
+    }
+
+    #[test]
+    fn compile_str_uses_search_paths_for_dependencies() {
+        let temp_dir = unique_temp_dir("compile-str-search-path");
+        let lib_dir = temp_dir.join("lib");
+        fs::create_dir_all(&lib_dir).expect("create lib dir");
+        fs::write(
+            lib_dir.join("child.sv"),
+            "module child(output logic outY); assign outY = 1'b1; endmodule\n",
+        )
+        .expect("write child");
+
+        let design = Compiler::new()
+            .add_search_path(&lib_dir)
+            .compile_str(
+                temp_dir.join("top.sv"),
+                "module top(output logic outY); child u_child (.outY(outY)); endmodule\n",
+            )
+            .expect("compile design");
+
+        assert_eq!(
+            design
+                .hir()
+                .module_names()
+                .into_iter()
+                .collect::<BTreeSet<_>>(),
+            BTreeSet::from(["child", "top"]),
+        );
     }
 
     fn unique_temp_dir(name: &str) -> PathBuf {
