@@ -26,7 +26,7 @@ Current implementation status as of March 14, 2026:
 - library API now exposes `Compiler`, `CompiledDesign`, and `SimulationSession`, including `compile_file` and `compile_str`
 - `CompiledDesign::hierarchy()` now exposes an owned top-down instance tree so embedding callers can discover valid instance paths before using per-instance memory APIs
 - library-side JSON regression execution is now available through `CompiledDesign::run_json_file` / `svsim::JsonTestSuite` for combinational arrays, sequential `test_cases`, and relative memory-file preload
-- `Compiler::run_json_test_dir` and CLI `--json-test-dir` now batch-discover sibling `*.sv` / `*.json` regression pairs under a directory and emit structured per-suite pass/fail or compile/runtime error reports
+- `Compiler::run_json_test_dir` and CLI `--json-test-dir` now batch-discover sibling `*.sv` / `*.json` regression pairs under a directory, execute suites in parallel, and emit structured per-suite pass/fail or compile/runtime error reports in deterministic path order
 - CLI can parse a SystemVerilog file and emit JSON describing discovered modules, or run single-suite / directory JSON regressions via `--json-test` and `--json-test-dir`
 - `SimulationSession::eval_once` can execute hierarchical combinational designs with fixed-point convergence across continuous assignments, module instances, and a basic `always_comb` subset
 - `SimulationSession::step` now maintains per-instance state and can advance hierarchical designs using `always_ff @(posedge <clock>)` blocks with blocking immediate updates and nonblocking assignment staging
@@ -35,7 +35,8 @@ Current implementation status as of March 14, 2026:
 - frontend lowering now accepts grouped ANSI port declarations such as `input [4:0] a, b, c` and lowers net declaration initializers like `wire [24:0] v = expr;` into signal declarations plus continuous assignments
 - `compile_str` can seed a design from an in-memory top module while still resolving instantiated dependencies from the virtual path's directory and configured search paths
 - current sequential limits: only `posedge` event controls are lowered, `always_ff` clock expressions must be local identifiers, and cross-block race semantics are not modeled beyond deterministic source order
-- current memory subset supports fixed-size unpacked `reg` / `logic` arrays with zero-initialized reads, explicit programmatic preload/read access by instance path, text-file ROM/RAM loading, procedural single-element writes, and JSON-driven regression preload; explicit elaboration, broader event controls, parallel batch execution, and render integration are still pending
+- current memory subset supports fixed-size unpacked `reg` / `logic` arrays with zero-initialized reads, explicit programmatic preload/read access by instance path, text-file ROM/RAM loading, procedural single-element writes, and JSON-driven regression preload; explicit elaboration, broader event controls, and render integration are still pending
+- measured batch status: `parts/testing` currently passes `39/40` suites, with only `019-Vector5` failing because the checked-in JSON preserves a Python reference replication-order bug
 - known compatibility gap: `parts/testing/019-Vector5` now lowers and evaluates with standard concatenation/replication bit ordering, but its checked-in JSON reflects a Python reference parser bug for multi-expression replication (`{5{a, b, c, d, e}}`), so Rust and JSON parity still diverge there until the compatibility policy is decided
 
 ## Compatibility Target
@@ -368,7 +369,7 @@ Current progress:
 - blocking and nonblocking assignment semantics work for the supported subset
 - zero-initialized single-dimension memory reads, explicit memory preload/read APIs, text-file memory loading, and procedural single-element memory writes are implemented
 - library-side JSON regression execution now covers sequential `test_cases`, including memory-backed suites
-- remaining work is broader event controls, larger Overture sequential regressions, and parallelizing the batch runner
+- remaining work is broader event controls and larger Overture sequential regressions
 
 Exit criterion:
 - parity for sequential register/counter tests and the math sequence stubs
@@ -380,8 +381,8 @@ Exit criterion:
 - batch regression entry points over the existing CLI regression mode
 
 Current progress:
-- library and CLI batch regression entry points now exist for directory-backed `*.sv` / `*.json` discovery
-- remaining work is using that runner to establish wider Overture parity and then parallelizing it
+- library and CLI batch regression entry points now exist for directory-backed `*.sv` / `*.json` discovery, and per-suite execution now runs in parallel while keeping the report sorted by source path
+- remaining work is using that runner to establish wider measured Overture parity and tighten unsupported-construct diagnostics where batch coverage finds gaps
 
 Exit criterion:
 - parity for `parts/overture/` tests
@@ -391,7 +392,7 @@ Exit criterion:
 - truth table generation
 - waveform capture
 - machine-readable result output
-- batch test runner parallel execution
+- batch regression reporting polish beyond the current structured JSON summaries
 
 Exit criterion:
 - Rust CLI can replace the main workflows currently provided by `ref/pysvsim.py`
@@ -439,8 +440,8 @@ The first concrete implementation target should be:
 3. execute combinational modules and JSON tests
 4. add sequential stepping
 5. add explicit memory binding configuration
-6. broaden Rust CLI regression coverage across Overture and add batch execution
+6. broaden Rust CLI regression coverage across Overture and add scalable batch execution
 
-That library milestone, the first CLI regression path, and a basic batch runner are now in place; the next pragmatic target is using that runner to broaden measured coverage across the Overture corpus, then parallelizing it.
+That library milestone, the first CLI regression path, and a parallel batch runner are now in place; the next pragmatic target is using that runner to broaden measured coverage across the Overture corpus and close the highest-value compatibility gaps it exposes.
 
 At that point the project has replaced the Python simulator for core use, even before image rendering exists.

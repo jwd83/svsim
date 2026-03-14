@@ -2,6 +2,8 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use rayon::prelude::*;
+
 use crate::design::CompiledDesign;
 use crate::diag::{Error, Result};
 use crate::frontend::SvParserFrontend;
@@ -60,49 +62,50 @@ impl Compiler {
             )));
         }
 
-        let mut suites = Vec::with_capacity(suite_paths.len());
-        for suite in suite_paths {
-            match self.compile_file(&suite.source_path) {
-                Ok(design) => {
-                    let top_module = design.top_module().map(str::to_owned);
-                    match design.run_json_file(&suite.json_path) {
-                        Ok(report) => {
-                            let passed = report.all_passed();
-                            suites.push(JsonTestSuiteRunReport {
-                                source_path: suite.source_path,
-                                json_path: suite.json_path,
-                                top_module,
-                                passed,
-                                report: Some(report),
-                                error: None,
-                            });
-                        }
-                        Err(error) => {
-                            suites.push(JsonTestSuiteRunReport {
-                                source_path: suite.source_path,
-                                json_path: suite.json_path,
-                                top_module,
-                                passed: false,
-                                report: None,
-                                error: Some(error.to_string()),
-                            });
+        let mut suites = suite_paths
+            .into_par_iter()
+            .map(|suite| self.run_json_test_suite(suite))
+            .collect::<Vec<_>>();
+        suites.sort_by(|left, right| left.source_path.cmp(&right.source_path));
+
+        Ok(build_directory_report(suites))
+    }
+
+    fn run_json_test_suite(&self, suite: JsonTestSuitePaths) -> JsonTestSuiteRunReport {
+        match self.compile_file(&suite.source_path) {
+            Ok(design) => {
+                let top_module = design.top_module().map(str::to_owned);
+                match design.run_json_file(&suite.json_path) {
+                    Ok(report) => {
+                        let passed = report.all_passed();
+                        JsonTestSuiteRunReport {
+                            source_path: suite.source_path,
+                            json_path: suite.json_path,
+                            top_module,
+                            passed,
+                            report: Some(report),
+                            error: None,
                         }
                     }
-                }
-                Err(error) => {
-                    suites.push(JsonTestSuiteRunReport {
+                    Err(error) => JsonTestSuiteRunReport {
                         source_path: suite.source_path,
                         json_path: suite.json_path,
-                        top_module: None,
+                        top_module,
                         passed: false,
                         report: None,
                         error: Some(error.to_string()),
-                    });
+                    },
                 }
             }
+            Err(error) => JsonTestSuiteRunReport {
+                source_path: suite.source_path,
+                json_path: suite.json_path,
+                top_module: None,
+                passed: false,
+                report: None,
+                error: Some(error.to_string()),
+            },
         }
-
-        Ok(build_directory_report(suites))
     }
 
     fn resolve_module_path(&self, module_name: &str, current_dir: &Path) -> Result<PathBuf> {
