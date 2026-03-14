@@ -315,4 +315,13 @@ impl HirDesign {
             .flat_map(|file| file.modules.iter())
             .find(|module| module.name == name)
     }
+
+    pub fn module_source_path(&self, name: &str) -> Option<&PathBuf> {
+        self.files.iter().find_map(|file| {
+            file.modules
+                .iter()
+                .any(|module| module.name == name)
+                .then_some(&file.path)
+        })
+    }
 }

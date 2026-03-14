@@ -20,6 +20,7 @@ struct ModuleState {
     module_name: String,
     persisted: HashMap<String, Value>,
     memories: HashMap<String, MemoryState>,
+    legacy_rom: Option<LegacyRomState>,
     children: Vec<ChildState>,
 }
 
@@ -31,6 +32,13 @@ struct ChildState {
 #[derive(Debug, Clone)]
 struct MemoryState {
     index_range: PackedRange,
+    words: Vec<Value>,
+}
+
+#[derive(Debug, Clone)]
+struct LegacyRomState {
+    addr_port: String,
+    data_port: String,
     words: Vec<Value>,
 }
 
@@ -367,6 +375,7 @@ fn instantiate_module_state(
         module_name: module_name.to_owned(),
         persisted: build_persisted_signal_table(module),
         memories: build_memory_table(module),
+        legacy_rom: build_legacy_rom_state(hir, module)?,
         children,
     })
 }
@@ -387,6 +396,10 @@ fn settle_module(
     }
 
     let mut values = build_signal_table(module, inputs, &state.persisted)?;
+    if let Some(legacy_rom) = &state.legacy_rom {
+        apply_legacy_rom_outputs(module, &mut values, legacy_rom)?;
+        return Ok(values);
+    }
     let max_iterations = ((module.continuous_assignments.len()
         + module.proc_blocks.len()
         + module.instantiations.len()
@@ -507,7 +520,13 @@ fn execute_proc_block(
     memories: &HashMap<String, MemoryState>,
 ) -> Result<bool> {
     match kind {
-        ProcBlockKind::AlwaysComb => execute_comb_stmt(body, module, values, memories),
+        ProcBlockKind::AlwaysComb => {
+            let mut next_values = values.clone();
+            execute_comb_stmt(body, module, &mut next_values, memories)?;
+            let changed = *values != next_values;
+            *values = next_values;
+            Ok(changed)
+        }
         ProcBlockKind::AlwaysFf { .. } => Ok(false),
     }
 }
@@ -517,15 +536,14 @@ fn execute_comb_stmt(
     module: &ModuleSummary,
     values: &mut HashMap<String, Value>,
     memories: &HashMap<String, MemoryState>,
-) -> Result<bool> {
+) -> Result<()> {
     match stmt {
-        Stmt::Empty => Ok(false),
+        Stmt::Empty => Ok(()),
         Stmt::Block(statements) => {
-            let mut changed = false;
             for statement in statements {
-                changed |= execute_comb_stmt(statement, module, values, memories)?;
+                execute_comb_stmt(statement, module, values, memories)?;
             }
-            Ok(changed)
+            Ok(())
         }
         Stmt::Assign { kind, target, expr } => match kind {
             AssignmentKind::Blocking => {
@@ -538,7 +556,8 @@ fn execute_comb_stmt(
                     ));
                 }
                 let mut no_memories = HashMap::new();
-                apply_resolved_lvalue(&target, value, module, values, &mut no_memories)
+                apply_resolved_lvalue(&target, value, module, values, &mut no_memories)?;
+                Ok(())
             }
             AssignmentKind::Nonblocking => Err(Error::Unsupported(
                 "nonblocking assignments are only supported inside `always_ff` blocks".into(),
@@ -554,7 +573,7 @@ fn execute_comb_stmt(
             } else if let Some(else_branch) = else_branch {
                 execute_comb_stmt(else_branch, module, values, memories)
             } else {
-                Ok(false)
+                Ok(())
             }
         }
         Stmt::Case {
@@ -573,7 +592,7 @@ fn execute_comb_stmt(
             if let Some(default) = default {
                 execute_comb_stmt(default, module, values, memories)
             } else {
-                Ok(false)
+                Ok(())
             }
         }
     }
@@ -706,6 +725,118 @@ fn build_memory_table(module: &ModuleSummary) -> HashMap<String, MemoryState> {
     }
 
     memories
+}
+
+fn build_legacy_rom_state(
+    hir: &HirDesign,
+    module: &ModuleSummary,
+) -> Result<Option<LegacyRomState>> {
+    if !module.name.starts_with("rom_")
+        || !module.signals.is_empty()
+        || !module.memories.is_empty()
+        || !module.continuous_assignments.is_empty()
+        || !module.proc_blocks.is_empty()
+        || !module.instantiations.is_empty()
+    {
+        return Ok(None);
+    }
+
+    let addr_port = module
+        .ports
+        .iter()
+        .find(|port| matches!(port.direction, PortDirection::Input))
+        .ok_or_else(|| {
+            Error::Resolve(format!(
+                "legacy ROM primitive '{}' requires an input address port",
+                module.name
+            ))
+        })?;
+    let data_port = module
+        .ports
+        .iter()
+        .find(|port| matches!(port.direction, PortDirection::Output))
+        .ok_or_else(|| {
+            Error::Resolve(format!(
+                "legacy ROM primitive '{}' requires an output data port",
+                module.name
+            ))
+        })?;
+    let source_path = hir.module_source_path(&module.name).ok_or_else(|| {
+        Error::Resolve(format!(
+            "could not determine source file for legacy ROM primitive '{}'",
+            module.name
+        ))
+    })?;
+    let rom_name = &module.name["rom_".len()..];
+    if rom_name.is_empty() {
+        return Ok(None);
+    }
+
+    let data_path = resolve_legacy_rom_data_path(source_path, rom_name).ok_or_else(|| {
+        Error::Resolve(format!(
+            "legacy ROM primitive '{}' could not find '{}.txt'",
+            module.name, rom_name
+        ))
+    })?;
+    let depth = 1usize
+        .checked_shl(addr_port.width() as u32)
+        .ok_or_else(|| {
+            Error::Unsupported(format!(
+                "legacy ROM primitive '{}' address width {} exceeds host limits",
+                module.name,
+                addr_port.width()
+            ))
+        })?;
+    let writes = parse_memory_file(&data_path, data_port.width(), depth)?;
+    let mut words = vec![Value::zero(data_port.width()); depth];
+    for (index, word) in writes {
+        words[index] = Value::new(word, data_port.width());
+    }
+
+    Ok(Some(LegacyRomState {
+        addr_port: addr_port.name.clone(),
+        data_port: data_port.name.clone(),
+        words,
+    }))
+}
+
+fn resolve_legacy_rom_data_path(source_path: &Path, rom_name: &str) -> Option<std::path::PathBuf> {
+    let file_name = format!("{rom_name}.txt");
+    let mut candidates = Vec::new();
+    if let Some(source_dir) = source_path.parent() {
+        candidates.push(source_dir.join(&file_name));
+        candidates.push(source_dir.join("roms").join(&file_name));
+    }
+    if let Ok(current_dir) = std::env::current_dir() {
+        candidates.push(current_dir.join("roms").join(&file_name));
+    }
+
+    candidates.into_iter().find(|candidate| candidate.is_file())
+}
+
+fn apply_legacy_rom_outputs(
+    module: &ModuleSummary,
+    values: &mut HashMap<String, Value>,
+    legacy_rom: &LegacyRomState,
+) -> Result<()> {
+    let addr = values
+        .get(&legacy_rom.addr_port)
+        .copied()
+        .ok_or_else(|| {
+            Error::Resolve(format!(
+                "legacy ROM primitive '{}' is missing address port '{}'",
+                module.name, legacy_rom.addr_port
+            ))
+        })?
+        .normalized_bits() as usize;
+    let data = legacy_rom.words.get(addr).copied().ok_or_else(|| {
+        Error::Resolve(format!(
+            "legacy ROM primitive '{}' address {} is out of range",
+            module.name, addr
+        ))
+    })?;
+    values.insert(legacy_rom.data_port.clone(), data);
+    Ok(())
 }
 
 fn build_signal_table(
@@ -1497,6 +1628,24 @@ endmodule
             .expect("eval");
 
         assert_eq!(outputs.get("out"), Some(&1));
+    }
+
+    #[test]
+    fn eval_once_runs_always_comb_with_multiple_assignments_to_same_output() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .compile_file(repo.join("parts/overture/overture_alu_8bit.sv"))
+            .expect("compile overture_alu_8bit");
+        let mut sim = design.instantiate_top().expect("instantiate");
+        let outputs = sim
+            .eval_once(BTreeMap::from([
+                ("inA".into(), 5),
+                ("inB".into(), 3),
+                ("op".into(), 0b100),
+            ]))
+            .expect("eval");
+
+        assert_eq!(outputs.get("outY"), Some(&8));
     }
 
     #[test]

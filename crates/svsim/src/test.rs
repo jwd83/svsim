@@ -79,6 +79,7 @@ struct CombinationalTestCase {
 
 #[derive(Debug, Clone)]
 struct SequentialTestSuite {
+    base_dir: PathBuf,
     memory_bindings: Vec<MemoryBinding>,
     cases: Vec<SequentialTestCase>,
 }
@@ -180,7 +181,12 @@ impl JsonTestSuite {
         suite: &SequentialTestSuite,
     ) -> Result<JsonTestReport> {
         let mut sim = design.instantiate_top()?;
-        apply_memory_bindings(design, &mut sim, &suite.memory_bindings)?;
+        let memory_bindings = suite.memory_bindings_for_top_module(
+            design
+                .top_module()
+                .expect("compiled designs always carry a top module"),
+        );
+        apply_memory_bindings(design, &mut sim, &memory_bindings)?;
 
         let mut results = Vec::with_capacity(suite.cases.len());
         for case in &suite.cases {
@@ -257,9 +263,35 @@ impl SequentialTestSuite {
             .collect();
 
         Self {
+            base_dir: base_dir.to_path_buf(),
             memory_bindings,
             cases,
         }
+    }
+
+    fn memory_bindings_for_top_module(&self, top_module: &str) -> Vec<MemoryBinding> {
+        if !self.memory_bindings.is_empty() || !top_module.starts_with("pgm_") {
+            return self.memory_bindings.clone();
+        }
+
+        let program_name = &top_module["pgm_".len()..];
+        if program_name.is_empty() {
+            return self.memory_bindings.clone();
+        }
+
+        let program_path = self.base_dir.join(format!("{program_name}.txt"));
+        if !program_path.is_file() {
+            return self.memory_bindings.clone();
+        }
+
+        let mut bindings = self.memory_bindings.clone();
+        bindings.push(MemoryBinding {
+            module_name: Some("overture_fetch".into()),
+            instance_suffix: None,
+            memory_name: Some("rom".into()),
+            file: program_path,
+        });
+        bindings
     }
 }
 
@@ -589,6 +621,37 @@ mod tests {
 
         let report = design
             .run_json_file(repo.join("parts/testing/memory_cpu_stub.json"))
+            .expect("run json tests");
+
+        assert!(report.all_passed());
+        assert_eq!(report.passed, report.total);
+    }
+
+    #[test]
+    fn run_json_file_passes_legacy_rom_primitive_suite() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .compile_file(repo.join("parts/basic/rom_deadbeef.sv"))
+            .expect("compile rom_deadbeef");
+
+        let report = design
+            .run_json_file(repo.join("parts/basic/rom_deadbeef.json"))
+            .expect("run json tests");
+
+        assert!(report.all_passed());
+        assert_eq!(report.passed, report.total);
+    }
+
+    #[test]
+    fn run_json_file_passes_legacy_pgm_suite_without_explicit_bindings() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .add_search_path(repo.join("parts/overture"))
+            .compile_file(repo.join("parts/overture/pgm_overture_add5.sv"))
+            .expect("compile pgm_overture_add5");
+
+        let report = design
+            .run_json_file(repo.join("parts/overture/pgm_overture_add5.json"))
             .expect("run json tests");
 
         assert!(report.all_passed());

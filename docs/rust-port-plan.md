@@ -14,7 +14,7 @@ These product decisions are fixed for the first Rust pass:
 - make the embeddable surface Rust-only for now
 - treat the CLI as the cross-language integration point
 - defer PNG generation until after the simulator can emit stable structured results
-- replace implicit `rom_*` and `pgm_*` naming conventions with explicit configuration
+- keep the library memory/program API explicit, while allowing narrowly scoped corpus-compatibility fallbacks for legacy `rom_*` and `pgm_*` fixtures in regression execution
 
 ## Current Status
 
@@ -29,6 +29,7 @@ Current implementation status as of March 14, 2026:
 - `Compiler::run_json_test_dir` and CLI `--json-test-dir` now batch-discover sibling `*.sv` / `*.json` regression pairs under a directory, execute suites in parallel, and emit structured per-suite pass/fail or compile/runtime error reports in deterministic path order
 - CLI can parse a SystemVerilog file and emit JSON describing discovered modules, or run single-suite / directory JSON regressions via `--json-test` and `--json-test-dir`
 - `SimulationSession::eval_once` can execute hierarchical combinational designs with fixed-point convergence across continuous assignments, module instances, and a basic `always_comb` subset
+- `always_comb` execution now compares each block's final post-statement state against the prior iteration, so blocks that assign the same signal multiple times per execution settle correctly instead of oscillating
 - `SimulationSession::step` now maintains per-instance state and can advance hierarchical designs using `always_ff @(posedge <clock>)` blocks with blocking immediate updates and nonblocking assignment staging
 - current procedural subset: blocking assignments in combinational blocks and `always_ff`, nonblocking assignments in `always_ff`, `if` / `else`, `case` / `default`, and `begin` / `end` statement blocks
 - current expression subset adds concatenation, replication, logical `&&` / `||`, equality `==` / `!=`, arithmetic `+` / `-`, and single-dimension memory reads on top of literals, identifiers, slices, ternary expressions, and bitwise operators
@@ -36,6 +37,8 @@ Current implementation status as of March 14, 2026:
 - `compile_str` can seed a design from an in-memory top module while still resolving instantiated dependencies from the virtual path's directory and configured search paths
 - current sequential limits: only `posedge` event controls are lowered, `always_ff` clock expressions must be local identifiers, and cross-block race semantics are not modeled beyond deterministic source order
 - current memory subset supports fixed-size unpacked `reg` / `logic` arrays with zero-initialized reads, explicit programmatic preload/read access by instance path, text-file ROM/RAM loading, procedural single-element writes, and JSON-driven regression preload; explicit elaboration, broader event controls, and render integration are still pending
+- regression compatibility now covers the legacy corpus conventions that still matter in `parts/`: interface-only `rom_*` wrappers auto-load sibling ROM text files at runtime, and `pgm_*` JSON suites auto-bind `overture_fetch.rom` from a sibling program text file when no explicit memory bindings are present
+- measured verification: `cargo test -p svsim` passes, targeted legacy regressions now pass for `parts/basic/rom_deadbeef` and `parts/overture/pgm_overture_add5`, and `parts/testing` remains `39/40` with only `019-Vector5` failing for the known replication-order reference mismatch
 - measured batch status: `parts/testing` currently passes `39/40` suites, with only `019-Vector5` failing because the checked-in JSON preserves a Python reference replication-order bug
 - known compatibility gap: `parts/testing/019-Vector5` now lowers and evaluates with standard concatenation/replication bit ordering, but its checked-in JSON reflects a Python reference parser bug for multi-expression replication (`{5{a, b, c, d, e}}`), so Rust and JSON parity still diverge there until the compatibility policy is decided
 
@@ -347,6 +350,7 @@ Exit criterion:
 
 Current progress:
 - hierarchical combinational evaluation is implemented across continuous assignments, instances, `always_comb`, concatenation, replication, and concatenated lvalues
+- `always_comb` convergence now uses each block's final assigned state, which fixes Overture-style blocks that seed an output before overriding it inside `case` or `if` logic
 - grouped ANSI port declarations and initialized net declarations from the vector corpus are now lowered
 - in-memory top-level compilation via `compile_str` is implemented, with dependency lookup anchored at the virtual path plus explicit search paths
 - callers can now inspect the compiled instance tree directly instead of reverse-engineering valid instance paths from raw HIR module summaries
@@ -382,6 +386,7 @@ Exit criterion:
 
 Current progress:
 - library and CLI batch regression entry points now exist for directory-backed `*.sv` / `*.json` discovery, and per-suite execution now runs in parallel while keeping the report sorted by source path
+- legacy corpus compatibility for `rom_*` wrappers and `pgm_*` program harnesses now exists without reintroducing those naming conventions into the main library memory API
 - remaining work is using that runner to establish wider measured Overture parity and tighten unsupported-construct diagnostics where batch coverage finds gaps
 
 Exit criterion:
