@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 use std::process::Command;
+use std::time::{SystemTime, UNIX_EPOCH};
+use std::{fs, process};
 
 use serde_json::Value;
 
@@ -22,7 +24,11 @@ fn cli_emits_hir_json_for_parse_mode() {
         .output()
         .expect("run svsim");
 
-    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     let json: Value = serde_json::from_slice(&output.stdout).expect("parse stdout json");
     assert_eq!(json["top_module"], "full_adder");
@@ -39,10 +45,52 @@ fn cli_runs_json_regression_suite() {
         .output()
         .expect("run svsim");
 
-    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     let json: Value = serde_json::from_slice(&output.stdout).expect("parse stdout json");
     assert_eq!(json["top_module"], "full_adder");
     assert_eq!(json["report"]["passed"], 8);
     assert_eq!(json["report"]["total"], 8);
+}
+
+#[test]
+fn cli_runs_json_regression_directory() {
+    let temp_dir = unique_temp_dir("cli-json-test-dir");
+    fs::write(
+        temp_dir.join("pass.sv"),
+        "module pass(output logic one); assign one = 1'b1; endmodule\n",
+    )
+    .expect("write pass.sv");
+    fs::write(temp_dir.join("pass.json"), "[{\"expect\":{\"one\":1}}]").expect("write pass.json");
+
+    let output = Command::new(svsim_bin())
+        .arg("--json-test-dir")
+        .arg(&temp_dir)
+        .output()
+        .expect("run svsim");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let json: Value = serde_json::from_slice(&output.stdout).expect("parse stdout json");
+    assert_eq!(json["report"]["passed"], 1);
+    assert_eq!(json["report"]["total"], 1);
+    assert_eq!(json["report"]["suites"][0]["top_module"], "pass");
+}
+
+fn unique_temp_dir(name: &str) -> PathBuf {
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time")
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!("svsim-{name}-{}-{nonce}", process::id()));
+    fs::create_dir_all(&dir).expect("create temp dir");
+    dir
 }

@@ -6,6 +6,7 @@ use crate::design::CompiledDesign;
 use crate::diag::{Error, Result};
 use crate::frontend::SvParserFrontend;
 use crate::hir::SourceFile;
+use crate::test::{JsonTestDirectoryReport, JsonTestSuiteRunReport, build_directory_report};
 
 #[derive(Debug, Clone, Default)]
 pub struct Compiler {
@@ -47,6 +48,61 @@ impl Compiler {
         let virtual_path = virtual_path.into();
         let source_file = frontend.parse_str(&virtual_path, source)?;
         self.compile_from_source_file(virtual_path, source_file)
+    }
+
+    pub fn run_json_test_dir(&self, path: impl AsRef<Path>) -> Result<JsonTestDirectoryReport> {
+        let root = path.as_ref();
+        let suite_paths = collect_json_test_suites(root)?;
+        if suite_paths.is_empty() {
+            return Err(Error::Resolve(format!(
+                "no SystemVerilog/JSON regression pairs found under {}",
+                root.display()
+            )));
+        }
+
+        let mut suites = Vec::with_capacity(suite_paths.len());
+        for suite in suite_paths {
+            match self.compile_file(&suite.source_path) {
+                Ok(design) => {
+                    let top_module = design.top_module().map(str::to_owned);
+                    match design.run_json_file(&suite.json_path) {
+                        Ok(report) => {
+                            let passed = report.all_passed();
+                            suites.push(JsonTestSuiteRunReport {
+                                source_path: suite.source_path,
+                                json_path: suite.json_path,
+                                top_module,
+                                passed,
+                                report: Some(report),
+                                error: None,
+                            });
+                        }
+                        Err(error) => {
+                            suites.push(JsonTestSuiteRunReport {
+                                source_path: suite.source_path,
+                                json_path: suite.json_path,
+                                top_module,
+                                passed: false,
+                                report: None,
+                                error: Some(error.to_string()),
+                            });
+                        }
+                    }
+                }
+                Err(error) => {
+                    suites.push(JsonTestSuiteRunReport {
+                        source_path: suite.source_path,
+                        json_path: suite.json_path,
+                        top_module: None,
+                        passed: false,
+                        report: None,
+                        error: Some(error.to_string()),
+                    });
+                }
+            }
+        }
+
+        Ok(build_directory_report(suites))
     }
 
     fn resolve_module_path(&self, module_name: &str, current_dir: &Path) -> Result<PathBuf> {
@@ -174,6 +230,62 @@ impl Compiler {
 
         Ok(())
     }
+}
+
+#[derive(Debug, Clone)]
+struct JsonTestSuitePaths {
+    source_path: PathBuf,
+    json_path: PathBuf,
+}
+
+fn collect_json_test_suites(root: &Path) -> Result<Vec<JsonTestSuitePaths>> {
+    let mut suites = Vec::new();
+    collect_json_test_suites_recursive(root, &mut suites)?;
+    suites.sort_by(|left, right| left.source_path.cmp(&right.source_path));
+    Ok(suites)
+}
+
+fn collect_json_test_suites_recursive(
+    root: &Path,
+    suites: &mut Vec<JsonTestSuitePaths>,
+) -> Result<()> {
+    if root.is_file() {
+        if root.extension().and_then(|ext| ext.to_str()) == Some("sv") {
+            let json_path = root.with_extension("json");
+            if json_path.is_file() {
+                suites.push(JsonTestSuitePaths {
+                    source_path: root.to_path_buf(),
+                    json_path,
+                });
+            }
+        }
+        return Ok(());
+    }
+
+    let mut entries = fs::read_dir(root)?.collect::<std::io::Result<Vec<_>>>()?;
+    entries.sort_by_key(|entry| entry.path());
+
+    for entry in entries {
+        let path = entry.path();
+        if entry.file_type()?.is_dir() {
+            collect_json_test_suites_recursive(&path, suites)?;
+            continue;
+        }
+
+        if path.extension().and_then(|ext| ext.to_str()) != Some("sv") {
+            continue;
+        }
+
+        let json_path = path.with_extension("json");
+        if json_path.is_file() {
+            suites.push(JsonTestSuitePaths {
+                source_path: path,
+                json_path,
+            });
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -363,6 +475,90 @@ mod tests {
                 .into_iter()
                 .collect::<BTreeSet<_>>(),
             BTreeSet::from(["child", "top"]),
+        );
+    }
+
+    #[test]
+    fn run_json_test_dir_reports_passes_and_failures() {
+        let temp_dir = unique_temp_dir("json-test-dir");
+        let nested_dir = temp_dir.join("nested");
+        fs::create_dir_all(&nested_dir).expect("create nested dir");
+
+        fs::write(
+            temp_dir.join("pass.sv"),
+            "module pass(output logic one); assign one = 1'b1; endmodule\n",
+        )
+        .expect("write pass.sv");
+        fs::write(temp_dir.join("pass.json"), "[{\"expect\":{\"one\":1}}]")
+            .expect("write pass.json");
+
+        fs::write(
+            nested_dir.join("fail.sv"),
+            "module fail(output logic zero); assign zero = 1'b0; endmodule\n",
+        )
+        .expect("write fail.sv");
+        fs::write(nested_dir.join("fail.json"), "[{\"expect\":{\"zero\":1}}]")
+            .expect("write fail.json");
+
+        fs::write(
+            temp_dir.join("ignored.sv"),
+            "module ignored(output logic one); assign one = 1'b1; endmodule\n",
+        )
+        .expect("write ignored.sv");
+
+        let report = Compiler::new()
+            .run_json_test_dir(&temp_dir)
+            .expect("run batch regression");
+
+        assert_eq!(report.total, 2);
+        assert_eq!(report.passed, 1);
+        assert!(!report.all_passed());
+        assert_eq!(
+            report
+                .suites
+                .iter()
+                .map(|suite| {
+                    (
+                        suite
+                            .source_path
+                            .file_name()
+                            .and_then(|name| name.to_str())
+                            .expect("file name"),
+                        suite.passed,
+                    )
+                })
+                .collect::<Vec<_>>(),
+            vec![("fail.sv", false), ("pass.sv", true)],
+        );
+        assert!(report.suites[0].report.is_some());
+        assert!(report.suites[0].error.is_none());
+    }
+
+    #[test]
+    fn run_json_test_dir_keeps_compile_errors_in_report() {
+        let temp_dir = unique_temp_dir("json-test-dir-compile-error");
+
+        fs::write(
+            temp_dir.join("top.sv"),
+            "module top(output logic outY); missing_dep u_missing (.outY(outY)); endmodule\n",
+        )
+        .expect("write top.sv");
+        fs::write(temp_dir.join("top.json"), "[{\"expect\":{\"outY\":1}}]")
+            .expect("write top.json");
+
+        let report = Compiler::new()
+            .run_json_test_dir(&temp_dir)
+            .expect("run batch regression");
+
+        assert_eq!(report.total, 1);
+        assert_eq!(report.passed, 0);
+        assert!(!report.all_passed());
+        assert!(report.suites[0].report.is_none());
+        assert!(
+            report.suites[0]
+                .error
+                .as_deref()
+                .is_some_and(|message| message.contains("missing_dep"))
         );
     }
 

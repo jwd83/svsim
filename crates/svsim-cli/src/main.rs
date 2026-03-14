@@ -3,7 +3,7 @@ use std::process::ExitCode;
 
 use clap::Parser;
 use serde::Serialize;
-use svsim::{Compiler, HirDesign, JsonTestReport};
+use svsim::{Compiler, HirDesign, JsonTestDirectoryReport, JsonTestReport};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -17,11 +17,20 @@ struct Args {
     search_paths: Vec<PathBuf>,
 
     /// Run a JSON regression suite against the compiled design.
-    #[arg(long = "json-test")]
+    #[arg(
+        long = "json-test",
+        conflicts_with = "json_test_dir",
+        requires = "file"
+    )]
     json_test: Option<PathBuf>,
 
+    /// Run all sibling *.sv/*.json regression pairs under a directory.
+    #[arg(long = "json-test-dir", conflicts_with = "json_test")]
+    json_test_dir: Option<PathBuf>,
+
     /// SystemVerilog source file to compile.
-    file: PathBuf,
+    #[arg(required_unless_present = "json_test_dir")]
+    file: Option<PathBuf>,
 }
 
 #[derive(Debug, Serialize)]
@@ -36,6 +45,12 @@ struct TestOutput<'a> {
     report: JsonTestReport,
 }
 
+#[derive(Debug, Serialize)]
+struct BatchTestOutput {
+    directory: PathBuf,
+    report: JsonTestDirectoryReport,
+}
+
 fn main() -> ExitCode {
     let args = Args::parse();
 
@@ -46,45 +61,71 @@ fn main() -> ExitCode {
             compiler.add_search_path(path)
         });
 
-    match compiler.compile_file(&args.file) {
-        Ok(design) => {
-            if let Some(json_test) = args.json_test {
-                match design.run_json_file(&json_test) {
-                    Ok(report) => {
-                        let all_passed = report.all_passed();
-                        let output = TestOutput {
-                            top_module: design.top_module(),
-                            report,
-                        };
-                        if write_json(&output).is_err() {
-                            ExitCode::FAILURE
-                        } else if all_passed {
-                            ExitCode::SUCCESS
-                        } else {
+    if let Some(json_test_dir) = args.json_test_dir {
+        match compiler.run_json_test_dir(&json_test_dir) {
+            Ok(report) => {
+                let all_passed = report.all_passed();
+                let output = BatchTestOutput {
+                    directory: json_test_dir,
+                    report,
+                };
+                if write_json(&output).is_err() {
+                    ExitCode::FAILURE
+                } else if all_passed {
+                    ExitCode::SUCCESS
+                } else {
+                    ExitCode::FAILURE
+                }
+            }
+            Err(error) => {
+                eprintln!("{error}");
+                ExitCode::FAILURE
+            }
+        }
+    } else {
+        let file = args
+            .file
+            .expect("clap should require a file unless --json-test-dir is used");
+        match compiler.compile_file(&file) {
+            Ok(design) => {
+                if let Some(json_test) = args.json_test {
+                    match design.run_json_file(&json_test) {
+                        Ok(report) => {
+                            let all_passed = report.all_passed();
+                            let output = TestOutput {
+                                top_module: design.top_module(),
+                                report,
+                            };
+                            if write_json(&output).is_err() {
+                                ExitCode::FAILURE
+                            } else if all_passed {
+                                ExitCode::SUCCESS
+                            } else {
+                                ExitCode::FAILURE
+                            }
+                        }
+                        Err(error) => {
+                            eprintln!("{error}");
                             ExitCode::FAILURE
                         }
                     }
-                    Err(error) => {
-                        eprintln!("{error}");
+                } else {
+                    let output = ParseOutput {
+                        top_module: design.top_module(),
+                        hir: design.hir(),
+                    };
+
+                    if write_json(&output).is_err() {
                         ExitCode::FAILURE
+                    } else {
+                        ExitCode::SUCCESS
                     }
                 }
-            } else {
-                let output = ParseOutput {
-                    top_module: design.top_module(),
-                    hir: design.hir(),
-                };
-
-                if write_json(&output).is_err() {
-                    ExitCode::FAILURE
-                } else {
-                    ExitCode::SUCCESS
-                }
             }
-        }
-        Err(error) => {
-            eprintln!("{error}");
-            ExitCode::FAILURE
+            Err(error) => {
+                eprintln!("{error}");
+                ExitCode::FAILURE
+            }
         }
     }
 }

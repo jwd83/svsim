@@ -21,6 +21,29 @@ impl JsonTestReport {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct JsonTestDirectoryReport {
+    pub passed: usize,
+    pub total: usize,
+    pub suites: Vec<JsonTestSuiteRunReport>,
+}
+
+impl JsonTestDirectoryReport {
+    pub fn all_passed(&self) -> bool {
+        self.passed == self.total
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct JsonTestSuiteRunReport {
+    pub source_path: PathBuf,
+    pub json_path: PathBuf,
+    pub top_module: Option<String>,
+    pub passed: bool,
+    pub report: Option<JsonTestReport>,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct JsonTestCaseReport {
     pub name: String,
     pub description: Option<String>,
@@ -125,9 +148,7 @@ impl JsonTestSuite {
             }
         };
 
-        Ok(Self {
-            kind,
-        })
+        Ok(Self { kind })
     }
 
     fn run_combinational(
@@ -406,6 +427,18 @@ fn build_report(cases: Vec<JsonTestCaseReport>) -> JsonTestReport {
         passed,
         total,
         cases,
+    }
+}
+
+pub(crate) fn build_directory_report(
+    suites: Vec<JsonTestSuiteRunReport>,
+) -> JsonTestDirectoryReport {
+    let passed = suites.iter().filter(|suite| suite.passed).count();
+    let total = suites.len();
+    JsonTestDirectoryReport {
+        passed,
+        total,
+        suites,
     }
 }
 

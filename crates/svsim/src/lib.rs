@@ -14,4 +14,7 @@ pub use hir::{
     ProcBlock, ProcBlockKind, SourceFile, Stmt,
 };
 pub use sim::SimulationSession;
-pub use test::{JsonTestCaseReport, JsonTestFailure, JsonTestReport, JsonTestSuite};
+pub use test::{
+    JsonTestCaseReport, JsonTestDirectoryReport, JsonTestFailure, JsonTestReport, JsonTestSuite,
+    JsonTestSuiteRunReport,
+};
