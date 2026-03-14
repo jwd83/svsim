@@ -39,6 +39,6 @@ impl CompiledDesign {
     }
 
     pub fn instantiate_top(&self) -> Result<SimulationSession> {
-        Ok(SimulationSession::new(self.top_module.clone()))
+        Ok(SimulationSession::new(self.clone()))
     }
 }
