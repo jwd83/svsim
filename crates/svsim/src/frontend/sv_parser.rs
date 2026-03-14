@@ -11,20 +11,26 @@ use sv_parser::{
     ModuleOrGenerateItemDeclaration, NamedPortConnection, NetDeclaration, NetLvalue,
     NonPortModuleItem, PackageOrGenerateItemDeclaration, PartSelectRange, PortDirection, Primary,
     PsOrHierarchicalNetIdentifier, RefNode, Select, SeqBlock, Statement, StatementItem,
-    StatementOrNull, SyntaxTree, UnaryOperator, VariableAssignment, VariableLvalue,
-    VariablePortType, parse_sv, unwrap_node,
+    StatementOrNull, SyntaxTree, UnaryOperator, UnpackedDimension, VariableAssignment,
+    VariableDimension, VariableLvalue, VariablePortType, parse_sv, unwrap_node,
 };
 
 use crate::diag::{Diagnostic, Error, Result, SourceSpan};
 use crate::hir::{
     AssignmentKind, BinaryOp, CaseStmtItem, ContinuousAssign as HirContinuousAssign, Expr, LValue,
-    ModuleDeclStyle, ModuleInstanceSummary, ModuleSummary,
+    MemoryDecl, ModuleDeclStyle, ModuleInstanceSummary, ModuleSummary,
     NamedPortConnection as HirNamedPortConnection, NumericLiteral, PackedRange, PortDecl,
     PortDirection as HirPortDirection, ProcBlock, ProcBlockKind, SignalDecl, SourceFile, Stmt,
     UnaryOp,
 };
 
 type LowerResult<T> = std::result::Result<T, Diagnostic>;
+
+#[derive(Debug, Default)]
+struct LoweredDeclarations {
+    signals: Vec<SignalDecl>,
+    memories: Vec<MemoryDecl>,
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct SvParserFrontend {
@@ -83,6 +89,7 @@ fn lower_ansi_module(
         span: Some(span_from_locate(path, locate)),
         ports: Vec::new(),
         signals: Vec::new(),
+        memories: Vec::new(),
         continuous_assignments: Vec::new(),
         proc_blocks: Vec::new(),
         instantiations: Vec::new(),
@@ -127,6 +134,7 @@ fn lower_nonansi_module(
         span: Some(span_from_locate(path, locate)),
         ports: Vec::new(),
         signals: Vec::new(),
+        memories: Vec::new(),
         continuous_assignments: Vec::new(),
         proc_blocks: Vec::new(),
         instantiations: Vec::new(),
@@ -172,7 +180,7 @@ fn lower_module_or_generate_item(
 ) {
     match item {
         ModuleOrGenerateItem::Module(item) => {
-            match lower_module_instantiation(syntax_tree, &item.nodes.1, path) {
+            match lower_module_instantiation(syntax_tree, &item.nodes.1, module, path) {
                 Ok(instantiations) => module.instantiations.extend(instantiations),
                 Err(diag) => module.unsupported.push(diag),
             }
@@ -182,13 +190,13 @@ fn lower_module_or_generate_item(
                 lower_module_declaration_item(syntax_tree, decl, path, module);
             }
             sv_parser::ModuleCommonItem::ContinuousAssign(assign) => {
-                match lower_continuous_assign(syntax_tree, assign, path) {
+                match lower_continuous_assign(syntax_tree, assign, module, path) {
                     Ok(assignments) => module.continuous_assignments.extend(assignments),
                     Err(diag) => module.unsupported.push(diag),
                 }
             }
             sv_parser::ModuleCommonItem::AlwaysConstruct(construct) => {
-                match lower_always_construct(syntax_tree, construct, path) {
+                match lower_always_construct(syntax_tree, construct, module, path) {
                     Ok(block) => module.proc_blocks.push(block),
                     Err(diag) => module.unsupported.push(diag),
                 }
@@ -215,7 +223,10 @@ fn lower_module_declaration_item(
         ModuleOrGenerateItemDeclaration::PackageOrGenerateItemDeclaration(decl) => match &**decl {
             PackageOrGenerateItemDeclaration::DataDeclaration(decl) => {
                 match lower_data_declaration(syntax_tree, decl, path) {
-                    Ok(signals) => module.signals.extend(signals),
+                    Ok(decls) => {
+                        module.signals.extend(decls.signals);
+                        module.memories.extend(decls.memories);
+                    }
                     Err(diag) => module.unsupported.push(diag),
                 }
             }
@@ -357,11 +368,11 @@ fn lower_data_declaration(
     syntax_tree: &SyntaxTree,
     decl: &DataDeclaration,
     path: &Path,
-) -> LowerResult<Vec<SignalDecl>> {
+) -> LowerResult<LoweredDeclarations> {
     match decl {
         DataDeclaration::Variable(decl) => {
             let range = lower_data_type_or_implicit_range(syntax_tree, &decl.nodes.3, path)?;
-            let mut signals = Vec::new();
+            let mut lowered = LoweredDeclarations::default();
             for assignment in decl.nodes.4.nodes.0.contents() {
                 let sv_parser::VariableDeclAssignment::Variable(assignment) = assignment else {
                     return Err(unsupported(
@@ -369,9 +380,9 @@ fn lower_data_declaration(
                         None,
                     ));
                 };
-                if !assignment.nodes.1.is_empty() || assignment.nodes.2.is_some() {
+                if assignment.nodes.2.is_some() {
                     return Err(unsupported(
-                        "variable declarations with unpacked dimensions or initializers are not supported yet",
+                        "variable declarations with initializers are not supported yet",
                         None,
                     ));
                 }
@@ -380,13 +391,18 @@ fn lower_data_declaration(
                         .ok_or_else(|| {
                             unsupported("failed to determine variable declaration name", None)
                         })?;
-                signals.push(SignalDecl {
-                    name,
-                    range,
-                    span: Some(span_from_locate(path, locate)),
-                });
+                let span = Some(span_from_locate(path, locate));
+                match lower_variable_dimensions(syntax_tree, &assignment.nodes.1, path)? {
+                    None => lowered.signals.push(SignalDecl { name, range, span }),
+                    Some(index_range) => lowered.memories.push(MemoryDecl {
+                        name,
+                        element_range: range,
+                        index_range,
+                        span,
+                    }),
+                }
             }
-            Ok(signals)
+            Ok(lowered)
         }
         _ => Err(unsupported("data declaration is not supported yet", None)),
     }
@@ -466,6 +482,50 @@ fn lower_implicit_data_type_range(
     lower_packed_dimensions(syntax_tree, &data_type.nodes.1, path)
 }
 
+fn lower_unpacked_dimensions(
+    syntax_tree: &SyntaxTree,
+    unpacked_dimensions: &[UnpackedDimension],
+    path: &Path,
+) -> LowerResult<Option<PackedRange>> {
+    match unpacked_dimensions {
+        [] => Ok(None),
+        [UnpackedDimension::Range(range)] => {
+            lower_constant_range(syntax_tree, &range.nodes.0.nodes.1, path).map(Some)
+        }
+        [UnpackedDimension::Expression(_)] => Err(unsupported(
+            "unsized unpacked dimensions are not supported yet",
+            None,
+        )),
+        _ => Err(unsupported(
+            "multiple unpacked dimensions are not supported yet",
+            None,
+        )),
+    }
+}
+
+fn lower_variable_dimensions(
+    syntax_tree: &SyntaxTree,
+    dimensions: &[VariableDimension],
+    path: &Path,
+) -> LowerResult<Option<PackedRange>> {
+    match dimensions {
+        [] => Ok(None),
+        [VariableDimension::UnpackedDimension(dimension)] => {
+            lower_unpacked_dimensions(syntax_tree, std::slice::from_ref(dimension.as_ref()), path)
+        }
+        [VariableDimension::UnsizedDimension(_)]
+        | [VariableDimension::AssociativeDimension(_)]
+        | [VariableDimension::QueueDimension(_)] => Err(unsupported(
+            "only fixed-size unpacked dimensions are supported today",
+            None,
+        )),
+        _ => Err(unsupported(
+            "multiple unpacked dimensions are not supported yet",
+            None,
+        )),
+    }
+}
+
 fn lower_packed_dimensions(
     syntax_tree: &SyntaxTree,
     packed_dimensions: &[sv_parser::PackedDimension],
@@ -486,6 +546,7 @@ fn lower_packed_dimensions(
 fn lower_continuous_assign(
     syntax_tree: &SyntaxTree,
     assign: &ContinuousAssign,
+    module: &ModuleSummary,
     path: &Path,
 ) -> LowerResult<Vec<HirContinuousAssign>> {
     match assign {
@@ -494,7 +555,7 @@ fn lower_continuous_assign(
             for assignment in assign.nodes.3.nodes.0.contents() {
                 lowered.push(HirContinuousAssign {
                     target: lower_net_lvalue(syntax_tree, &assignment.nodes.0, path)?,
-                    expr: lower_expression(syntax_tree, &assignment.nodes.2, path)?,
+                    expr: lower_expression(syntax_tree, &assignment.nodes.2, module, path)?,
                     span: None,
                 });
             }
@@ -504,8 +565,13 @@ fn lower_continuous_assign(
             let mut lowered = Vec::new();
             for assignment in assign.nodes.2.nodes.0.contents() {
                 lowered.push(HirContinuousAssign {
-                    target: lower_variable_assignment_lvalue(syntax_tree, assignment, path)?,
-                    expr: lower_expression(syntax_tree, &assignment.nodes.2, path)?,
+                    target: lower_variable_assignment_lvalue(
+                        syntax_tree,
+                        assignment,
+                        module,
+                        path,
+                    )?,
+                    expr: lower_expression(syntax_tree, &assignment.nodes.2, module, path)?,
                     span: None,
                 });
             }
@@ -517,6 +583,7 @@ fn lower_continuous_assign(
 fn lower_module_instantiation(
     syntax_tree: &SyntaxTree,
     instantiation: &ModuleInstantiation,
+    module: &ModuleSummary,
     path: &Path,
 ) -> LowerResult<Vec<ModuleInstanceSummary>> {
     if instantiation.nodes.1.is_some() {
@@ -567,7 +634,7 @@ fn lower_module_instantiation(
                 .ok_or_else(|| {
                     unsupported("named port connections must provide an expression", None)
                 })
-                .and_then(|expr| lower_expression(syntax_tree, expr, path))?;
+                .and_then(|expr| lower_expression(syntax_tree, expr, module, path))?;
             lowered_connections.push(HirNamedPortConnection {
                 port_name,
                 expr,
@@ -589,12 +656,13 @@ fn lower_module_instantiation(
 fn lower_always_construct(
     syntax_tree: &SyntaxTree,
     construct: &AlwaysConstruct,
+    module: &ModuleSummary,
     path: &Path,
 ) -> LowerResult<ProcBlock> {
     match &construct.nodes.0 {
         AlwaysKeyword::AlwaysComb(_) => Ok(ProcBlock {
             kind: ProcBlockKind::AlwaysComb,
-            body: lower_statement(syntax_tree, &construct.nodes.1, path)?,
+            body: lower_statement(syntax_tree, &construct.nodes.1, module, path)?,
             span: None,
         }),
         AlwaysKeyword::Always(_) => Err(unsupported(
@@ -606,7 +674,8 @@ fn lower_always_construct(
             None,
         )),
         AlwaysKeyword::AlwaysFf(_) => {
-            let (clock, body) = lower_always_ff_statement(syntax_tree, &construct.nodes.1, path)?;
+            let (clock, body) =
+                lower_always_ff_statement(syntax_tree, &construct.nodes.1, module, path)?;
             Ok(ProcBlock {
                 kind: ProcBlockKind::AlwaysFf { clock },
                 body,
@@ -619,6 +688,7 @@ fn lower_always_construct(
 fn lower_always_ff_statement(
     syntax_tree: &SyntaxTree,
     statement: &Statement,
+    module: &ModuleSummary,
     path: &Path,
 ) -> LowerResult<(String, Stmt)> {
     if statement.nodes.0.is_some() {
@@ -643,7 +713,7 @@ fn lower_always_ff_statement(
 
     let clock = match &statement.nodes.0 {
         sv_parser::ProceduralTimingControl::EventControl(control) => {
-            lower_always_ff_event_control(syntax_tree, control, path)?
+            lower_always_ff_event_control(syntax_tree, control, module, path)?
         }
         _ => {
             return Err(unsupported(
@@ -652,18 +722,19 @@ fn lower_always_ff_statement(
             ));
         }
     };
-    let body = lower_statement_or_null(syntax_tree, &statement.nodes.1, path)?;
+    let body = lower_statement_or_null(syntax_tree, &statement.nodes.1, module, path)?;
     Ok((clock, body))
 }
 
 fn lower_always_ff_event_control(
     syntax_tree: &SyntaxTree,
     control: &sv_parser::EventControl,
+    module: &ModuleSummary,
     path: &Path,
 ) -> LowerResult<String> {
     match control {
         sv_parser::EventControl::EventExpression(expr) => {
-            lower_always_ff_event_expression(syntax_tree, &expr.nodes.1.nodes.1, path)
+            lower_always_ff_event_expression(syntax_tree, &expr.nodes.1.nodes.1, module, path)
         }
         _ => Err(unsupported(
             "`always_ff` blocks must use a single `@(posedge <clock>)` event",
@@ -675,6 +746,7 @@ fn lower_always_ff_event_control(
 fn lower_always_ff_event_expression(
     syntax_tree: &SyntaxTree,
     expr: &sv_parser::EventExpression,
+    module: &ModuleSummary,
     path: &Path,
 ) -> LowerResult<String> {
     let sv_parser::EventExpression::Expression(expr) = expr else {
@@ -697,7 +769,7 @@ fn lower_always_ff_event_expression(
         ));
     }
 
-    let Expr::Ident(clock) = lower_expression(syntax_tree, &expr.nodes.1, path)? else {
+    let Expr::Ident(clock) = lower_expression(syntax_tree, &expr.nodes.1, module, path)? else {
         return Err(unsupported(
             "`always_ff` clock expressions must name a local signal",
             None,
@@ -709,6 +781,7 @@ fn lower_always_ff_event_expression(
 fn lower_statement(
     syntax_tree: &SyntaxTree,
     statement: &Statement,
+    module: &ModuleSummary,
     path: &Path,
 ) -> LowerResult<Stmt> {
     if statement.nodes.0.is_some() {
@@ -726,17 +799,17 @@ fn lower_statement(
 
     match &statement.nodes.2 {
         StatementItem::BlockingAssignment(assignment) => {
-            lower_blocking_assignment(syntax_tree, &assignment.0, path)
+            lower_blocking_assignment(syntax_tree, &assignment.0, module, path)
         }
         StatementItem::NonblockingAssignment(assignment) => {
-            lower_nonblocking_assignment(syntax_tree, &assignment.0, path)
+            lower_nonblocking_assignment(syntax_tree, &assignment.0, module, path)
         }
-        StatementItem::SeqBlock(block) => lower_seq_block(syntax_tree, block, path),
+        StatementItem::SeqBlock(block) => lower_seq_block(syntax_tree, block, module, path),
         StatementItem::ConditionalStatement(statement) => {
-            lower_conditional_statement(syntax_tree, statement, path)
+            lower_conditional_statement(syntax_tree, statement, module, path)
         }
         StatementItem::CaseStatement(statement) => {
-            lower_case_statement(syntax_tree, statement, path)
+            lower_case_statement(syntax_tree, statement, module, path)
         }
         _ => Err(unsupported(
             "statement is outside the current executable subset",
@@ -748,10 +821,13 @@ fn lower_statement(
 fn lower_statement_or_null(
     syntax_tree: &SyntaxTree,
     statement: &StatementOrNull,
+    module: &ModuleSummary,
     path: &Path,
 ) -> LowerResult<Stmt> {
     match statement {
-        StatementOrNull::Statement(statement) => lower_statement(syntax_tree, statement, path),
+        StatementOrNull::Statement(statement) => {
+            lower_statement(syntax_tree, statement, module, path)
+        }
         StatementOrNull::Attribute(_) => {
             Err(unsupported("null statements are not supported yet", None))
         }
@@ -761,6 +837,7 @@ fn lower_statement_or_null(
 fn lower_blocking_assignment(
     syntax_tree: &SyntaxTree,
     assignment: &sv_parser::BlockingAssignment,
+    module: &ModuleSummary,
     path: &Path,
 ) -> LowerResult<Stmt> {
     match assignment {
@@ -773,8 +850,8 @@ fn lower_blocking_assignment(
             }
             Ok(Stmt::Assign {
                 kind: AssignmentKind::Blocking,
-                target: lower_variable_lvalue(syntax_tree, &assignment.nodes.0, path)?,
-                expr: lower_expression(syntax_tree, &assignment.nodes.2, path)?,
+                target: lower_variable_lvalue(syntax_tree, &assignment.nodes.0, module, path)?,
+                expr: lower_expression(syntax_tree, &assignment.nodes.2, module, path)?,
             })
         }
         sv_parser::BlockingAssignment::Variable(_) => Err(unsupported(
@@ -791,6 +868,7 @@ fn lower_blocking_assignment(
 fn lower_nonblocking_assignment(
     syntax_tree: &SyntaxTree,
     assignment: &sv_parser::NonblockingAssignment,
+    module: &ModuleSummary,
     path: &Path,
 ) -> LowerResult<Stmt> {
     if assignment.nodes.2.is_some() {
@@ -808,12 +886,17 @@ fn lower_nonblocking_assignment(
 
     Ok(Stmt::Assign {
         kind: AssignmentKind::Nonblocking,
-        target: lower_variable_lvalue(syntax_tree, &assignment.nodes.0, path)?,
-        expr: lower_expression(syntax_tree, &assignment.nodes.3, path)?,
+        target: lower_variable_lvalue(syntax_tree, &assignment.nodes.0, module, path)?,
+        expr: lower_expression(syntax_tree, &assignment.nodes.3, module, path)?,
     })
 }
 
-fn lower_seq_block(syntax_tree: &SyntaxTree, block: &SeqBlock, path: &Path) -> LowerResult<Stmt> {
+fn lower_seq_block(
+    syntax_tree: &SyntaxTree,
+    block: &SeqBlock,
+    module: &ModuleSummary,
+    path: &Path,
+) -> LowerResult<Stmt> {
     if block.nodes.1.is_some() || block.nodes.5.is_some() {
         return Err(unsupported(
             "named begin/end blocks are not supported yet",
@@ -829,7 +912,12 @@ fn lower_seq_block(syntax_tree: &SyntaxTree, block: &SeqBlock, path: &Path) -> L
 
     let mut statements = Vec::new();
     for statement in &block.nodes.3 {
-        statements.push(lower_statement_or_null(syntax_tree, statement, path)?);
+        statements.push(lower_statement_or_null(
+            syntax_tree,
+            statement,
+            module,
+            path,
+        )?);
     }
 
     Ok(Stmt::Block(statements))
@@ -838,6 +926,7 @@ fn lower_seq_block(syntax_tree: &SyntaxTree, block: &SeqBlock, path: &Path) -> L
 fn lower_conditional_statement(
     syntax_tree: &SyntaxTree,
     statement: &ConditionalStatement,
+    module: &ModuleSummary,
     path: &Path,
 ) -> LowerResult<Stmt> {
     if statement.nodes.0.is_some() {
@@ -851,23 +940,24 @@ fn lower_conditional_statement(
         .nodes
         .5
         .as_ref()
-        .map(|(_, branch)| lower_statement_or_null(syntax_tree, branch, path))
+        .map(|(_, branch)| lower_statement_or_null(syntax_tree, branch, module, path))
         .transpose()?
         .map(Box::new);
 
     for (_, _, predicate, branch) in statement.nodes.4.iter().rev() {
         else_branch = Some(Box::new(Stmt::If {
-            cond: lower_cond_predicate(syntax_tree, &predicate.nodes.1, path)?,
-            then_branch: Box::new(lower_statement_or_null(syntax_tree, branch, path)?),
+            cond: lower_cond_predicate(syntax_tree, &predicate.nodes.1, module, path)?,
+            then_branch: Box::new(lower_statement_or_null(syntax_tree, branch, module, path)?),
             else_branch,
         }));
     }
 
     Ok(Stmt::If {
-        cond: lower_cond_predicate(syntax_tree, &statement.nodes.2.nodes.1, path)?,
+        cond: lower_cond_predicate(syntax_tree, &statement.nodes.2.nodes.1, module, path)?,
         then_branch: Box::new(lower_statement_or_null(
             syntax_tree,
             &statement.nodes.3,
+            module,
             path,
         )?),
         else_branch,
@@ -877,6 +967,7 @@ fn lower_conditional_statement(
 fn lower_case_statement(
     syntax_tree: &SyntaxTree,
     statement: &CaseStatement,
+    module: &ModuleSummary,
     path: &Path,
 ) -> LowerResult<Stmt> {
     let (keyword, expr, first_item, rest_items) = match statement {
@@ -903,13 +994,20 @@ fn lower_case_statement(
 
     let mut items = Vec::new();
     let mut default = None;
-    lower_case_item(syntax_tree, first_item, path, &mut items, &mut default)?;
+    lower_case_item(
+        syntax_tree,
+        first_item,
+        module,
+        path,
+        &mut items,
+        &mut default,
+    )?;
     for item in rest_items {
-        lower_case_item(syntax_tree, item, path, &mut items, &mut default)?;
+        lower_case_item(syntax_tree, item, module, path, &mut items, &mut default)?;
     }
 
     Ok(Stmt::Case {
-        expr: lower_expression(syntax_tree, expr, path)?,
+        expr: lower_expression(syntax_tree, expr, module, path)?,
         items,
         default,
     })
@@ -918,6 +1016,7 @@ fn lower_case_statement(
 fn lower_case_item(
     syntax_tree: &SyntaxTree,
     item: &SvCaseItem,
+    module: &ModuleSummary,
     path: &Path,
     items: &mut Vec<CaseStmtItem>,
     default: &mut Option<Box<Stmt>>,
@@ -926,11 +1025,11 @@ fn lower_case_item(
         SvCaseItem::NonDefault(item) => {
             let mut patterns = Vec::new();
             for expr in item.nodes.0.contents() {
-                patterns.push(lower_expression(syntax_tree, &expr.nodes.0, path)?);
+                patterns.push(lower_expression(syntax_tree, &expr.nodes.0, module, path)?);
             }
             items.push(CaseStmtItem {
                 patterns,
-                body: lower_statement_or_null(syntax_tree, &item.nodes.2, path)?,
+                body: lower_statement_or_null(syntax_tree, &item.nodes.2, module, path)?,
             });
         }
         SvCaseItem::Default(item) => {
@@ -943,6 +1042,7 @@ fn lower_case_item(
             *default = Some(Box::new(lower_statement_or_null(
                 syntax_tree,
                 &item.nodes.2,
+                module,
                 path,
             )?));
         }
@@ -951,28 +1051,38 @@ fn lower_case_item(
     Ok(())
 }
 
-fn lower_expression(syntax_tree: &SyntaxTree, expr: &Expression, path: &Path) -> LowerResult<Expr> {
+fn lower_expression(
+    syntax_tree: &SyntaxTree,
+    expr: &Expression,
+    module: &ModuleSummary,
+    path: &Path,
+) -> LowerResult<Expr> {
     match expr {
-        Expression::Primary(primary) => lower_primary(syntax_tree, primary, path),
+        Expression::Primary(primary) => lower_primary(syntax_tree, primary, module, path),
         Expression::Unary(expr) => {
             let op = lower_unary_operator(syntax_tree, &expr.nodes.0)?;
             Ok(Expr::Unary {
                 op,
-                expr: Box::new(lower_primary(syntax_tree, &expr.nodes.2, path)?),
+                expr: Box::new(lower_primary(syntax_tree, &expr.nodes.2, module, path)?),
             })
         }
         Expression::Binary(expr) => {
             let op = lower_binary_operator(syntax_tree, &expr.nodes.1)?;
             Ok(Expr::Binary {
-                left: Box::new(lower_expression(syntax_tree, &expr.nodes.0, path)?),
+                left: Box::new(lower_expression(syntax_tree, &expr.nodes.0, module, path)?),
                 op,
-                right: Box::new(lower_expression(syntax_tree, &expr.nodes.3, path)?),
+                right: Box::new(lower_expression(syntax_tree, &expr.nodes.3, module, path)?),
             })
         }
         Expression::ConditionalExpression(expr) => Ok(Expr::Ternary {
-            cond: Box::new(lower_cond_predicate(syntax_tree, &expr.nodes.0, path)?),
-            when_true: Box::new(lower_expression(syntax_tree, &expr.nodes.3, path)?),
-            when_false: Box::new(lower_expression(syntax_tree, &expr.nodes.5, path)?),
+            cond: Box::new(lower_cond_predicate(
+                syntax_tree,
+                &expr.nodes.0,
+                module,
+                path,
+            )?),
+            when_true: Box::new(lower_expression(syntax_tree, &expr.nodes.3, module, path)?),
+            when_false: Box::new(lower_expression(syntax_tree, &expr.nodes.5, module, path)?),
         }),
         _ => Err(unsupported(
             "expression is outside the current executable subset",
@@ -981,7 +1091,12 @@ fn lower_expression(syntax_tree: &SyntaxTree, expr: &Expression, path: &Path) ->
     }
 }
 
-fn lower_primary(syntax_tree: &SyntaxTree, primary: &Primary, path: &Path) -> LowerResult<Expr> {
+fn lower_primary(
+    syntax_tree: &SyntaxTree,
+    primary: &Primary,
+    module: &ModuleSummary,
+    path: &Path,
+) -> LowerResult<Expr> {
     match primary {
         Primary::PrimaryLiteral(literal) => lower_literal(syntax_tree, literal),
         Primary::Hierarchical(primary) => {
@@ -990,10 +1105,16 @@ fn lower_primary(syntax_tree: &SyntaxTree, primary: &Primary, path: &Path) -> Lo
                 &primary.nodes.1,
                 "hierarchical expressions",
             )?;
-            lower_expr_select(syntax_tree, Expr::Ident(name), &primary.nodes.2, path)
+            lower_expr_select(
+                syntax_tree,
+                Expr::Ident(name),
+                &primary.nodes.2,
+                module,
+                path,
+            )
         }
         Primary::MintypmaxExpression(expr) => {
-            lower_mintypmax_expression(syntax_tree, &expr.nodes.0.nodes.1, path)
+            lower_mintypmax_expression(syntax_tree, &expr.nodes.0.nodes.1, module, path)
         }
         _ => Err(unsupported("primary expression is not supported yet", None)),
     }
@@ -1002,16 +1123,17 @@ fn lower_primary(syntax_tree: &SyntaxTree, primary: &Primary, path: &Path) -> Lo
 fn lower_mintypmax_expression(
     syntax_tree: &SyntaxTree,
     expr: &sv_parser::MintypmaxExpression,
+    module: &ModuleSummary,
     path: &Path,
 ) -> LowerResult<Expr> {
     match expr {
         sv_parser::MintypmaxExpression::Expression(expr) => {
-            lower_expression(syntax_tree, expr, path)
+            lower_expression(syntax_tree, expr, module, path)
         }
         sv_parser::MintypmaxExpression::Ternary(expr) => Ok(Expr::Ternary {
-            cond: Box::new(lower_expression(syntax_tree, &expr.nodes.0, path)?),
-            when_true: Box::new(lower_expression(syntax_tree, &expr.nodes.2, path)?),
-            when_false: Box::new(lower_expression(syntax_tree, &expr.nodes.4, path)?),
+            cond: Box::new(lower_expression(syntax_tree, &expr.nodes.0, module, path)?),
+            when_true: Box::new(lower_expression(syntax_tree, &expr.nodes.2, module, path)?),
+            when_false: Box::new(lower_expression(syntax_tree, &expr.nodes.4, module, path)?),
         }),
     }
 }
@@ -1098,10 +1220,27 @@ fn lower_expr_select(
     syntax_tree: &SyntaxTree,
     base: Expr,
     select: &Select,
+    module: &ModuleSummary,
     path: &Path,
 ) -> LowerResult<Expr> {
     if select.nodes.0.is_some() {
         return Err(unsupported("member selections are not supported yet", None));
+    }
+
+    if let Expr::Ident(name) = &base {
+        if module.memory_decl(name).is_some() {
+            return match select.nodes.1.nodes.0.as_slice() {
+                [index] if select.nodes.2.is_none() => Ok(Expr::MemoryRead {
+                    memory: name.clone(),
+                    index: Box::new(lower_expression(syntax_tree, &index.nodes.1, module, path)?),
+                }),
+                [] => Ok(base),
+                _ => Err(unsupported(
+                    "memory reads only support a single element index today",
+                    None,
+                )),
+            };
+        }
     }
 
     let mut expr = base;
@@ -1111,7 +1250,7 @@ fn lower_expr_select(
         [index] => {
             expr = Expr::BitSelect {
                 expr: Box::new(expr),
-                index: lower_usize_expression(syntax_tree, &index.nodes.1, path)?,
+                index: lower_usize_expression(syntax_tree, &index.nodes.1, module, path)?,
             };
         }
         _ => {
@@ -1154,14 +1293,16 @@ fn lower_net_lvalue(
 fn lower_variable_assignment_lvalue(
     syntax_tree: &SyntaxTree,
     assignment: &VariableAssignment,
+    module: &ModuleSummary,
     path: &Path,
 ) -> LowerResult<LValue> {
-    lower_variable_lvalue(syntax_tree, &assignment.nodes.0, path)
+    lower_variable_lvalue(syntax_tree, &assignment.nodes.0, module, path)
 }
 
 fn lower_variable_lvalue(
     syntax_tree: &SyntaxTree,
     lvalue: &VariableLvalue,
+    module: &ModuleSummary,
     path: &Path,
 ) -> LowerResult<LValue> {
     match lvalue {
@@ -1171,7 +1312,7 @@ fn lower_variable_lvalue(
                 &lvalue.nodes.1.nodes.0,
                 "variable lvalues",
             )?;
-            lower_select_lvalue(syntax_tree, name, &lvalue.nodes.2, path)
+            lower_select_lvalue(syntax_tree, name, &lvalue.nodes.2, module, path)
         }
         _ => Err(unsupported(
             "complex variable lvalues are not supported yet",
@@ -1222,10 +1363,18 @@ fn lower_select_lvalue(
     syntax_tree: &SyntaxTree,
     name: String,
     select: &Select,
+    module: &ModuleSummary,
     path: &Path,
 ) -> LowerResult<LValue> {
     if select.nodes.0.is_some() {
         return Err(unsupported("member selections are not supported yet", None));
+    }
+
+    if module.memory_decl(&name).is_some() {
+        return Err(unsupported(
+            "memory element assignments are not supported yet",
+            None,
+        ));
     }
 
     match select.nodes.1.nodes.0.as_slice() {
@@ -1233,7 +1382,7 @@ fn lower_select_lvalue(
         [index] => {
             return Ok(LValue::BitSelect {
                 signal: name,
-                index: lower_usize_expression(syntax_tree, &index.nodes.1, path)?,
+                index: lower_usize_expression(syntax_tree, &index.nodes.1, module, path)?,
             });
         }
         _ => {
@@ -1306,6 +1455,7 @@ fn lower_net_identifier(
 fn lower_cond_predicate(
     syntax_tree: &SyntaxTree,
     predicate: &CondPredicate,
+    module: &ModuleSummary,
     path: &Path,
 ) -> LowerResult<Expr> {
     let entries = predicate.nodes.0.contents();
@@ -1317,7 +1467,7 @@ fn lower_cond_predicate(
     };
     match entry {
         sv_parser::ExpressionOrCondPattern::Expression(expr) => {
-            lower_expression(syntax_tree, expr, path)
+            lower_expression(syntax_tree, expr, module, path)
         }
         _ => Err(unsupported(
             "conditional pattern expressions are not supported yet",
@@ -1402,9 +1552,10 @@ fn lower_part_select_range(
 fn lower_usize_expression(
     syntax_tree: &SyntaxTree,
     expr: &Expression,
+    module: &ModuleSummary,
     path: &Path,
 ) -> LowerResult<usize> {
-    let Expr::Literal(literal) = lower_expression(syntax_tree, expr, path)? else {
+    let Expr::Literal(literal) = lower_expression(syntax_tree, expr, module, path)? else {
         return Err(unsupported(
             "only constant bit and part select indices are supported",
             None,
@@ -1528,7 +1679,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::SvParserFrontend;
-    use crate::hir::{AssignmentKind, ProcBlockKind, Stmt};
+    use crate::hir::{AssignmentKind, Expr, ProcBlockKind, Stmt};
 
     fn repo_root() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -1613,6 +1764,26 @@ mod tests {
                 other => panic!("unexpected first statement: {other:?}"),
             },
             other => panic!("unexpected always_ff body: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_file_lowers_memory_declaration_and_read() {
+        let repo = repo_root();
+        let frontend = SvParserFrontend::default();
+        let source = frontend
+            .parse_file(&repo.join("parts/overture/overture_fetch.sv"))
+            .expect("parse overture_fetch");
+
+        let module = &source.modules[0];
+        assert!(module.unsupported.is_empty());
+        assert_eq!(module.memories.len(), 1);
+        assert_eq!(module.memories[0].name, "rom");
+        assert_eq!(module.memories[0].element_width(), 8);
+        assert_eq!(module.memories[0].depth(), 256);
+        match &module.continuous_assignments[0].expr {
+            Expr::MemoryRead { memory, .. } => assert_eq!(memory, "rom"),
+            other => panic!("unexpected memory read expression: {other:?}"),
         }
     }
 }

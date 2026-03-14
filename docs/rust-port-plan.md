@@ -28,9 +28,9 @@ Current implementation status as of March 14, 2026:
 - `SimulationSession::eval_once` can execute hierarchical combinational designs with fixed-point convergence across continuous assignments, module instances, and a basic `always_comb` subset
 - `SimulationSession::step` now maintains per-instance state and can advance hierarchical designs using `always_ff @(posedge <clock>)` blocks with nonblocking assignment staging
 - current procedural subset: blocking assignments in combinational blocks, nonblocking assignments in `always_ff`, `if` / `else`, `case` / `default`, and `begin` / `end` statement blocks without local declarations
-- current expression subset adds logical `&&` / `||`, equality `==` / `!=`, and arithmetic `+` / `-` on top of literals, identifiers, slices, ternary expressions, and bitwise operators
+- current expression subset adds logical `&&` / `||`, equality `==` / `!=`, arithmetic `+` / `-`, and single-dimension memory reads on top of literals, identifiers, slices, ternary expressions, and bitwise operators
 - current sequential limits: only `posedge` event controls are lowered, `always_ff` clock expressions must be local identifiers, and blocking assignments inside `always_ff` are still rejected
-- memories, explicit elaboration, general event controls, and test-runner/render integration are still pending
+- current memory subset supports fixed-size unpacked `reg` / `logic` arrays with zero-initialized reads; memory writes, explicit ROM/RAM bindings, explicit elaboration, general event controls, and test-runner/render integration are still pending
 
 ## Compatibility Target
 
@@ -120,9 +120,11 @@ Current lowered subset in the tree today:
 - continuous assignments
 - `always_comb`
 - `always_ff @(posedge <clock>)`
+- fixed-size single-dimension unpacked memory declarations
 - blocking and nonblocking procedural assignment
 - `if` / `else`
 - `case` / `default`
+- memory element reads
 - bit-select and part-select expressions
 - unary bitwise-not
 - binary `&`, `|`, `^`, `&&`, `||`, `==`, `!=`, `+`, `-`
@@ -193,7 +195,7 @@ Core semantics:
 - `always_comb` fixed-point convergence
 - nonblocking assignment staging for `always_ff`
 - blocking assignment immediate update within the current procedural context
-- deterministic memory reads and writes
+- deterministic memory reads, with writes still pending
 - hierarchical instance stepping without recursive parser calls
 
 For the current subset, cycle-stepped simulation is enough. Event-driven timing can stay out of scope for v1.
@@ -345,14 +347,15 @@ Current progress:
 - `always_ff @(posedge <clock>)` lowering is implemented
 - cycle-stepped state is preserved per instance across `step()` calls
 - nonblocking assignment staging works for the supported subset
-- remaining work is broader event controls, memories, and larger Overture sequential regressions
+- zero-initialized single-dimension memory reads are implemented
+- remaining work is broader event controls, memory writes/bindings, and larger Overture sequential regressions
 
 Exit criterion:
 - parity for sequential register/counter tests and the math sequence stubs
 
 ### Phase 3: Memories And Overture
 
-- packed memory arrays
+- memory writes and bindings
 - explicit ROM/RAM bindings
 - Overture CPU regression suite
 

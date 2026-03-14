@@ -4,7 +4,7 @@ use crate::design::CompiledDesign;
 use crate::diag::{Error, Result};
 use crate::hir::{
     AssignmentKind, BinaryOp, Expr, HirDesign, LValue, ModuleInstanceSummary, ModuleSummary,
-    NumericLiteral, PortDirection, ProcBlockKind, Stmt, UnaryOp,
+    NumericLiteral, PackedRange, PortDirection, ProcBlockKind, Stmt, UnaryOp,
 };
 
 #[derive(Debug, Clone)]
@@ -17,12 +17,31 @@ pub struct SimulationSession {
 struct ModuleState {
     module_name: String,
     persisted: HashMap<String, Value>,
+    memories: HashMap<String, MemoryState>,
     children: Vec<ChildState>,
 }
 
 #[derive(Debug, Clone)]
 struct ChildState {
     state: Box<ModuleState>,
+}
+
+#[derive(Debug, Clone)]
+struct MemoryState {
+    index_range: PackedRange,
+    words: Vec<Value>,
+}
+
+impl MemoryState {
+    fn read(&self, index: usize, memory_name: &str) -> Result<Value> {
+        let offset = self.index_range.index_offset(index).ok_or_else(|| {
+            Error::Resolve(format!(
+                "memory index [{}] is out of range for '{}'",
+                index, memory_name
+            ))
+        })?;
+        Ok(self.words[offset])
+    }
 }
 
 impl SimulationSession {
@@ -124,6 +143,7 @@ fn instantiate_module_state(
     Ok(ModuleState {
         module_name: module_name.to_owned(),
         persisted: build_persisted_signal_table(module),
+        memories: build_memory_table(module),
         children,
     })
 }
@@ -157,12 +177,18 @@ fn settle_module(
         let mut changed = false;
 
         for assign in &module.continuous_assignments {
-            let value = eval_expr(&assign.expr, &values)?;
+            let value = eval_expr(&assign.expr, &values, &state.memories)?;
             changed |= apply_lvalue(&assign.target, value, module, &mut values)?;
         }
 
         for block in &module.proc_blocks {
-            changed |= execute_proc_block(&block.kind, &block.body, module, &mut values)?;
+            changed |= execute_proc_block(
+                &block.kind,
+                &block.body,
+                module,
+                &mut values,
+                &state.memories,
+            )?;
         }
 
         for (instance, child_state) in module.instantiations.iter().zip(&state.children) {
@@ -172,6 +198,7 @@ fn settle_module(
                 instance,
                 child_state.state.as_ref(),
                 &mut values,
+                &state.memories,
                 stack,
             )?;
         }
@@ -204,7 +231,7 @@ fn step_module(
 
     for (instance, child_state) in module.instantiations.iter().zip(state.children.iter_mut()) {
         let child = resolve_supported_module(hir, &instance.module_name)?;
-        let child_inputs = build_child_inputs(child, instance, &pre_values)?;
+        let child_inputs = build_child_inputs(child, instance, &pre_values, &state.memories)?;
         step_module(hir, child_state.state.as_mut(), &child_inputs, stack)?;
     }
 
@@ -220,7 +247,13 @@ fn step_module(
                     ))
                 })?;
                 if clock_value.truthy() {
-                    execute_sequential_stmt(&block.body, module, &pre_values, &mut staged)?;
+                    execute_sequential_stmt(
+                        &block.body,
+                        module,
+                        &pre_values,
+                        &state.memories,
+                        &mut staged,
+                    )?;
                 }
             }
         }
@@ -235,9 +268,10 @@ fn execute_proc_block(
     body: &Stmt,
     module: &ModuleSummary,
     values: &mut HashMap<String, Value>,
+    memories: &HashMap<String, MemoryState>,
 ) -> Result<bool> {
     match kind {
-        ProcBlockKind::AlwaysComb => execute_comb_stmt(body, module, values),
+        ProcBlockKind::AlwaysComb => execute_comb_stmt(body, module, values, memories),
         ProcBlockKind::AlwaysFf { .. } => Ok(false),
     }
 }
@@ -246,19 +280,20 @@ fn execute_comb_stmt(
     stmt: &Stmt,
     module: &ModuleSummary,
     values: &mut HashMap<String, Value>,
+    memories: &HashMap<String, MemoryState>,
 ) -> Result<bool> {
     match stmt {
         Stmt::Empty => Ok(false),
         Stmt::Block(statements) => {
             let mut changed = false;
             for statement in statements {
-                changed |= execute_comb_stmt(statement, module, values)?;
+                changed |= execute_comb_stmt(statement, module, values, memories)?;
             }
             Ok(changed)
         }
         Stmt::Assign { kind, target, expr } => match kind {
             AssignmentKind::Blocking => {
-                let value = eval_expr(expr, values)?;
+                let value = eval_expr(expr, values, memories)?;
                 apply_lvalue(target, value, module, values)
             }
             AssignmentKind::Nonblocking => Err(Error::Unsupported(
@@ -270,10 +305,10 @@ fn execute_comb_stmt(
             then_branch,
             else_branch,
         } => {
-            if eval_expr(cond, values)?.truthy() {
-                execute_comb_stmt(then_branch, module, values)
+            if eval_expr(cond, values, memories)?.truthy() {
+                execute_comb_stmt(then_branch, module, values, memories)
             } else if let Some(else_branch) = else_branch {
-                execute_comb_stmt(else_branch, module, values)
+                execute_comb_stmt(else_branch, module, values, memories)
             } else {
                 Ok(false)
             }
@@ -283,16 +318,16 @@ fn execute_comb_stmt(
             items,
             default,
         } => {
-            let value = eval_expr(expr, values)?;
+            let value = eval_expr(expr, values, memories)?;
             for item in items {
                 for pattern in &item.patterns {
-                    if values_equal(value, eval_expr(pattern, values)?) {
-                        return execute_comb_stmt(&item.body, module, values);
+                    if values_equal(value, eval_expr(pattern, values, memories)?) {
+                        return execute_comb_stmt(&item.body, module, values, memories);
                     }
                 }
             }
             if let Some(default) = default {
-                execute_comb_stmt(default, module, values)
+                execute_comb_stmt(default, module, values, memories)
             } else {
                 Ok(false)
             }
@@ -304,19 +339,26 @@ fn execute_sequential_stmt(
     stmt: &Stmt,
     module: &ModuleSummary,
     current_values: &HashMap<String, Value>,
+    memories: &HashMap<String, MemoryState>,
     staged_values: &mut HashMap<String, Value>,
 ) -> Result<()> {
     match stmt {
         Stmt::Empty => Ok(()),
         Stmt::Block(statements) => {
             for statement in statements {
-                execute_sequential_stmt(statement, module, current_values, staged_values)?;
+                execute_sequential_stmt(
+                    statement,
+                    module,
+                    current_values,
+                    memories,
+                    staged_values,
+                )?;
             }
             Ok(())
         }
         Stmt::Assign { kind, target, expr } => match kind {
             AssignmentKind::Nonblocking => {
-                let value = eval_expr(expr, current_values)?;
+                let value = eval_expr(expr, current_values, memories)?;
                 apply_lvalue(target, value, module, staged_values)?;
                 Ok(())
             }
@@ -329,10 +371,22 @@ fn execute_sequential_stmt(
             then_branch,
             else_branch,
         } => {
-            if eval_expr(cond, current_values)?.truthy() {
-                execute_sequential_stmt(then_branch, module, current_values, staged_values)
+            if eval_expr(cond, current_values, memories)?.truthy() {
+                execute_sequential_stmt(
+                    then_branch,
+                    module,
+                    current_values,
+                    memories,
+                    staged_values,
+                )
             } else if let Some(else_branch) = else_branch {
-                execute_sequential_stmt(else_branch, module, current_values, staged_values)
+                execute_sequential_stmt(
+                    else_branch,
+                    module,
+                    current_values,
+                    memories,
+                    staged_values,
+                )
             } else {
                 Ok(())
             }
@@ -342,21 +396,22 @@ fn execute_sequential_stmt(
             items,
             default,
         } => {
-            let value = eval_expr(expr, current_values)?;
+            let value = eval_expr(expr, current_values, memories)?;
             for item in items {
                 for pattern in &item.patterns {
-                    if values_equal(value, eval_expr(pattern, current_values)?) {
+                    if values_equal(value, eval_expr(pattern, current_values, memories)?) {
                         return execute_sequential_stmt(
                             &item.body,
                             module,
                             current_values,
+                            memories,
                             staged_values,
                         );
                     }
                 }
             }
             if let Some(default) = default {
-                execute_sequential_stmt(default, module, current_values, staged_values)
+                execute_sequential_stmt(default, module, current_values, memories, staged_values)
             } else {
                 Ok(())
             }
@@ -375,6 +430,22 @@ fn build_persisted_signal_table(module: &ModuleSummary) -> HashMap<String, Value
     }
 
     values
+}
+
+fn build_memory_table(module: &ModuleSummary) -> HashMap<String, MemoryState> {
+    let mut memories = HashMap::new();
+
+    for memory in &module.memories {
+        memories.insert(
+            memory.name.clone(),
+            MemoryState {
+                index_range: memory.index_range,
+                words: vec![Value::zero(memory.element_width()); memory.depth()],
+            },
+        );
+    }
+
+    memories
 }
 
 fn build_signal_table(
@@ -422,6 +493,7 @@ fn build_child_inputs(
     child: &ModuleSummary,
     instance: &ModuleInstanceSummary,
     parent_values: &HashMap<String, Value>,
+    parent_memories: &HashMap<String, MemoryState>,
 ) -> Result<BTreeMap<String, u64>> {
     let mut child_inputs = BTreeMap::new();
 
@@ -433,7 +505,7 @@ fn build_child_inputs(
         let Some(connection) = find_connection(instance, &port.name) else {
             continue;
         };
-        let value = eval_expr(&connection.expr, parent_values)?;
+        let value = eval_expr(&connection.expr, parent_values, parent_memories)?;
         child_inputs.insert(port.name.clone(), value.normalized_bits());
     }
 
@@ -446,6 +518,7 @@ fn evaluate_instance(
     instance: &ModuleInstanceSummary,
     child_state: &ModuleState,
     values: &mut HashMap<String, Value>,
+    memories: &HashMap<String, MemoryState>,
     stack: &mut Vec<String>,
 ) -> Result<bool> {
     let child = resolve_supported_module(hir, &instance.module_name).map_err(|_| {
@@ -455,7 +528,7 @@ fn evaluate_instance(
         ))
     })?;
 
-    let child_inputs = build_child_inputs(child, instance, values)?;
+    let child_inputs = build_child_inputs(child, instance, values, memories)?;
     let child_values = settle_module(hir, child, child_state, &child_inputs, stack)?;
     let mut changed = false;
 
@@ -536,15 +609,26 @@ fn find_connection<'a>(
         .find(|connection| connection.port_name == port_name)
 }
 
-fn eval_expr(expr: &Expr, values: &HashMap<String, Value>) -> Result<Value> {
+fn eval_expr(
+    expr: &Expr,
+    values: &HashMap<String, Value>,
+    memories: &HashMap<String, MemoryState>,
+) -> Result<Value> {
     match expr {
         Expr::Ident(name) => values
             .get(name)
             .copied()
             .ok_or_else(|| Error::Resolve(format!("signal '{}' is not declared", name))),
         Expr::Literal(literal) => Ok(value_from_literal(literal)),
+        Expr::MemoryRead { memory, index } => {
+            let index = eval_expr(index, values, memories)?.normalized_bits() as usize;
+            let memory_state = memories
+                .get(memory)
+                .ok_or_else(|| Error::Resolve(format!("memory '{}' is not declared", memory)))?;
+            memory_state.read(index, memory)
+        }
         Expr::BitSelect { expr, index } => {
-            let value = eval_expr(expr, values)?;
+            let value = eval_expr(expr, values, memories)?;
             if *index >= value.width {
                 return Err(Error::Resolve(format!(
                     "bit select [{}] is out of range for width {}",
@@ -554,7 +638,7 @@ fn eval_expr(expr: &Expr, values: &HashMap<String, Value>) -> Result<Value> {
             Ok(Value::new((value.normalized_bits() >> index) & 1, 1))
         }
         Expr::PartSelect { expr, msb, lsb } => {
-            let value = eval_expr(expr, values)?;
+            let value = eval_expr(expr, values, memories)?;
             let low = (*msb).min(*lsb);
             let high = (*msb).max(*lsb);
             if high >= value.width {
@@ -570,14 +654,14 @@ fn eval_expr(expr: &Expr, values: &HashMap<String, Value>) -> Result<Value> {
             ))
         }
         Expr::Unary { op, expr } => {
-            let value = eval_expr(expr, values)?;
+            let value = eval_expr(expr, values, memories)?;
             match op {
                 UnaryOp::BitNot => Ok(Value::new(!value.normalized_bits(), value.width)),
             }
         }
         Expr::Binary { left, op, right } => {
-            let left = eval_expr(left, values)?;
-            let right = eval_expr(right, values)?;
+            let left = eval_expr(left, values, memories)?;
+            let right = eval_expr(right, values, memories)?;
             let (bits, width) = match op {
                 BinaryOp::BitAnd => (
                     left.normalized_bits() & right.normalized_bits(),
@@ -611,10 +695,10 @@ fn eval_expr(expr: &Expr, values: &HashMap<String, Value>) -> Result<Value> {
             when_true,
             when_false,
         } => {
-            if eval_expr(cond, values)?.truthy() {
-                eval_expr(when_true, values)
+            if eval_expr(cond, values, memories)?.truthy() {
+                eval_expr(when_true, values, memories)
             } else {
-                eval_expr(when_false, values)
+                eval_expr(when_false, values, memories)
             }
         }
     }
@@ -1055,6 +1139,21 @@ endmodule
             ]))
             .expect("jump");
         assert_eq!(outputs.get("pc"), Some(&10));
+    }
+
+    #[test]
+    fn eval_once_reads_zero_initialized_memory() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .compile_file(repo.join("parts/overture/overture_fetch.sv"))
+            .expect("compile overture_fetch");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let outputs = sim
+            .eval_once(BTreeMap::from([("addr".into(), 0x2a)]))
+            .expect("eval");
+
+        assert_eq!(outputs.get("data"), Some(&0));
     }
 
     fn unique_temp_dir(name: &str) -> PathBuf {

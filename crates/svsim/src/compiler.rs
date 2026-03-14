@@ -236,6 +236,22 @@ mod tests {
         }
     }
 
+    #[test]
+    fn compile_file_loads_overture_fetch_without_memory_diagnostics() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .add_search_path(repo.join("parts/overture"))
+            .compile_file(repo.join("parts/overture/overture_cpu.sv"))
+            .expect("compile overture_cpu");
+
+        let fetch = design
+            .hir()
+            .module("overture_fetch")
+            .expect("overture_fetch module");
+        assert!(fetch.unsupported.is_empty());
+        assert_eq!(fetch.memories.len(), 1);
+    }
+
     fn unique_temp_dir(name: &str) -> PathBuf {
         let mut path = std::env::temp_dir();
         let nonce = SystemTime::now()

@@ -9,7 +9,7 @@ pub use compiler::Compiler;
 pub use design::CompiledDesign;
 pub use diag::{Diagnostic, Error, Result, SourceSpan};
 pub use hir::{
-    CaseStmtItem, HirDesign, ModuleDeclStyle, ModuleInstanceSummary, ModuleSummary, ProcBlock,
-    ProcBlockKind, SourceFile, Stmt,
+    CaseStmtItem, HirDesign, MemoryDecl, ModuleDeclStyle, ModuleInstanceSummary, ModuleSummary,
+    ProcBlock, ProcBlockKind, SourceFile, Stmt,
 };
 pub use sim::SimulationSession;

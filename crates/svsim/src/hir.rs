@@ -18,6 +18,22 @@ impl PackedRange {
             self.lsb - self.msb + 1
         }
     }
+
+    pub fn low(&self) -> usize {
+        self.msb.min(self.lsb)
+    }
+
+    pub fn high(&self) -> usize {
+        self.msb.max(self.lsb)
+    }
+
+    pub fn contains_index(&self, index: usize) -> bool {
+        (self.low()..=self.high()).contains(&index)
+    }
+
+    pub fn index_offset(&self, index: usize) -> Option<usize> {
+        self.contains_index(index).then_some(index - self.low())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -56,6 +72,24 @@ impl SignalDecl {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct MemoryDecl {
+    pub name: String,
+    pub element_range: Option<PackedRange>,
+    pub index_range: PackedRange,
+    pub span: Option<SourceSpan>,
+}
+
+impl MemoryDecl {
+    pub fn element_width(&self) -> usize {
+        self.element_range.map_or(1, |range| range.width())
+    }
+
+    pub fn depth(&self) -> usize {
+        self.index_range.width()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct NumericLiteral {
     pub bits: u64,
     pub width: Option<usize>,
@@ -83,6 +117,10 @@ pub enum BinaryOp {
 pub enum Expr {
     Ident(String),
     Literal(NumericLiteral),
+    MemoryRead {
+        memory: String,
+        index: Box<Expr>,
+    },
     BitSelect {
         expr: Box<Expr>,
         index: usize,
@@ -203,6 +241,7 @@ pub struct ModuleSummary {
     pub span: Option<SourceSpan>,
     pub ports: Vec<PortDecl>,
     pub signals: Vec<SignalDecl>,
+    pub memories: Vec<MemoryDecl>,
     pub continuous_assignments: Vec<ContinuousAssign>,
     pub proc_blocks: Vec<ProcBlock>,
     pub instantiations: Vec<ModuleInstanceSummary>,
@@ -216,6 +255,10 @@ impl ModuleSummary {
 
     pub fn signal_decl(&self, name: &str) -> Option<&SignalDecl> {
         self.signals.iter().find(|signal| signal.name == name)
+    }
+
+    pub fn memory_decl(&self, name: &str) -> Option<&MemoryDecl> {
+        self.memories.iter().find(|memory| memory.name == name)
     }
 
     pub fn signal_width(&self, name: &str) -> Option<usize> {
