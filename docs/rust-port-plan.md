@@ -26,7 +26,7 @@ Current implementation status as of March 14, 2026:
 - library API now exposes `Compiler`, `CompiledDesign`, and `SimulationSession`, including `compile_file` and `compile_str`
 - `CompiledDesign::hierarchy()` now exposes an owned top-down instance tree so embedding callers can discover valid instance paths before using per-instance memory APIs
 - library-side JSON regression execution is now available through `CompiledDesign::run_json_file` / `svsim::JsonTestSuite` for combinational arrays, sequential `test_cases`, and relative memory-file preload
-- CLI can parse a SystemVerilog file and emit JSON describing discovered modules
+- CLI can parse a SystemVerilog file and emit JSON describing discovered modules, or run a JSON regression suite via `--json-test` and emit a structured report
 - `SimulationSession::eval_once` can execute hierarchical combinational designs with fixed-point convergence across continuous assignments, module instances, and a basic `always_comb` subset
 - `SimulationSession::step` now maintains per-instance state and can advance hierarchical designs using `always_ff @(posedge <clock>)` blocks with blocking immediate updates and nonblocking assignment staging
 - current procedural subset: blocking assignments in combinational blocks and `always_ff`, nonblocking assignments in `always_ff`, `if` / `else`, `case` / `default`, and `begin` / `end` statement blocks
@@ -34,7 +34,7 @@ Current implementation status as of March 14, 2026:
 - frontend lowering now accepts grouped ANSI port declarations such as `input [4:0] a, b, c` and lowers net declaration initializers like `wire [24:0] v = expr;` into signal declarations plus continuous assignments
 - `compile_str` can seed a design from an in-memory top module while still resolving instantiated dependencies from the virtual path's directory and configured search paths
 - current sequential limits: only `posedge` event controls are lowered, `always_ff` clock expressions must be local identifiers, and cross-block race semantics are not modeled beyond deterministic source order
-- current memory subset supports fixed-size unpacked `reg` / `logic` arrays with zero-initialized reads, explicit programmatic preload/read access by instance path, text-file ROM/RAM loading, procedural single-element writes, and JSON-driven regression preload; explicit elaboration, general event controls, CLI test-runner wiring, and render integration are still pending
+- current memory subset supports fixed-size unpacked `reg` / `logic` arrays with zero-initialized reads, explicit programmatic preload/read access by instance path, text-file ROM/RAM loading, procedural single-element writes, and JSON-driven regression preload; explicit elaboration, general event controls, batch regression wiring, and render integration are still pending
 - known compatibility gap: `parts/testing/019-Vector5` now lowers and evaluates with standard concatenation/replication bit ordering, but its checked-in JSON reflects a Python reference parser bug for multi-expression replication (`{5{a, b, c, d, e}}`), so Rust and JSON parity still diverge there until the compatibility policy is decided
 
 ## Compatibility Target
@@ -348,7 +348,7 @@ Current progress:
 - in-memory top-level compilation via `compile_str` is implemented, with dependency lookup anchored at the virtual path plus explicit search paths
 - callers can now inspect the compiled instance tree directly instead of reverse-engineering valid instance paths from raw HIR module summaries
 - library-side JSON-backed combinational regression execution is implemented
-- remaining work is deciding whether to preserve or retire the Python reference bug encoded in `parts/testing/019-Vector5.json`, then wiring the same regression path into the CLI/batch workflow
+- remaining work is deciding whether to preserve or retire the Python reference bug encoded in `parts/testing/019-Vector5.json`, then wiring the same regression path into a batch workflow
 
 Exit criterion:
 - parity for the combinational modules and tests in `parts/basic/` and `parts/testing/`
@@ -366,7 +366,7 @@ Current progress:
 - blocking and nonblocking assignment semantics work for the supported subset
 - zero-initialized single-dimension memory reads, explicit memory preload/read APIs, text-file memory loading, and procedural single-element memory writes are implemented
 - library-side JSON regression execution now covers sequential `test_cases`, including memory-backed suites
-- remaining work is broader event controls, CLI/batch regression wiring, and larger Overture sequential regressions
+- remaining work is broader event controls, batch regression wiring, and larger Overture sequential regressions
 
 Exit criterion:
 - parity for sequential register/counter tests and the math sequence stubs
@@ -375,7 +375,7 @@ Exit criterion:
 
 - JSON-driven memory binding through the library test runner
 - Overture CPU regression suite
-- CLI and batch regression entry points
+- batch regression entry points over the existing CLI regression mode
 
 Exit criterion:
 - parity for `parts/overture/` tests
@@ -433,8 +433,8 @@ The first concrete implementation target should be:
 3. execute combinational modules and JSON tests
 4. add sequential stepping
 5. add explicit memory binding configuration
-6. run Overture regressions through the Rust CLI
+6. broaden Rust CLI regression coverage across Overture and add batch execution
 
-That library milestone is now largely in place; the next pragmatic target is exposing the same regression flow through the CLI and a batch runner.
+That library milestone and the first CLI regression path are now in place; the next pragmatic target is broadening that workflow across the Overture corpus and adding a batch runner.
 
 At that point the project has replaced the Python simulator for core use, even before image rendering exists.

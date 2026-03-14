@@ -3,7 +3,7 @@ use std::process::ExitCode;
 
 use clap::Parser;
 use serde::Serialize;
-use svsim::{Compiler, HirDesign};
+use svsim::{Compiler, HirDesign, JsonTestReport};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -16,6 +16,10 @@ struct Args {
     #[arg(short = 'I', long = "search-path")]
     search_paths: Vec<PathBuf>,
 
+    /// Run a JSON regression suite against the compiled design.
+    #[arg(long = "json-test")]
+    json_test: Option<PathBuf>,
+
     /// SystemVerilog source file to compile.
     file: PathBuf,
 }
@@ -24,6 +28,12 @@ struct Args {
 struct ParseOutput<'a> {
     top_module: Option<&'a str>,
     hir: &'a HirDesign,
+}
+
+#[derive(Debug, Serialize)]
+struct TestOutput<'a> {
+    top_module: Option<&'a str>,
+    report: JsonTestReport,
 }
 
 fn main() -> ExitCode {
@@ -38,25 +48,56 @@ fn main() -> ExitCode {
 
     match compiler.compile_file(&args.file) {
         Ok(design) => {
-            let output = ParseOutput {
-                top_module: design.top_module(),
-                hir: design.hir(),
-            };
-
-            match serde_json::to_writer_pretty(std::io::stdout(), &output) {
-                Ok(()) => {
-                    println!();
-                    ExitCode::SUCCESS
+            if let Some(json_test) = args.json_test {
+                match design.run_json_file(&json_test) {
+                    Ok(report) => {
+                        let all_passed = report.all_passed();
+                        let output = TestOutput {
+                            top_module: design.top_module(),
+                            report,
+                        };
+                        if write_json(&output).is_err() {
+                            ExitCode::FAILURE
+                        } else if all_passed {
+                            ExitCode::SUCCESS
+                        } else {
+                            ExitCode::FAILURE
+                        }
+                    }
+                    Err(error) => {
+                        eprintln!("{error}");
+                        ExitCode::FAILURE
+                    }
                 }
-                Err(error) => {
-                    eprintln!("failed to write JSON output: {error}");
+            } else {
+                let output = ParseOutput {
+                    top_module: design.top_module(),
+                    hir: design.hir(),
+                };
+
+                if write_json(&output).is_err() {
                     ExitCode::FAILURE
+                } else {
+                    ExitCode::SUCCESS
                 }
             }
         }
         Err(error) => {
             eprintln!("{error}");
             ExitCode::FAILURE
+        }
+    }
+}
+
+fn write_json<T: Serialize>(value: &T) -> Result<(), ()> {
+    match serde_json::to_writer_pretty(std::io::stdout(), value) {
+        Ok(()) => {
+            println!();
+            Ok(())
+        }
+        Err(error) => {
+            eprintln!("failed to write JSON output: {error}");
+            Err(())
         }
     }
 }

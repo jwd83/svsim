@@ -20,6 +20,7 @@ Prefer adding new simulator code under `crates/svsim/src/` before splitting into
 - `cargo test`: build and run all Rust tests.
 - `cargo test -p svsim`: run core library tests only.
 - `cargo run -p svsim-cli -- parts/basic/full_adder.sv`: parse a real module and emit JSON.
+- `cargo run -p svsim-cli -- --json-test parts/basic/full_adder.json parts/basic/full_adder.sv`: run a JSON regression suite through the Rust CLI and emit a structured report.
 
 When adding support for new language features, verify them against files under `parts/` instead of isolated toy inputs only.
 
