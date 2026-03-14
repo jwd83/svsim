@@ -24,6 +24,7 @@ Current implementation status as of March 14, 2026:
 - `sv-parser` integrated for file-based parsing and in-memory source parsing via virtual paths
 - owned HIR covers source files, module summaries, continuous assignments, instantiations, `always_comb`, a first `always_ff @(posedge ...)` subset, concatenation/replication expressions, and concatenated assignment targets
 - library API now exposes `Compiler`, `CompiledDesign`, and `SimulationSession`, including `compile_file` and `compile_str`
+- `CompiledDesign::hierarchy()` now exposes an owned top-down instance tree so embedding callers can discover valid instance paths before using per-instance memory APIs
 - CLI can parse a SystemVerilog file and emit JSON describing discovered modules
 - `SimulationSession::eval_once` can execute hierarchical combinational designs with fixed-point convergence across continuous assignments, module instances, and a basic `always_comb` subset
 - `SimulationSession::step` now maintains per-instance state and can advance hierarchical designs using `always_ff @(posedge <clock>)` blocks with blocking immediate updates and nonblocking assignment staging
@@ -249,7 +250,7 @@ Useful embedded surfaces:
 - compile from string with a virtual path that anchors relative dependency resolution
 - configure module search paths
 - preload or inspect ROM/RAM contents explicitly by instance path, including text-file initialization
-- inspect ports, widths, and instance hierarchy
+- inspect ports and widths through the compiled HIR, and inspect instance hierarchy through `CompiledDesign::hierarchy()`
 - evaluate combinational top modules
 - step sequential top modules
 - reset simulator state
@@ -343,6 +344,7 @@ Current progress:
 - hierarchical combinational evaluation is implemented across continuous assignments, instances, `always_comb`, concatenation, replication, and concatenated lvalues
 - grouped ANSI port declarations and initialized net declarations from the vector corpus are now lowered
 - in-memory top-level compilation via `compile_str` is implemented, with dependency lookup anchored at the virtual path plus explicit search paths
+- callers can now inspect the compiled instance tree directly instead of reverse-engineering valid instance paths from raw HIR module summaries
 - remaining work is JSON-backed combinational regression execution and deciding whether to preserve or retire the Python reference bug encoded in `parts/testing/019-Vector5.json`
 
 Exit criterion:
