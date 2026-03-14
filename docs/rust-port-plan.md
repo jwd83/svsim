@@ -38,9 +38,9 @@ Current implementation status as of March 14, 2026:
 - current sequential limits: only `posedge` event controls are lowered, `always_ff` clock expressions must be local identifiers, and cross-block race semantics are not modeled beyond deterministic source order
 - current memory subset supports fixed-size unpacked `reg` / `logic` arrays with zero-initialized reads, explicit programmatic preload/read access by instance path, text-file ROM/RAM loading, procedural single-element writes, and JSON-driven regression preload; explicit elaboration, broader event controls, and render integration are still pending
 - regression compatibility now covers the legacy corpus conventions that still matter in `parts/`: interface-only `rom_*` wrappers auto-load sibling ROM text files at runtime, and `pgm_*` JSON suites auto-bind `overture_fetch.rom` from a sibling program text file when no explicit memory bindings are present
-- measured verification: `cargo test` passes, `parts/testing` is `39/40`, and `parts/overture` is `41/41`; the new aggregated corpus report can also measure those directories together in one CLI invocation
-- measured batch status: `parts/testing` currently passes `39/40` suites, `parts/overture` passes `41/41`, and the lone known mismatch remains `019-Vector5`
-- known compatibility gap: `parts/testing/019-Vector5` now lowers and evaluates with standard concatenation/replication bit ordering, but its checked-in JSON reflects a Python reference parser bug for multi-expression replication (`{5{a, b, c, d, e}}`), so Rust and JSON parity still diverge there until the compatibility policy is decided
+- measured verification: `cargo test` passes, `parts/testing` is `40/40`, and `parts/overture` is `41/41`; the new aggregated corpus report can also measure those directories together in one CLI invocation
+- measured batch status: `parts/testing` currently passes `40/40` suites and `parts/overture` passes `41/41`; the next open measurement task is recording a fresh aggregate status for `parts/basic`
+- `parts/testing/019-Vector5.json` now matches the standard SystemVerilog bit ordering for multi-expression replication (`{5{a, b, c, d, e}}`), retiring the old Python reference divergence from the checked-in corpus
 
 ## Compatibility Target
 
@@ -357,7 +357,7 @@ Current progress:
 - in-memory top-level compilation via `compile_str` is implemented, with dependency lookup anchored at the virtual path plus explicit search paths
 - callers can now inspect the compiled instance tree directly instead of reverse-engineering valid instance paths from raw HIR module summaries
 - library-side JSON-backed combinational regression execution is implemented
-- remaining work is deciding whether to preserve or retire the Python reference bug encoded in `parts/testing/019-Vector5.json`, then using the new corpus report to record and close any remaining `parts/basic` parity gaps
+- remaining work is using the new corpus report to record and close any remaining `parts/basic` parity gaps
 
 Exit criterion:
 - parity for the combinational modules and tests in `parts/basic/` and `parts/testing/`
@@ -450,6 +450,6 @@ The first concrete implementation target should be:
 5. add explicit memory binding configuration
 6. broaden Rust CLI regression coverage across Overture and add scalable batch execution
 
-That library milestone, the first CLI regression path, and the aggregated corpus runner are now in place; the next pragmatic target is using that runner to keep whole-corpus status current and resolve the highest-value remaining compatibility decision around `parts/testing/019-Vector5`.
+That library milestone, the first CLI regression path, and the aggregated corpus runner are now in place; the next pragmatic target is using that runner to keep whole-corpus status current and close the remaining `parts/basic` parity/documentation gaps.
 
 At that point the project has replaced the Python simulator for core use, even before image rendering exists.
