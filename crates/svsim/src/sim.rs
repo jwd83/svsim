@@ -3,18 +3,36 @@ use std::collections::{BTreeMap, HashMap};
 use crate::design::CompiledDesign;
 use crate::diag::{Error, Result};
 use crate::hir::{
-    BinaryOp, Expr, HirDesign, LValue, ModuleInstanceSummary, ModuleSummary, NumericLiteral,
-    PortDirection, ProcBlockKind, Stmt, UnaryOp,
+    AssignmentKind, BinaryOp, Expr, HirDesign, LValue, ModuleInstanceSummary, ModuleSummary,
+    NumericLiteral, PortDirection, ProcBlockKind, Stmt, UnaryOp,
 };
 
 #[derive(Debug, Clone)]
 pub struct SimulationSession {
     design: CompiledDesign,
+    state: ModuleState,
+}
+
+#[derive(Debug, Clone)]
+struct ModuleState {
+    module_name: String,
+    persisted: HashMap<String, Value>,
+    children: Vec<ChildState>,
+}
+
+#[derive(Debug, Clone)]
+struct ChildState {
+    state: Box<ModuleState>,
 }
 
 impl SimulationSession {
-    pub(crate) fn new(design: CompiledDesign) -> Self {
-        Self { design }
+    pub(crate) fn new(design: CompiledDesign) -> Result<Self> {
+        let top_module = design
+            .top_module()
+            .expect("compiled designs always carry a top module");
+        let mut stack = Vec::new();
+        let state = instantiate_module_state(design.hir(), top_module, &mut stack)?;
+        Ok(Self { design, state })
     }
 
     pub fn top_module(&self) -> &str {
@@ -24,33 +42,26 @@ impl SimulationSession {
     }
 
     pub fn eval_once(&mut self, inputs: BTreeMap<String, u64>) -> Result<BTreeMap<String, u64>> {
+        let module = top_module(self.design.hir(), self.top_module())?;
         let mut stack = Vec::new();
-        let values = evaluate_module(self.design.hir(), self.top_module(), &inputs, &mut stack)?;
-        let module =
-            self.design.hir().module(self.top_module()).ok_or_else(|| {
-                Error::Resolve(format!("missing top module '{}'", self.top_module()))
-            })?;
-
-        let mut outputs = BTreeMap::new();
-        for port in module
-            .ports
-            .iter()
-            .filter(|port| matches!(port.direction, PortDirection::Output))
-        {
-            let value = values
-                .get(&port.name)
-                .copied()
-                .unwrap_or_else(|| Value::zero(port.width()));
-            outputs.insert(port.name.clone(), value.normalized_bits());
-        }
-
-        Ok(outputs)
+        let values = settle_module(self.design.hir(), module, &self.state, &inputs, &mut stack)?;
+        Ok(collect_outputs(module, &values))
     }
 
-    pub fn step(&mut self, _inputs: BTreeMap<String, u64>) -> Result<BTreeMap<String, u64>> {
-        Err(Error::Unsupported(
-            "the sequential engine is not implemented yet".into(),
-        ))
+    pub fn step(&mut self, inputs: BTreeMap<String, u64>) -> Result<BTreeMap<String, u64>> {
+        let module = top_module(self.design.hir(), self.top_module())?;
+        let mut stack = Vec::new();
+        step_module(self.design.hir(), &mut self.state, &inputs, &mut stack)?;
+
+        let mut settle_stack = Vec::new();
+        let values = settle_module(
+            self.design.hir(),
+            module,
+            &self.state,
+            &inputs,
+            &mut settle_stack,
+        )?;
+        Ok(collect_outputs(module, &values))
     }
 }
 
@@ -82,36 +93,57 @@ impl Value {
     }
 }
 
-fn evaluate_module(
+fn top_module<'a>(hir: &'a HirDesign, module_name: &str) -> Result<&'a ModuleSummary> {
+    resolve_supported_module(hir, module_name)
+}
+
+fn instantiate_module_state(
     hir: &HirDesign,
     module_name: &str,
+    stack: &mut Vec<String>,
+) -> Result<ModuleState> {
+    if stack.iter().any(|name| name == module_name) {
+        return Err(Error::Unsupported(format!(
+            "recursive instantiation detected at {} -> {}",
+            stack.join(" -> "),
+            module_name
+        )));
+    }
+
+    let module = resolve_supported_module(hir, module_name)?;
+    stack.push(module_name.to_owned());
+
+    let mut children = Vec::with_capacity(module.instantiations.len());
+    for instance in &module.instantiations {
+        children.push(ChildState {
+            state: Box::new(instantiate_module_state(hir, &instance.module_name, stack)?),
+        });
+    }
+
+    stack.pop();
+    Ok(ModuleState {
+        module_name: module_name.to_owned(),
+        persisted: build_persisted_signal_table(module),
+        children,
+    })
+}
+
+fn settle_module(
+    hir: &HirDesign,
+    module: &ModuleSummary,
+    state: &ModuleState,
     inputs: &BTreeMap<String, u64>,
     stack: &mut Vec<String>,
 ) -> Result<HashMap<String, Value>> {
-    if stack.iter().any(|name| name == module_name) {
+    if stack.iter().any(|name| name == &state.module_name) {
         return Err(Error::Unsupported(format!(
-            "recursive combinational instantiation detected at {}",
-            stack.join(" -> ")
+            "recursive combinational instantiation detected at {} -> {}",
+            stack.join(" -> "),
+            state.module_name
         )));
     }
 
-    let module = hir
-        .module(module_name)
-        .ok_or_else(|| Error::Resolve(format!("module '{}' was not compiled", module_name)))?;
-    if !module.unsupported.is_empty() {
-        return Err(Error::Unsupported(format!(
-            "module '{}' uses unsupported constructs: {}",
-            module_name,
-            module
-                .unsupported
-                .iter()
-                .map(|diag| diag.message.as_str())
-                .collect::<Vec<_>>()
-                .join("; ")
-        )));
-    }
-
-    let mut values = build_signal_table(module, inputs)?;
+    let mut values = build_signal_table(module, inputs, &state.persisted)?;
     let max_iterations = ((module.continuous_assignments.len()
         + module.proc_blocks.len()
         + module.instantiations.len()
@@ -119,7 +151,7 @@ fn evaluate_module(
     .max(1))
         * 8;
 
-    stack.push(module_name.to_owned());
+    stack.push(state.module_name.clone());
     let mut converged = false;
     for _ in 0..max_iterations {
         let mut changed = false;
@@ -130,11 +162,18 @@ fn evaluate_module(
         }
 
         for block in &module.proc_blocks {
-            changed |= execute_proc_block(block.kind.clone(), &block.body, module, &mut values)?;
+            changed |= execute_proc_block(&block.kind, &block.body, module, &mut values)?;
         }
 
-        for instance in &module.instantiations {
-            changed |= evaluate_instance(hir, module, instance, &mut values, stack)?;
+        for (instance, child_state) in module.instantiations.iter().zip(&state.children) {
+            changed |= evaluate_instance(
+                hir,
+                module,
+                instance,
+                child_state.state.as_ref(),
+                &mut values,
+                stack,
+            )?;
         }
 
         if !changed {
@@ -147,25 +186,63 @@ fn evaluate_module(
     if !converged {
         return Err(Error::Unsupported(format!(
             "combinational evaluation did not converge for module '{}'",
-            module_name
+            module.name
         )));
     }
 
     Ok(values)
 }
 
+fn step_module(
+    hir: &HirDesign,
+    state: &mut ModuleState,
+    inputs: &BTreeMap<String, u64>,
+    stack: &mut Vec<String>,
+) -> Result<()> {
+    let module = resolve_supported_module(hir, &state.module_name)?;
+    let pre_values = settle_module(hir, module, state, inputs, stack)?;
+
+    for (instance, child_state) in module.instantiations.iter().zip(state.children.iter_mut()) {
+        let child = resolve_supported_module(hir, &instance.module_name)?;
+        let child_inputs = build_child_inputs(child, instance, &pre_values)?;
+        step_module(hir, child_state.state.as_mut(), &child_inputs, stack)?;
+    }
+
+    let mut staged = state.persisted.clone();
+    for block in &module.proc_blocks {
+        match &block.kind {
+            ProcBlockKind::AlwaysComb => {}
+            ProcBlockKind::AlwaysFf { clock } => {
+                let clock_value = pre_values.get(clock).copied().ok_or_else(|| {
+                    Error::Resolve(format!(
+                        "clock '{}' is not declared in '{}'",
+                        clock, module.name
+                    ))
+                })?;
+                if clock_value.truthy() {
+                    execute_sequential_stmt(&block.body, module, &pre_values, &mut staged)?;
+                }
+            }
+        }
+    }
+
+    state.persisted = staged;
+    Ok(())
+}
+
 fn execute_proc_block(
-    kind: ProcBlockKind,
+    kind: &ProcBlockKind,
     body: &Stmt,
     module: &ModuleSummary,
     values: &mut HashMap<String, Value>,
 ) -> Result<bool> {
     match kind {
-        ProcBlockKind::AlwaysComb => execute_stmt(body, module, values),
+        ProcBlockKind::AlwaysComb => execute_comb_stmt(body, module, values),
+        ProcBlockKind::AlwaysFf { .. } => Ok(false),
     }
 }
 
-fn execute_stmt(
+fn execute_comb_stmt(
     stmt: &Stmt,
     module: &ModuleSummary,
     values: &mut HashMap<String, Value>,
@@ -175,23 +252,28 @@ fn execute_stmt(
         Stmt::Block(statements) => {
             let mut changed = false;
             for statement in statements {
-                changed |= execute_stmt(statement, module, values)?;
+                changed |= execute_comb_stmt(statement, module, values)?;
             }
             Ok(changed)
         }
-        Stmt::Assign { target, expr } => {
-            let value = eval_expr(expr, values)?;
-            apply_lvalue(target, value, module, values)
-        }
+        Stmt::Assign { kind, target, expr } => match kind {
+            AssignmentKind::Blocking => {
+                let value = eval_expr(expr, values)?;
+                apply_lvalue(target, value, module, values)
+            }
+            AssignmentKind::Nonblocking => Err(Error::Unsupported(
+                "nonblocking assignments are only supported inside `always_ff` blocks".into(),
+            )),
+        },
         Stmt::If {
             cond,
             then_branch,
             else_branch,
         } => {
             if eval_expr(cond, values)?.truthy() {
-                execute_stmt(then_branch, module, values)
+                execute_comb_stmt(then_branch, module, values)
             } else if let Some(else_branch) = else_branch {
-                execute_stmt(else_branch, module, values)
+                execute_comb_stmt(else_branch, module, values)
             } else {
                 Ok(false)
             }
@@ -205,12 +287,12 @@ fn execute_stmt(
             for item in items {
                 for pattern in &item.patterns {
                     if values_equal(value, eval_expr(pattern, values)?) {
-                        return execute_stmt(&item.body, module, values);
+                        return execute_comb_stmt(&item.body, module, values);
                     }
                 }
             }
             if let Some(default) = default {
-                execute_stmt(default, module, values)
+                execute_comb_stmt(default, module, values)
             } else {
                 Ok(false)
             }
@@ -218,22 +300,110 @@ fn execute_stmt(
     }
 }
 
+fn execute_sequential_stmt(
+    stmt: &Stmt,
+    module: &ModuleSummary,
+    current_values: &HashMap<String, Value>,
+    staged_values: &mut HashMap<String, Value>,
+) -> Result<()> {
+    match stmt {
+        Stmt::Empty => Ok(()),
+        Stmt::Block(statements) => {
+            for statement in statements {
+                execute_sequential_stmt(statement, module, current_values, staged_values)?;
+            }
+            Ok(())
+        }
+        Stmt::Assign { kind, target, expr } => match kind {
+            AssignmentKind::Nonblocking => {
+                let value = eval_expr(expr, current_values)?;
+                apply_lvalue(target, value, module, staged_values)?;
+                Ok(())
+            }
+            AssignmentKind::Blocking => Err(Error::Unsupported(
+                "blocking assignments inside `always_ff` blocks are not supported yet".into(),
+            )),
+        },
+        Stmt::If {
+            cond,
+            then_branch,
+            else_branch,
+        } => {
+            if eval_expr(cond, current_values)?.truthy() {
+                execute_sequential_stmt(then_branch, module, current_values, staged_values)
+            } else if let Some(else_branch) = else_branch {
+                execute_sequential_stmt(else_branch, module, current_values, staged_values)
+            } else {
+                Ok(())
+            }
+        }
+        Stmt::Case {
+            expr,
+            items,
+            default,
+        } => {
+            let value = eval_expr(expr, current_values)?;
+            for item in items {
+                for pattern in &item.patterns {
+                    if values_equal(value, eval_expr(pattern, current_values)?) {
+                        return execute_sequential_stmt(
+                            &item.body,
+                            module,
+                            current_values,
+                            staged_values,
+                        );
+                    }
+                }
+            }
+            if let Some(default) = default {
+                execute_sequential_stmt(default, module, current_values, staged_values)
+            } else {
+                Ok(())
+            }
+        }
+    }
+}
+
+fn build_persisted_signal_table(module: &ModuleSummary) -> HashMap<String, Value> {
+    let mut values = HashMap::new();
+
+    for port in &module.ports {
+        values.insert(port.name.clone(), Value::zero(port.width()));
+    }
+    for signal in &module.signals {
+        values.insert(signal.name.clone(), Value::zero(signal.width()));
+    }
+
+    values
+}
+
 fn build_signal_table(
     module: &ModuleSummary,
     inputs: &BTreeMap<String, u64>,
+    persisted: &HashMap<String, Value>,
 ) -> Result<HashMap<String, Value>> {
     let mut values = HashMap::new();
 
     for port in &module.ports {
-        let mut value = Value::zero(port.width());
-        if matches!(port.direction, PortDirection::Input) {
-            value = Value::new(*inputs.get(&port.name).unwrap_or(&0), port.width());
-        }
+        let value = if matches!(port.direction, PortDirection::Input) {
+            Value::new(*inputs.get(&port.name).unwrap_or(&0), port.width())
+        } else {
+            persisted
+                .get(&port.name)
+                .copied()
+                .unwrap_or_else(|| Value::zero(port.width()))
+        };
         values.insert(port.name.clone(), value);
     }
 
     for signal in &module.signals {
-        values.insert(signal.name.clone(), Value::zero(signal.width()));
+        values.insert(
+            signal.name.clone(),
+            persisted
+                .get(&signal.name)
+                .copied()
+                .unwrap_or_else(|| Value::zero(signal.width())),
+        );
     }
 
     for name in inputs.keys() {
@@ -248,21 +418,13 @@ fn build_signal_table(
     Ok(values)
 }
 
-fn evaluate_instance(
-    hir: &HirDesign,
-    parent: &ModuleSummary,
+fn build_child_inputs(
+    child: &ModuleSummary,
     instance: &ModuleInstanceSummary,
-    values: &mut HashMap<String, Value>,
-    stack: &mut Vec<String>,
-) -> Result<bool> {
-    let child = hir.module(&instance.module_name).ok_or_else(|| {
-        Error::Resolve(format!(
-            "instance '{}' references missing module '{}'",
-            instance.instance_name, instance.module_name
-        ))
-    })?;
-
+    parent_values: &HashMap<String, Value>,
+) -> Result<BTreeMap<String, u64>> {
     let mut child_inputs = BTreeMap::new();
+
     for port in child
         .ports
         .iter()
@@ -271,11 +433,30 @@ fn evaluate_instance(
         let Some(connection) = find_connection(instance, &port.name) else {
             continue;
         };
-        let value = eval_expr(&connection.expr, values)?;
+        let value = eval_expr(&connection.expr, parent_values)?;
         child_inputs.insert(port.name.clone(), value.normalized_bits());
     }
 
-    let child_values = evaluate_module(hir, &instance.module_name, &child_inputs, stack)?;
+    Ok(child_inputs)
+}
+
+fn evaluate_instance(
+    hir: &HirDesign,
+    parent: &ModuleSummary,
+    instance: &ModuleInstanceSummary,
+    child_state: &ModuleState,
+    values: &mut HashMap<String, Value>,
+    stack: &mut Vec<String>,
+) -> Result<bool> {
+    let child = resolve_supported_module(hir, &instance.module_name).map_err(|_| {
+        Error::Resolve(format!(
+            "instance '{}' references missing module '{}'",
+            instance.instance_name, instance.module_name
+        ))
+    })?;
+
+    let child_inputs = build_child_inputs(child, instance, values)?;
+    let child_values = settle_module(hir, child, child_state, &child_inputs, stack)?;
     let mut changed = false;
 
     for port in child
@@ -300,6 +481,49 @@ fn evaluate_instance(
     }
 
     Ok(changed)
+}
+
+fn collect_outputs(
+    module: &ModuleSummary,
+    values: &HashMap<String, Value>,
+) -> BTreeMap<String, u64> {
+    let mut outputs = BTreeMap::new();
+
+    for port in module
+        .ports
+        .iter()
+        .filter(|port| matches!(port.direction, PortDirection::Output))
+    {
+        let value = values
+            .get(&port.name)
+            .copied()
+            .unwrap_or_else(|| Value::zero(port.width()));
+        outputs.insert(port.name.clone(), value.normalized_bits());
+    }
+
+    outputs
+}
+
+fn resolve_supported_module<'a>(
+    hir: &'a HirDesign,
+    module_name: &str,
+) -> Result<&'a ModuleSummary> {
+    let module = hir
+        .module(module_name)
+        .ok_or_else(|| Error::Resolve(format!("module '{}' was not compiled", module_name)))?;
+    if !module.unsupported.is_empty() {
+        return Err(Error::Unsupported(format!(
+            "module '{}' uses unsupported constructs: {}",
+            module_name,
+            module
+                .unsupported
+                .iter()
+                .map(|diag| diag.message.as_str())
+                .collect::<Vec<_>>()
+                .join("; ")
+        )));
+    }
+    Ok(module)
 }
 
 fn find_connection<'a>(
@@ -692,6 +916,145 @@ endmodule
             .expect("eval");
 
         assert_eq!(outputs.get("out"), Some(&1));
+    }
+
+    #[test]
+    fn step_runs_register_8bit_module() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .compile_file(repo.join("parts/basic/register_8bit.sv"))
+            .expect("compile register_8bit");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let outputs = sim
+            .step(BTreeMap::from([
+                ("clk".into(), 1),
+                ("enable".into(), 1),
+                ("data".into(), 0x5a),
+            ]))
+            .expect("step");
+        assert_eq!(outputs.get("q"), Some(&0x5a));
+
+        let outputs = sim
+            .step(BTreeMap::from([
+                ("clk".into(), 1),
+                ("enable".into(), 0),
+                ("data".into(), 0xff),
+            ]))
+            .expect("hold");
+        assert_eq!(outputs.get("q"), Some(&0x5a));
+    }
+
+    #[test]
+    fn step_runs_counter_module() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .compile_file(repo.join("parts/basic/counter8.sv"))
+            .expect("compile counter8");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let outputs = sim
+            .step(BTreeMap::from([
+                ("clk".into(), 1),
+                ("reset".into(), 1),
+                ("enable".into(), 0),
+            ]))
+            .expect("reset");
+        assert_eq!(outputs.get("count"), Some(&0));
+
+        let outputs = sim
+            .step(BTreeMap::from([
+                ("clk".into(), 1),
+                ("reset".into(), 0),
+                ("enable".into(), 1),
+            ]))
+            .expect("increment");
+        assert_eq!(outputs.get("count"), Some(&1));
+
+        let outputs = sim
+            .step(BTreeMap::from([
+                ("clk".into(), 1),
+                ("reset".into(), 0),
+                ("enable".into(), 0),
+            ]))
+            .expect("hold");
+        assert_eq!(outputs.get("count"), Some(&1));
+    }
+
+    #[test]
+    fn step_runs_hierarchical_regfile() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .compile_file(repo.join("parts/basic/regfile_8x8.sv"))
+            .expect("compile regfile_8x8");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let outputs = sim
+            .step(BTreeMap::from([
+                ("clk".into(), 1),
+                ("write_en".into(), 1),
+                ("write_addr".into(), 3),
+                ("write_data".into(), 0x42),
+                ("read_addr1".into(), 3),
+                ("read_addr2".into(), 0),
+            ]))
+            .expect("write r3");
+        assert_eq!(outputs.get("read_data1"), Some(&0x42));
+
+        let outputs = sim
+            .step(BTreeMap::from([
+                ("clk".into(), 1),
+                ("write_en".into(), 1),
+                ("write_addr".into(), 1),
+                ("write_data".into(), 0x99),
+                ("read_addr1".into(), 1),
+                ("read_addr2".into(), 3),
+            ]))
+            .expect("write r1");
+        assert_eq!(outputs.get("read_data1"), Some(&0x99));
+        assert_eq!(outputs.get("read_data2"), Some(&0x42));
+    }
+
+    #[test]
+    fn step_runs_overture_pc_module() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .compile_file(repo.join("parts/overture/overture_pc_8bit.sv"))
+            .expect("compile overture_pc_8bit");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let outputs = sim
+            .step(BTreeMap::from([
+                ("clk".into(), 1),
+                ("reset".into(), 1),
+                ("run".into(), 0),
+                ("jump_en".into(), 0),
+                ("jump_addr".into(), 0),
+            ]))
+            .expect("reset");
+        assert_eq!(outputs.get("pc"), Some(&0));
+
+        let outputs = sim
+            .step(BTreeMap::from([
+                ("clk".into(), 1),
+                ("reset".into(), 0),
+                ("run".into(), 1),
+                ("jump_en".into(), 0),
+                ("jump_addr".into(), 0),
+            ]))
+            .expect("increment");
+        assert_eq!(outputs.get("pc"), Some(&1));
+
+        let outputs = sim
+            .step(BTreeMap::from([
+                ("clk".into(), 1),
+                ("reset".into(), 0),
+                ("run".into(), 1),
+                ("jump_en".into(), 1),
+                ("jump_addr".into(), 10),
+            ]))
+            .expect("jump");
+        assert_eq!(outputs.get("pc"), Some(&10));
     }
 
     fn unique_temp_dir(name: &str) -> PathBuf {

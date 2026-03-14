@@ -22,13 +22,15 @@ Current implementation status as of March 14, 2026:
 
 - Cargo workspace created with `svsim`, `svsim-cli`, and `svsim-render`
 - `sv-parser` integrated for file-based parsing
-- owned HIR covers source files, module summaries, continuous assignments, instantiations, and `always_comb` procedural blocks
+- owned HIR covers source files, module summaries, continuous assignments, instantiations, `always_comb`, and a first `always_ff @(posedge ...)` subset
 - library API started with `Compiler`, `CompiledDesign`, and `SimulationSession`
 - CLI can parse a SystemVerilog file and emit JSON describing discovered modules
 - `SimulationSession::eval_once` can execute hierarchical combinational designs with fixed-point convergence across continuous assignments, module instances, and a basic `always_comb` subset
-- current procedural subset: blocking assignments, `if` / `else`, `case` / `default`, and `begin` / `end` statement blocks without local declarations
+- `SimulationSession::step` now maintains per-instance state and can advance hierarchical designs using `always_ff @(posedge <clock>)` blocks with nonblocking assignment staging
+- current procedural subset: blocking assignments in combinational blocks, nonblocking assignments in `always_ff`, `if` / `else`, `case` / `default`, and `begin` / `end` statement blocks without local declarations
 - current expression subset adds logical `&&` / `||`, equality `==` / `!=`, and arithmetic `+` / `-` on top of literals, identifiers, slices, ternary expressions, and bitwise operators
-- sequential simulation, `always_ff`, memories, explicit elaboration, and test-runner/render integration are still pending
+- current sequential limits: only `posedge` event controls are lowered, `always_ff` clock expressions must be local identifiers, and blocking assignments inside `always_ff` are still rejected
+- memories, explicit elaboration, general event controls, and test-runner/render integration are still pending
 
 ## Compatibility Target
 
@@ -107,7 +109,7 @@ Parse SystemVerilog with `sv-parser`, then lower only the supported constructs i
 - ports and net/variable declarations
 - packed ranges and unpacked memory arrays
 - continuous assignments
-- procedural blocks: `always_comb` now, `always_ff` later
+- procedural blocks: `always_comb` and a first `always_ff @(posedge ...)` subset
 - `if` / `else`
 - `case` / `default`
 - module instantiations with named port connections
@@ -117,7 +119,8 @@ Current lowered subset in the tree today:
 
 - continuous assignments
 - `always_comb`
-- blocking procedural assignment
+- `always_ff @(posedge <clock>)`
+- blocking and nonblocking procedural assignment
 - `if` / `else`
 - `case` / `default`
 - bit-select and part-select expressions
@@ -194,6 +197,7 @@ Core semantics:
 - hierarchical instance stepping without recursive parser calls
 
 For the current subset, cycle-stepped simulation is enough. Event-driven timing can stay out of scope for v1.
+The current runtime interprets each `step()` call as one sampled active clock edge for supported `always_ff` blocks rather than as a free-running waveform simulation.
 
 ## Value Representation
 
@@ -336,6 +340,12 @@ Exit criterion:
 - blocking and nonblocking scheduling
 - multiple procedural blocks
 - cycle stepping and reset
+
+Current progress:
+- `always_ff @(posedge <clock>)` lowering is implemented
+- cycle-stepped state is preserved per instance across `step()` calls
+- nonblocking assignment staging works for the supported subset
+- remaining work is broader event controls, memories, and larger Overture sequential regressions
 
 Exit criterion:
 - parity for sequential register/counter tests and the math sequence stubs

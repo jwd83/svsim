@@ -123,8 +123,15 @@ pub enum LValue {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub enum AssignmentKind {
+    Blocking,
+    Nonblocking,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum ProcBlockKind {
     AlwaysComb,
+    AlwaysFf { clock: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -138,6 +145,7 @@ pub enum Stmt {
     Empty,
     Block(Vec<Stmt>),
     Assign {
+        kind: AssignmentKind,
         target: LValue,
         expr: Expr,
     },

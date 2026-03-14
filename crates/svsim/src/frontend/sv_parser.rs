@@ -17,10 +17,11 @@ use sv_parser::{
 
 use crate::diag::{Diagnostic, Error, Result, SourceSpan};
 use crate::hir::{
-    BinaryOp, CaseStmtItem, ContinuousAssign as HirContinuousAssign, Expr, LValue, ModuleDeclStyle,
-    ModuleInstanceSummary, ModuleSummary, NamedPortConnection as HirNamedPortConnection,
-    NumericLiteral, PackedRange, PortDecl, PortDirection as HirPortDirection, ProcBlock,
-    ProcBlockKind, SignalDecl, SourceFile, Stmt, UnaryOp,
+    AssignmentKind, BinaryOp, CaseStmtItem, ContinuousAssign as HirContinuousAssign, Expr, LValue,
+    ModuleDeclStyle, ModuleInstanceSummary, ModuleSummary,
+    NamedPortConnection as HirNamedPortConnection, NumericLiteral, PackedRange, PortDecl,
+    PortDirection as HirPortDirection, ProcBlock, ProcBlockKind, SignalDecl, SourceFile, Stmt,
+    UnaryOp,
 };
 
 type LowerResult<T> = std::result::Result<T, Diagnostic>;
@@ -590,33 +591,119 @@ fn lower_always_construct(
     construct: &AlwaysConstruct,
     path: &Path,
 ) -> LowerResult<ProcBlock> {
-    let kind = match &construct.nodes.0 {
-        AlwaysKeyword::AlwaysComb(_) => ProcBlockKind::AlwaysComb,
-        AlwaysKeyword::Always(_) => {
-            return Err(unsupported(
-                "`always` blocks are not supported yet; use `always_comb` or `always_ff`",
-                None,
-            ));
-        }
-        AlwaysKeyword::AlwaysLatch(_) => {
-            return Err(unsupported(
-                "`always_latch` blocks are not supported yet",
-                None,
-            ));
-        }
+    match &construct.nodes.0 {
+        AlwaysKeyword::AlwaysComb(_) => Ok(ProcBlock {
+            kind: ProcBlockKind::AlwaysComb,
+            body: lower_statement(syntax_tree, &construct.nodes.1, path)?,
+            span: None,
+        }),
+        AlwaysKeyword::Always(_) => Err(unsupported(
+            "`always` blocks are not supported yet; use `always_comb` or `always_ff`",
+            None,
+        )),
+        AlwaysKeyword::AlwaysLatch(_) => Err(unsupported(
+            "`always_latch` blocks are not supported yet",
+            None,
+        )),
         AlwaysKeyword::AlwaysFf(_) => {
+            let (clock, body) = lower_always_ff_statement(syntax_tree, &construct.nodes.1, path)?;
+            Ok(ProcBlock {
+                kind: ProcBlockKind::AlwaysFf { clock },
+                body,
+                span: None,
+            })
+        }
+    }
+}
+
+fn lower_always_ff_statement(
+    syntax_tree: &SyntaxTree,
+    statement: &Statement,
+    path: &Path,
+) -> LowerResult<(String, Stmt)> {
+    if statement.nodes.0.is_some() {
+        return Err(unsupported(
+            "named procedural blocks are not supported yet",
+            None,
+        ));
+    }
+    if !statement.nodes.1.is_empty() {
+        return Err(unsupported(
+            "statement attributes are not supported yet",
+            None,
+        ));
+    }
+
+    let StatementItem::ProceduralTimingControlStatement(statement) = &statement.nodes.2 else {
+        return Err(unsupported(
+            "`always_ff` blocks must use a single event control statement",
+            None,
+        ));
+    };
+
+    let clock = match &statement.nodes.0 {
+        sv_parser::ProceduralTimingControl::EventControl(control) => {
+            lower_always_ff_event_control(syntax_tree, control, path)?
+        }
+        _ => {
             return Err(unsupported(
-                "`always_ff` blocks are not supported yet",
+                "`always_ff` blocks only support event controls",
                 None,
             ));
         }
     };
+    let body = lower_statement_or_null(syntax_tree, &statement.nodes.1, path)?;
+    Ok((clock, body))
+}
 
-    Ok(ProcBlock {
-        kind,
-        body: lower_statement(syntax_tree, &construct.nodes.1, path)?,
-        span: None,
-    })
+fn lower_always_ff_event_control(
+    syntax_tree: &SyntaxTree,
+    control: &sv_parser::EventControl,
+    path: &Path,
+) -> LowerResult<String> {
+    match control {
+        sv_parser::EventControl::EventExpression(expr) => {
+            lower_always_ff_event_expression(syntax_tree, &expr.nodes.1.nodes.1, path)
+        }
+        _ => Err(unsupported(
+            "`always_ff` blocks must use a single `@(posedge <clock>)` event",
+            None,
+        )),
+    }
+}
+
+fn lower_always_ff_event_expression(
+    syntax_tree: &SyntaxTree,
+    expr: &sv_parser::EventExpression,
+    path: &Path,
+) -> LowerResult<String> {
+    let sv_parser::EventExpression::Expression(expr) = expr else {
+        return Err(unsupported(
+            "`always_ff` blocks must use a single `posedge` clock expression",
+            None,
+        ));
+    };
+
+    if !matches!(expr.nodes.0, Some(sv_parser::EdgeIdentifier::Posedge(_))) {
+        return Err(unsupported(
+            "`always_ff` blocks currently require `posedge` clocks",
+            None,
+        ));
+    }
+    if expr.nodes.2.is_some() {
+        return Err(unsupported(
+            "`always_ff` event expressions with `iff` are not supported yet",
+            None,
+        ));
+    }
+
+    let Expr::Ident(clock) = lower_expression(syntax_tree, &expr.nodes.1, path)? else {
+        return Err(unsupported(
+            "`always_ff` clock expressions must name a local signal",
+            None,
+        ));
+    };
+    Ok(clock)
 }
 
 fn lower_statement(
@@ -640,6 +727,9 @@ fn lower_statement(
     match &statement.nodes.2 {
         StatementItem::BlockingAssignment(assignment) => {
             lower_blocking_assignment(syntax_tree, &assignment.0, path)
+        }
+        StatementItem::NonblockingAssignment(assignment) => {
+            lower_nonblocking_assignment(syntax_tree, &assignment.0, path)
         }
         StatementItem::SeqBlock(block) => lower_seq_block(syntax_tree, block, path),
         StatementItem::ConditionalStatement(statement) => {
@@ -682,6 +772,7 @@ fn lower_blocking_assignment(
                 ));
             }
             Ok(Stmt::Assign {
+                kind: AssignmentKind::Blocking,
                 target: lower_variable_lvalue(syntax_tree, &assignment.nodes.0, path)?,
                 expr: lower_expression(syntax_tree, &assignment.nodes.2, path)?,
             })
@@ -695,6 +786,31 @@ fn lower_blocking_assignment(
             None,
         )),
     }
+}
+
+fn lower_nonblocking_assignment(
+    syntax_tree: &SyntaxTree,
+    assignment: &sv_parser::NonblockingAssignment,
+    path: &Path,
+) -> LowerResult<Stmt> {
+    if assignment.nodes.2.is_some() {
+        return Err(unsupported(
+            "nonblocking assignments with timing controls are not supported yet",
+            None,
+        ));
+    }
+    if symbol_text(syntax_tree, &assignment.nodes.1)? != "<=" {
+        return Err(unsupported(
+            "compound nonblocking assignments are not supported yet",
+            None,
+        ));
+    }
+
+    Ok(Stmt::Assign {
+        kind: AssignmentKind::Nonblocking,
+        target: lower_variable_lvalue(syntax_tree, &assignment.nodes.0, path)?,
+        expr: lower_expression(syntax_tree, &assignment.nodes.3, path)?,
+    })
 }
 
 fn lower_seq_block(syntax_tree: &SyntaxTree, block: &SeqBlock, path: &Path) -> LowerResult<Stmt> {
@@ -1412,6 +1528,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::SvParserFrontend;
+    use crate::hir::{AssignmentKind, ProcBlockKind, Stmt};
 
     fn repo_root() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -1463,5 +1580,39 @@ mod tests {
         let module = &source.modules[0];
         assert_eq!(module.proc_blocks.len(), 1);
         assert!(module.unsupported.is_empty());
+    }
+
+    #[test]
+    fn parse_file_lowers_always_ff_blocks() {
+        let repo = repo_root();
+        let frontend = SvParserFrontend::default();
+        let source = frontend
+            .parse_file(&repo.join("parts/basic/register_8bit.sv"))
+            .expect("parse register_8bit");
+
+        let module = &source.modules[0];
+        assert!(module.unsupported.is_empty());
+        assert_eq!(module.proc_blocks.len(), 1);
+        assert_eq!(
+            module.proc_blocks[0].kind,
+            ProcBlockKind::AlwaysFf {
+                clock: "clk".into()
+            }
+        );
+        match &module.proc_blocks[0].body {
+            Stmt::Block(statements) => match &statements[0] {
+                Stmt::If { then_branch, .. } => match then_branch.as_ref() {
+                    Stmt::Block(statements) => match &statements[0] {
+                        Stmt::Assign { kind, .. } => {
+                            assert_eq!(*kind, AssignmentKind::Nonblocking);
+                        }
+                        other => panic!("unexpected nested statement: {other:?}"),
+                    },
+                    other => panic!("unexpected then branch: {other:?}"),
+                },
+                other => panic!("unexpected first statement: {other:?}"),
+            },
+            other => panic!("unexpected always_ff body: {other:?}"),
+        }
     }
 }
