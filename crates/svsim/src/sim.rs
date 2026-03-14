@@ -402,7 +402,7 @@ fn settle_module(
         for assign in &module.continuous_assignments {
             let value = eval_expr(&assign.expr, &values, &state.memories)?;
             let target = resolve_lvalue(&assign.target, module, &values, &state.memories)?;
-            if matches!(target, ResolvedLValue::MemoryElement { .. }) {
+            if resolved_lvalue_contains_memory(&target) {
                 return Err(Error::Unsupported(
                     "continuous assignments to memory elements are not supported".into(),
                 ));
@@ -531,7 +531,7 @@ fn execute_comb_stmt(
             AssignmentKind::Blocking => {
                 let value = eval_expr(expr, values, memories)?;
                 let target = resolve_lvalue(target, module, values, memories)?;
-                if matches!(target, ResolvedLValue::MemoryElement { .. }) {
+                if resolved_lvalue_contains_memory(&target) {
                     return Err(Error::Unsupported(
                         "memory element assignments are only supported inside `always_ff` blocks"
                             .into(),
@@ -821,6 +821,7 @@ fn evaluate_instance(
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum ResolvedLValue {
     Signal(String),
+    Concat(Vec<ResolvedLValue>),
     BitSelect {
         signal: String,
         index: usize,
@@ -900,6 +901,18 @@ fn eval_expr(
             .copied()
             .ok_or_else(|| Error::Resolve(format!("signal '{}' is not declared", name))),
         Expr::Literal(literal) => Ok(value_from_literal(literal)),
+        Expr::Concat(exprs) => {
+            let mut values_out = Vec::with_capacity(exprs.len());
+            for expr in exprs {
+                values_out.push(eval_expr(expr, values, memories)?);
+            }
+            concat_values(&values_out)
+        }
+        Expr::Repeat { count, expr } => {
+            let value = eval_expr(expr, values, memories)?;
+            let values_out = vec![value; *count];
+            concat_values(&values_out)
+        }
         Expr::MemoryRead { memory, index } => {
             let index = eval_expr(index, values, memories)?.normalized_bits() as usize;
             let memory_state = memories
@@ -989,6 +1002,24 @@ fn value_from_literal(literal: &NumericLiteral) -> Value {
     Value::new(literal.bits, width)
 }
 
+fn concat_values(parts: &[Value]) -> Result<Value> {
+    let total_width: usize = parts.iter().map(|value| value.width).sum();
+    if total_width > u64::BITS as usize {
+        return Err(Error::Unsupported(format!(
+            "concatenation width {} exceeds the current 64-bit runtime limit",
+            total_width
+        )));
+    }
+
+    let mut bits = 0u64;
+    let mut shift = total_width;
+    for part in parts {
+        shift -= part.width;
+        bits |= (part.normalized_bits() & mask(part.width)) << shift;
+    }
+    Ok(Value::new(bits, total_width))
+}
+
 fn values_equal(left: Value, right: Value) -> bool {
     left.normalized_bits() == right.normalized_bits()
 }
@@ -996,6 +1027,13 @@ fn values_equal(left: Value, right: Value) -> bool {
 fn expr_to_lvalue(expr: &Expr) -> Option<LValue> {
     match expr {
         Expr::Ident(name) => Some(LValue::Signal(name.clone())),
+        Expr::Concat(exprs) => {
+            let mut items = Vec::with_capacity(exprs.len());
+            for expr in exprs {
+                items.push(expr_to_lvalue(expr)?);
+            }
+            Some(LValue::Concat(items))
+        }
         Expr::BitSelect { expr, index } => match expr.as_ref() {
             Expr::Ident(name) => Some(LValue::BitSelect {
                 signal: name.clone(),
@@ -1031,6 +1069,13 @@ fn resolve_lvalue(
             }
             Ok(ResolvedLValue::Signal(name.clone()))
         }
+        LValue::Concat(items) => {
+            let mut resolved = Vec::with_capacity(items.len());
+            for item in items {
+                resolved.push(resolve_lvalue(item, module, values, memories)?);
+            }
+            Ok(ResolvedLValue::Concat(resolved))
+        }
         LValue::BitSelect { signal, index } => Ok(ResolvedLValue::BitSelect {
             signal: signal.clone(),
             index: *index,
@@ -1044,6 +1089,74 @@ fn resolve_lvalue(
             memory: memory.clone(),
             index: eval_expr(index, values, memories)?.normalized_bits() as usize,
         }),
+    }
+}
+
+fn resolved_lvalue_contains_memory(lvalue: &ResolvedLValue) -> bool {
+    match lvalue {
+        ResolvedLValue::Signal(_)
+        | ResolvedLValue::BitSelect { .. }
+        | ResolvedLValue::PartSelect { .. } => false,
+        ResolvedLValue::Concat(items) => items.iter().any(resolved_lvalue_contains_memory),
+        ResolvedLValue::MemoryElement { .. } => true,
+    }
+}
+
+fn resolved_lvalue_width(lvalue: &ResolvedLValue, module: &ModuleSummary) -> Result<usize> {
+    match lvalue {
+        ResolvedLValue::Signal(name) => module.signal_width(name).ok_or_else(|| {
+            Error::Resolve(format!(
+                "signal '{}' is not declared in '{}'",
+                name, module.name
+            ))
+        }),
+        ResolvedLValue::Concat(items) => {
+            let mut total = 0usize;
+            for item in items {
+                total += resolved_lvalue_width(item, module)?;
+            }
+            Ok(total)
+        }
+        ResolvedLValue::BitSelect { signal, index } => {
+            let width = module.signal_width(signal).ok_or_else(|| {
+                Error::Resolve(format!(
+                    "signal '{}' is not declared in '{}'",
+                    signal, module.name
+                ))
+            })?;
+            if *index >= width {
+                return Err(Error::Resolve(format!(
+                    "bit select [{}] is out of range for signal '{}'",
+                    index, signal
+                )));
+            }
+            Ok(1)
+        }
+        ResolvedLValue::PartSelect { signal, msb, lsb } => {
+            let width = module.signal_width(signal).ok_or_else(|| {
+                Error::Resolve(format!(
+                    "signal '{}' is not declared in '{}'",
+                    signal, module.name
+                ))
+            })?;
+            let high = (*msb).max(*lsb);
+            if high >= width {
+                return Err(Error::Resolve(format!(
+                    "part select [{}:{}] is out of range for signal '{}'",
+                    msb, lsb, signal
+                )));
+            }
+            Ok(high - (*msb).min(*lsb) + 1)
+        }
+        ResolvedLValue::MemoryElement { memory, .. } => module
+            .memory_decl(memory)
+            .map(|memory| memory.element_width())
+            .ok_or_else(|| {
+                Error::Resolve(format!(
+                    "memory '{}' is not declared in '{}'",
+                    memory, module.name
+                ))
+            }),
     }
 }
 
@@ -1065,6 +1178,22 @@ fn apply_resolved_lvalue(
             let next = Value::new(value.normalized_bits(), current.width);
             let changed = *current != next;
             *current = next;
+            Ok(changed)
+        }
+        ResolvedLValue::Concat(items) => {
+            let total_width = resolved_lvalue_width(lvalue, module)?;
+            let normalized = value.normalized_bits() & mask(total_width);
+            let mut remaining_width = total_width;
+            let mut changed = false;
+            for item in items {
+                let item_width = resolved_lvalue_width(item, module)?;
+                remaining_width -= item_width;
+                let chunk = Value::new(
+                    (normalized >> remaining_width) & mask(item_width),
+                    item_width,
+                );
+                changed |= apply_resolved_lvalue(item, chunk, module, values, memories)?;
+            }
             Ok(changed)
         }
         ResolvedLValue::BitSelect { signal, index } => {
@@ -1721,6 +1850,78 @@ endmodule
                 .expect("read instruction 16"),
             0x9e
         );
+    }
+
+    #[test]
+    fn eval_once_runs_vector_concatenation_assignment() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .compile_file(repo.join("parts/testing/016-Vector3.sv"))
+            .expect("compile 016-Vector3");
+        let mut sim = design.instantiate_top().expect("instantiate");
+        let outputs = sim
+            .eval_once(BTreeMap::from([
+                ("a".into(), 31),
+                ("b".into(), 21),
+                ("c".into(), 10),
+                ("d".into(), 5),
+                ("e".into(), 3),
+                ("f".into(), 1),
+            ]))
+            .expect("eval");
+
+        assert_eq!(outputs.get("w"), Some(&253));
+        assert_eq!(outputs.get("x"), Some(&84));
+        assert_eq!(outputs.get("y"), Some(&81));
+        assert_eq!(outputs.get("z"), Some(&135));
+    }
+
+    #[test]
+    fn eval_once_runs_bit_reversal_concatenation() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .compile_file(repo.join("parts/testing/017-Vectorr.sv"))
+            .expect("compile 017-Vectorr");
+        let mut sim = design.instantiate_top().expect("instantiate");
+        let outputs = sim
+            .eval_once(BTreeMap::from([("in".into(), 0b1101_0011)]))
+            .expect("eval");
+
+        assert_eq!(outputs.get("out"), Some(&0b1100_1011));
+    }
+
+    #[test]
+    fn eval_once_runs_sign_extension_replication() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .compile_file(repo.join("parts/testing/018-Vector4SignExtension.sv"))
+            .expect("compile 018-Vector4SignExtension");
+        let mut sim = design.instantiate_top().expect("instantiate");
+        let outputs = sim
+            .eval_once(BTreeMap::from([("in".into(), 0x81)]))
+            .expect("eval");
+
+        assert_eq!(outputs.get("out"), Some(&0xffff_ff81));
+    }
+
+    #[test]
+    fn eval_once_runs_multi_expression_replication_with_sv_bit_order() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .compile_file(repo.join("parts/testing/019-Vector5.sv"))
+            .expect("compile 019-Vector5");
+        let mut sim = design.instantiate_top().expect("instantiate");
+        let outputs = sim
+            .eval_once(BTreeMap::from([
+                ("a".into(), 1),
+                ("b".into(), 0),
+                ("c".into(), 1),
+                ("d".into(), 0),
+                ("e".into(), 1),
+            ]))
+            .expect("eval");
+
+        assert_eq!(outputs.get("out"), Some(&22_369_621));
     }
 
     fn unique_temp_dir(name: &str) -> PathBuf {

@@ -36,7 +36,7 @@ impl PackedRange {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum PortDirection {
     Input,
     Output,
@@ -117,6 +117,11 @@ pub enum BinaryOp {
 pub enum Expr {
     Ident(String),
     Literal(NumericLiteral),
+    Concat(Vec<Expr>),
+    Repeat {
+        count: usize,
+        expr: Box<Expr>,
+    },
     MemoryRead {
         memory: String,
         index: Box<Expr>,
@@ -149,6 +154,7 @@ pub enum Expr {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum LValue {
     Signal(String),
+    Concat(Vec<LValue>),
     BitSelect {
         signal: String,
         index: usize,

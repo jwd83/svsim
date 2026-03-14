@@ -22,15 +22,17 @@ Current implementation status as of March 14, 2026:
 
 - Cargo workspace created with `svsim`, `svsim-cli`, and `svsim-render`
 - `sv-parser` integrated for file-based parsing
-- owned HIR covers source files, module summaries, continuous assignments, instantiations, `always_comb`, and a first `always_ff @(posedge ...)` subset
+- owned HIR covers source files, module summaries, continuous assignments, instantiations, `always_comb`, a first `always_ff @(posedge ...)` subset, concatenation/replication expressions, and concatenated assignment targets
 - library API started with `Compiler`, `CompiledDesign`, and `SimulationSession`
 - CLI can parse a SystemVerilog file and emit JSON describing discovered modules
 - `SimulationSession::eval_once` can execute hierarchical combinational designs with fixed-point convergence across continuous assignments, module instances, and a basic `always_comb` subset
 - `SimulationSession::step` now maintains per-instance state and can advance hierarchical designs using `always_ff @(posedge <clock>)` blocks with blocking immediate updates and nonblocking assignment staging
 - current procedural subset: blocking assignments in combinational blocks and `always_ff`, nonblocking assignments in `always_ff`, `if` / `else`, `case` / `default`, and `begin` / `end` statement blocks
-- current expression subset adds logical `&&` / `||`, equality `==` / `!=`, arithmetic `+` / `-`, and single-dimension memory reads on top of literals, identifiers, slices, ternary expressions, and bitwise operators
+- current expression subset adds concatenation, replication, logical `&&` / `||`, equality `==` / `!=`, arithmetic `+` / `-`, and single-dimension memory reads on top of literals, identifiers, slices, ternary expressions, and bitwise operators
+- frontend lowering now accepts grouped ANSI port declarations such as `input [4:0] a, b, c` and lowers net declaration initializers like `wire [24:0] v = expr;` into signal declarations plus continuous assignments
 - current sequential limits: only `posedge` event controls are lowered, `always_ff` clock expressions must be local identifiers, and cross-block race semantics are not modeled beyond deterministic source order
 - current memory subset supports fixed-size unpacked `reg` / `logic` arrays with zero-initialized reads, explicit programmatic preload/read access by instance path, text-file ROM/RAM loading, and procedural single-element writes; explicit elaboration, JSON regression execution, general event controls, and test-runner/render integration are still pending
+- known compatibility gap: `parts/testing/019-Vector5` now lowers and evaluates with standard concatenation/replication bit ordering, but its checked-in JSON reflects a Python reference parser bug for multi-expression replication (`{5{a, b, c, d, e}}`), so Rust and JSON parity still diverge there until the compatibility policy is decided
 
 ## Compatibility Target
 
@@ -125,10 +127,12 @@ Current lowered subset in the tree today:
 - `if` / `else`
 - `case` / `default`
 - memory element reads
+- concatenation and replication expressions
 - bit-select and part-select expressions
 - unary bitwise-not
 - binary `&`, `|`, `^`, `&&`, `||`, `==`, `!=`, `+`, `-`
 - ternary expressions
+- concatenated continuous/procedural assignment targets
 
 Lowering should resolve syntax noise early so the simulator never touches parser-specific node shapes after compilation.
 
@@ -332,6 +336,11 @@ Exit criterion:
 - expressions, buses, slices, concatenation, replication, ternary
 - named-port instantiation
 - hierarchical combinational evaluation
+
+Current progress:
+- hierarchical combinational evaluation is implemented across continuous assignments, instances, `always_comb`, concatenation, replication, and concatenated lvalues
+- grouped ANSI port declarations and initialized net declarations from the vector corpus are now lowered
+- remaining work is JSON-backed combinational regression execution and deciding whether to preserve or retire the Python reference bug encoded in `parts/testing/019-Vector5.json`
 
 Exit criterion:
 - parity for the combinational modules and tests in `parts/basic/` and `parts/testing/`

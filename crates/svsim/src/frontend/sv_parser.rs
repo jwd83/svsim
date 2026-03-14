@@ -33,6 +33,18 @@ struct LoweredDeclarations {
     memories: Vec<MemoryDecl>,
 }
 
+#[derive(Debug, Default)]
+struct LoweredNetDeclarations {
+    signals: Vec<SignalDecl>,
+    initializers: Vec<HirContinuousAssign>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct AnsiPortContext {
+    direction: HirPortDirection,
+    range: Option<PackedRange>,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct SvParserFrontend {
     include_paths: Vec<PathBuf>,
@@ -98,10 +110,14 @@ fn lower_ansi_module(
     };
 
     if let Some(port_decls) = decl.nodes.0.nodes.6.as_ref() {
+        let mut context = None;
         if let Some(list) = port_decls.nodes.0.nodes.1.as_ref() {
             for port_decl in list.contents() {
-                match lower_ansi_port_declaration(syntax_tree, &port_decl.1, path) {
-                    Ok(port) => module.ports.push(port),
+                match lower_ansi_port_declaration(syntax_tree, &port_decl.1, path, context) {
+                    Ok((port, next_context)) => {
+                        module.ports.push(port);
+                        context = Some(next_context);
+                    }
                     Err(diag) => module.unsupported.push(diag),
                 }
             }
@@ -232,8 +248,11 @@ fn lower_module_declaration_item(
                 }
             }
             PackageOrGenerateItemDeclaration::NetDeclaration(decl) => {
-                match lower_net_declaration(syntax_tree, decl, path) {
-                    Ok(signals) => module.signals.extend(signals),
+                match lower_net_declaration(syntax_tree, decl, module, path) {
+                    Ok(lowered) => {
+                        module.signals.extend(lowered.signals);
+                        module.continuous_assignments.extend(lowered.initializers);
+                    }
                     Err(diag) => module.unsupported.push(diag),
                 }
             }
@@ -254,22 +273,25 @@ fn lower_ansi_port_declaration(
     syntax_tree: &SyntaxTree,
     decl: &AnsiPortDeclaration,
     path: &Path,
-) -> LowerResult<PortDecl> {
+    inherited: Option<AnsiPortContext>,
+) -> LowerResult<(PortDecl, AnsiPortContext)> {
     match decl {
         AnsiPortDeclaration::Net(decl) => {
-            let header = decl
-                .nodes
-                .0
-                .as_ref()
-                .ok_or_else(|| unsupported("ports must declare an explicit direction", None))?;
-            let (direction, range) = match header {
-                sv_parser::NetPortHeaderOrInterfacePortHeader::NetPortHeader(header) => (
-                    lower_port_direction(header.nodes.0.as_ref(), path)?,
-                    lower_net_port_range(syntax_tree, &header.nodes.1, path)?,
-                ),
-                sv_parser::NetPortHeaderOrInterfacePortHeader::InterfacePortHeader(_) => {
-                    return Err(unsupported("interface ports are not supported yet", None));
+            let context = if let Some(header) = decl.nodes.0.as_ref() {
+                match header {
+                    sv_parser::NetPortHeaderOrInterfacePortHeader::NetPortHeader(header) => {
+                        AnsiPortContext {
+                            direction: lower_port_direction(header.nodes.0.as_ref(), path)?,
+                            range: lower_net_port_range(syntax_tree, &header.nodes.1, path)?,
+                        }
+                    }
+                    sv_parser::NetPortHeaderOrInterfacePortHeader::InterfacePortHeader(_) => {
+                        return Err(unsupported("interface ports are not supported yet", None));
+                    }
                 }
+            } else {
+                inherited
+                    .ok_or_else(|| unsupported("ports must declare an explicit direction", None))?
             };
             if !decl.nodes.2.is_empty() || decl.nodes.3.is_some() {
                 return Err(unsupported(
@@ -280,21 +302,26 @@ fn lower_ansi_port_declaration(
             let (name, locate) =
                 identifier_name_from_node(syntax_tree, RefNode::from(&decl.nodes.1))
                     .ok_or_else(|| unsupported("failed to determine ANSI port name", None))?;
-            Ok(PortDecl {
-                name,
-                direction,
-                range,
-                span: Some(span_from_locate(path, locate)),
-            })
+            Ok((
+                PortDecl {
+                    name,
+                    direction: context.direction,
+                    range: context.range,
+                    span: Some(span_from_locate(path, locate)),
+                },
+                context,
+            ))
         }
         AnsiPortDeclaration::Variable(decl) => {
-            let header = decl
-                .nodes
-                .0
-                .as_ref()
-                .ok_or_else(|| unsupported("ports must declare an explicit direction", None))?;
-            let direction = lower_port_direction(header.nodes.0.as_ref(), path)?;
-            let range = lower_variable_port_range(syntax_tree, &header.nodes.1, path)?;
+            let context = if let Some(header) = decl.nodes.0.as_ref() {
+                AnsiPortContext {
+                    direction: lower_port_direction(header.nodes.0.as_ref(), path)?,
+                    range: lower_variable_port_range(syntax_tree, &header.nodes.1, path)?,
+                }
+            } else {
+                inherited
+                    .ok_or_else(|| unsupported("ports must declare an explicit direction", None))?
+            };
             if !decl.nodes.2.is_empty() || decl.nodes.3.is_some() {
                 return Err(unsupported(
                     "ANSI ports with unpacked dimensions or default values are not supported yet",
@@ -304,12 +331,15 @@ fn lower_ansi_port_declaration(
             let (name, locate) =
                 identifier_name_from_node(syntax_tree, RefNode::from(&decl.nodes.1))
                     .ok_or_else(|| unsupported("failed to determine ANSI port name", None))?;
-            Ok(PortDecl {
-                name,
-                direction,
-                range,
-                span: Some(span_from_locate(path, locate)),
-            })
+            Ok((
+                PortDecl {
+                    name,
+                    direction: context.direction,
+                    range: context.range,
+                    span: Some(span_from_locate(path, locate)),
+                },
+                context,
+            ))
         }
         AnsiPortDeclaration::Paren(_) => Err(unsupported(
             "parenthesized ANSI ports are not supported yet",
@@ -412,16 +442,17 @@ fn lower_data_declaration(
 fn lower_net_declaration(
     syntax_tree: &SyntaxTree,
     decl: &NetDeclaration,
+    module: &ModuleSummary,
     path: &Path,
-) -> LowerResult<Vec<SignalDecl>> {
+) -> LowerResult<LoweredNetDeclarations> {
     match decl {
         NetDeclaration::NetType(decl) => {
             let range = lower_data_type_or_implicit_range(syntax_tree, &decl.nodes.3, path)?;
-            let mut signals = Vec::new();
+            let mut lowered = LoweredNetDeclarations::default();
             for assignment in decl.nodes.5.nodes.0.contents() {
-                if !assignment.nodes.1.is_empty() || assignment.nodes.2.is_some() {
+                if !assignment.nodes.1.is_empty() {
                     return Err(unsupported(
-                        "net declarations with unpacked dimensions or initializers are not supported yet",
+                        "net declarations with unpacked dimensions are not supported yet",
                         None,
                     ));
                 }
@@ -430,13 +461,24 @@ fn lower_net_declaration(
                         .ok_or_else(|| {
                             unsupported("failed to determine net declaration name", None)
                         })?;
-                signals.push(SignalDecl {
+                let signal = SignalDecl {
                     name,
                     range,
                     span: Some(span_from_locate(path, locate)),
-                });
+                };
+                if let Some((_, expr)) = assignment.nodes.2.as_ref() {
+                    let mut expr_module = module.clone();
+                    expr_module.signals.extend(lowered.signals.clone());
+                    expr_module.signals.push(signal.clone());
+                    lowered.initializers.push(HirContinuousAssign {
+                        target: LValue::Signal(signal.name.clone()),
+                        expr: lower_expression(syntax_tree, expr, &expr_module, path)?,
+                        span: signal.span.clone(),
+                    });
+                }
+                lowered.signals.push(signal);
             }
-            Ok(signals)
+            Ok(lowered)
         }
         _ => Err(unsupported("net declaration is not supported yet", None)),
     }
@@ -1179,11 +1221,59 @@ fn lower_primary(
                 path,
             )
         }
+        Primary::Concatenation(concat) => {
+            if concat.nodes.1.is_some() {
+                return Err(unsupported(
+                    "concatenation primaries with range indexing are not supported yet",
+                    None,
+                ));
+            }
+            lower_concatenation(syntax_tree, &concat.nodes.0, module, path)
+        }
+        Primary::MultipleConcatenation(concat) => {
+            if concat.nodes.1.is_some() {
+                return Err(unsupported(
+                    "replication primaries with range indexing are not supported yet",
+                    None,
+                ));
+            }
+            lower_multiple_concatenation(syntax_tree, &concat.nodes.0, module, path)
+        }
         Primary::MintypmaxExpression(expr) => {
             lower_mintypmax_expression(syntax_tree, &expr.nodes.0.nodes.1, module, path)
         }
         _ => Err(unsupported("primary expression is not supported yet", None)),
     }
+}
+
+fn lower_concatenation(
+    syntax_tree: &SyntaxTree,
+    concat: &sv_parser::Concatenation,
+    module: &ModuleSummary,
+    path: &Path,
+) -> LowerResult<Expr> {
+    let mut exprs = Vec::new();
+    for expr in concat.nodes.0.nodes.1.contents() {
+        exprs.push(lower_expression(syntax_tree, expr, module, path)?);
+    }
+    Ok(Expr::Concat(exprs))
+}
+
+fn lower_multiple_concatenation(
+    syntax_tree: &SyntaxTree,
+    concat: &sv_parser::MultipleConcatenation,
+    module: &ModuleSummary,
+    path: &Path,
+) -> LowerResult<Expr> {
+    Ok(Expr::Repeat {
+        count: lower_usize_expression(syntax_tree, &concat.nodes.0.nodes.1.0, module, path)?,
+        expr: Box::new(lower_concatenation(
+            syntax_tree,
+            &concat.nodes.0.nodes.1.1,
+            module,
+            path,
+        )?),
+    })
 }
 
 fn lower_mintypmax_expression(
@@ -1349,6 +1439,13 @@ fn lower_net_lvalue(
             let (name, _) = lower_net_identifier(syntax_tree, &lvalue.nodes.0, "net lvalues")?;
             lower_constant_select_lvalue(syntax_tree, name, &lvalue.nodes.1, path)
         }
+        NetLvalue::Lvalue(lvalue) => {
+            let mut items = Vec::new();
+            for item in lvalue.nodes.0.nodes.1.contents() {
+                items.push(lower_net_lvalue(syntax_tree, item, path)?);
+            }
+            Ok(LValue::Concat(items))
+        }
         _ => Err(unsupported(
             "complex net lvalues are not supported yet",
             None,
@@ -1379,6 +1476,13 @@ fn lower_variable_lvalue(
                 "variable lvalues",
             )?;
             lower_select_lvalue(syntax_tree, name, &lvalue.nodes.2, module, path)
+        }
+        VariableLvalue::Lvalue(lvalue) => {
+            let mut items = Vec::new();
+            for item in lvalue.nodes.0.nodes.1.contents() {
+                items.push(lower_variable_lvalue(syntax_tree, item, module, path)?);
+            }
+            Ok(LValue::Concat(items))
         }
         _ => Err(unsupported(
             "complex variable lvalues are not supported yet",
@@ -1904,6 +2008,59 @@ mod tests {
                 other => panic!("unexpected first statement: {other:?}"),
             },
             other => panic!("unexpected always_ff body: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_file_lowers_concatenation_assignments_and_shared_ansi_ports() {
+        let repo = repo_root();
+        let frontend = SvParserFrontend::default();
+        let source = frontend
+            .parse_file(&repo.join("parts/testing/016-Vector3.sv"))
+            .expect("parse 016-Vector3");
+
+        let module = &source.modules[0];
+        assert!(module.unsupported.is_empty());
+        assert_eq!(module.ports.len(), 10);
+        match &module.continuous_assignments[0].target {
+            LValue::Concat(items) => assert_eq!(items.len(), 4),
+            other => panic!("unexpected concatenation target: {other:?}"),
+        }
+        match &module.continuous_assignments[0].expr {
+            Expr::Concat(items) => assert_eq!(items.len(), 7),
+            other => panic!("unexpected concatenation expression: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_file_lowers_replication_and_net_initializer() {
+        let repo = repo_root();
+        let frontend = SvParserFrontend::default();
+        let source = frontend
+            .parse_file(&repo.join("parts/testing/019-Vector5.sv"))
+            .expect("parse 019-Vector5");
+
+        let module = &source.modules[0];
+        assert!(module.unsupported.is_empty());
+        assert_eq!(module.signals.len(), 2);
+        assert_eq!(module.continuous_assignments.len(), 3);
+        match &module.continuous_assignments[0].expr {
+            Expr::Concat(items) => {
+                assert_eq!(items.len(), 5);
+                assert!(
+                    items
+                        .iter()
+                        .all(|item| matches!(item, Expr::Repeat { count: 5, .. }))
+                );
+            }
+            other => panic!("unexpected replicated concatenation: {other:?}"),
+        }
+        match &module.continuous_assignments[1].expr {
+            Expr::Repeat { count, expr } => {
+                assert_eq!(*count, 5);
+                assert!(matches!(expr.as_ref(), Expr::Concat(items) if items.len() == 5));
+            }
+            other => panic!("unexpected multiple concatenation: {other:?}"),
         }
     }
 }
