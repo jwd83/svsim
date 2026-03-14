@@ -25,6 +25,7 @@ Current implementation status as of March 14, 2026:
 - owned HIR covers source files, module summaries, continuous assignments, instantiations, `always_comb`, a first `always_ff @(posedge ...)` subset, concatenation/replication expressions, and concatenated assignment targets
 - library API now exposes `Compiler`, `CompiledDesign`, and `SimulationSession`, including `compile_file` and `compile_str`
 - `CompiledDesign::hierarchy()` now exposes an owned top-down instance tree so embedding callers can discover valid instance paths before using per-instance memory APIs
+- library-side JSON regression execution is now available through `CompiledDesign::run_json_file` / `svsim::JsonTestSuite` for combinational arrays, sequential `test_cases`, and relative memory-file preload
 - CLI can parse a SystemVerilog file and emit JSON describing discovered modules
 - `SimulationSession::eval_once` can execute hierarchical combinational designs with fixed-point convergence across continuous assignments, module instances, and a basic `always_comb` subset
 - `SimulationSession::step` now maintains per-instance state and can advance hierarchical designs using `always_ff @(posedge <clock>)` blocks with blocking immediate updates and nonblocking assignment staging
@@ -33,7 +34,7 @@ Current implementation status as of March 14, 2026:
 - frontend lowering now accepts grouped ANSI port declarations such as `input [4:0] a, b, c` and lowers net declaration initializers like `wire [24:0] v = expr;` into signal declarations plus continuous assignments
 - `compile_str` can seed a design from an in-memory top module while still resolving instantiated dependencies from the virtual path's directory and configured search paths
 - current sequential limits: only `posedge` event controls are lowered, `always_ff` clock expressions must be local identifiers, and cross-block race semantics are not modeled beyond deterministic source order
-- current memory subset supports fixed-size unpacked `reg` / `logic` arrays with zero-initialized reads, explicit programmatic preload/read access by instance path, text-file ROM/RAM loading, and procedural single-element writes; explicit elaboration, JSON regression execution, general event controls, and test-runner/render integration are still pending
+- current memory subset supports fixed-size unpacked `reg` / `logic` arrays with zero-initialized reads, explicit programmatic preload/read access by instance path, text-file ROM/RAM loading, procedural single-element writes, and JSON-driven regression preload; explicit elaboration, general event controls, CLI test-runner wiring, and render integration are still pending
 - known compatibility gap: `parts/testing/019-Vector5` now lowers and evaluates with standard concatenation/replication bit ordering, but its checked-in JSON reflects a Python reference parser bug for multi-expression replication (`{5{a, b, c, d, e}}`), so Rust and JSON parity still diverge there until the compatibility policy is decided
 
 ## Compatibility Target
@@ -253,7 +254,8 @@ Useful embedded surfaces:
 - inspect ports and widths through the compiled HIR, and inspect instance hierarchy through `CompiledDesign::hierarchy()`
 - evaluate combinational top modules
 - step sequential top modules
-- reset simulator state
+- run JSON-backed regression suites through `CompiledDesign::run_json_file`
+- reset simulator state by instantiating a fresh `SimulationSession`
 - export traces for external visualization
 
 The CLI should consume this API, not own separate logic.
@@ -266,7 +268,7 @@ The simulator should emit structured results first:
 
 - `TruthTable`
 - `WaveTrace`
-- `TestRunResult`
+- `TestRunResult` (now partially in place as structured JSON test reports)
 
 Those artifacts can be rendered later using:
 
@@ -345,7 +347,8 @@ Current progress:
 - grouped ANSI port declarations and initialized net declarations from the vector corpus are now lowered
 - in-memory top-level compilation via `compile_str` is implemented, with dependency lookup anchored at the virtual path plus explicit search paths
 - callers can now inspect the compiled instance tree directly instead of reverse-engineering valid instance paths from raw HIR module summaries
-- remaining work is JSON-backed combinational regression execution and deciding whether to preserve or retire the Python reference bug encoded in `parts/testing/019-Vector5.json`
+- library-side JSON-backed combinational regression execution is implemented
+- remaining work is deciding whether to preserve or retire the Python reference bug encoded in `parts/testing/019-Vector5.json`, then wiring the same regression path into the CLI/batch workflow
 
 Exit criterion:
 - parity for the combinational modules and tests in `parts/basic/` and `parts/testing/`
@@ -362,15 +365,17 @@ Current progress:
 - cycle-stepped state is preserved per instance across `step()` calls
 - blocking and nonblocking assignment semantics work for the supported subset
 - zero-initialized single-dimension memory reads, explicit memory preload/read APIs, text-file memory loading, and procedural single-element memory writes are implemented
-- remaining work is broader event controls, JSON regression execution, and larger Overture sequential regressions
+- library-side JSON regression execution now covers sequential `test_cases`, including memory-backed suites
+- remaining work is broader event controls, CLI/batch regression wiring, and larger Overture sequential regressions
 
 Exit criterion:
 - parity for sequential register/counter tests and the math sequence stubs
 
 ### Phase 3: Memories And Overture
 
-- JSON-driven memory binding and regression execution
+- JSON-driven memory binding through the library test runner
 - Overture CPU regression suite
+- CLI and batch regression entry points
 
 Exit criterion:
 - parity for `parts/overture/` tests
@@ -429,5 +434,7 @@ The first concrete implementation target should be:
 4. add sequential stepping
 5. add explicit memory binding configuration
 6. run Overture regressions through the Rust CLI
+
+That library milestone is now largely in place; the next pragmatic target is exposing the same regression flow through the CLI and a batch runner.
 
 At that point the project has replaced the Python simulator for core use, even before image rendering exists.

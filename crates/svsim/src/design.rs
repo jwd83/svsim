@@ -1,9 +1,11 @@
+use std::path::Path;
 use std::path::PathBuf;
 
 use crate::diag::Error;
 use crate::diag::Result;
 use crate::hir::{HirDesign, SourceFile};
 use crate::sim::SimulationSession;
+use crate::test::{JsonTestReport, JsonTestSuite};
 use serde::Serialize;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -62,6 +64,10 @@ impl CompiledDesign {
 
     pub fn instantiate_top(&self) -> Result<SimulationSession> {
         SimulationSession::new(self.clone())
+    }
+
+    pub fn run_json_file(&self, path: impl AsRef<Path>) -> Result<JsonTestReport> {
+        JsonTestSuite::load_file(path)?.run(self)
     }
 }
 
