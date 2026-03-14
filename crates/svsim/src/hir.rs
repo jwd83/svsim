@@ -71,6 +71,12 @@ pub enum BinaryOp {
     BitAnd,
     BitOr,
     BitXor,
+    LogicalAnd,
+    LogicalOr,
+    Eq,
+    NotEq,
+    Add,
+    Sub,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -117,6 +123,44 @@ pub enum LValue {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub enum ProcBlockKind {
+    AlwaysComb,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct CaseStmtItem {
+    pub patterns: Vec<Expr>,
+    pub body: Stmt,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub enum Stmt {
+    Empty,
+    Block(Vec<Stmt>),
+    Assign {
+        target: LValue,
+        expr: Expr,
+    },
+    If {
+        cond: Expr,
+        then_branch: Box<Stmt>,
+        else_branch: Option<Box<Stmt>>,
+    },
+    Case {
+        expr: Expr,
+        items: Vec<CaseStmtItem>,
+        default: Option<Box<Stmt>>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ProcBlock {
+    pub kind: ProcBlockKind,
+    pub body: Stmt,
+    pub span: Option<SourceSpan>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ContinuousAssign {
     pub target: LValue,
     pub expr: Expr,
@@ -152,6 +196,7 @@ pub struct ModuleSummary {
     pub ports: Vec<PortDecl>,
     pub signals: Vec<SignalDecl>,
     pub continuous_assignments: Vec<ContinuousAssign>,
+    pub proc_blocks: Vec<ProcBlock>,
     pub instantiations: Vec<ModuleInstanceSummary>,
     pub unsupported: Vec<Diagnostic>,
 }

@@ -2,23 +2,25 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use sv_parser::{
-    AnsiPortDeclaration, BinaryOperator, CondPredicate, ConstantExpression,
+    AlwaysConstruct, AlwaysKeyword, AnsiPortDeclaration, BinaryOperator, CaseItem as SvCaseItem,
+    CaseStatement, CondPredicate, ConditionalStatement, ConstantExpression,
     ConstantPartSelectRange, ConstantRange, ConstantSelect, ContinuousAssign, DataDeclaration,
     DataType, DataTypeOrImplicit, Define, Defines, Expression, HierarchicalIdentifier,
     ImplicitDataType, ListOfPortConnections, Locate, ModuleDeclarationAnsi,
     ModuleDeclarationNonansi, ModuleInstantiation, ModuleOrGenerateItem,
     ModuleOrGenerateItemDeclaration, NamedPortConnection, NetDeclaration, NetLvalue,
     NonPortModuleItem, PackageOrGenerateItemDeclaration, PartSelectRange, PortDirection, Primary,
-    PsOrHierarchicalNetIdentifier, RefNode, Select, SyntaxTree, UnaryOperator, VariableAssignment,
-    VariableLvalue, VariablePortType, parse_sv, unwrap_node,
+    PsOrHierarchicalNetIdentifier, RefNode, Select, SeqBlock, Statement, StatementItem,
+    StatementOrNull, SyntaxTree, UnaryOperator, VariableAssignment, VariableLvalue,
+    VariablePortType, parse_sv, unwrap_node,
 };
 
 use crate::diag::{Diagnostic, Error, Result, SourceSpan};
 use crate::hir::{
-    BinaryOp, ContinuousAssign as HirContinuousAssign, Expr, LValue, ModuleDeclStyle,
+    BinaryOp, CaseStmtItem, ContinuousAssign as HirContinuousAssign, Expr, LValue, ModuleDeclStyle,
     ModuleInstanceSummary, ModuleSummary, NamedPortConnection as HirNamedPortConnection,
-    NumericLiteral, PackedRange, PortDecl, PortDirection as HirPortDirection, SignalDecl,
-    SourceFile, UnaryOp,
+    NumericLiteral, PackedRange, PortDecl, PortDirection as HirPortDirection, ProcBlock,
+    ProcBlockKind, SignalDecl, SourceFile, Stmt, UnaryOp,
 };
 
 type LowerResult<T> = std::result::Result<T, Diagnostic>;
@@ -81,6 +83,7 @@ fn lower_ansi_module(
         ports: Vec::new(),
         signals: Vec::new(),
         continuous_assignments: Vec::new(),
+        proc_blocks: Vec::new(),
         instantiations: Vec::new(),
         unsupported: Vec::new(),
     };
@@ -124,6 +127,7 @@ fn lower_nonansi_module(
         ports: Vec::new(),
         signals: Vec::new(),
         continuous_assignments: Vec::new(),
+        proc_blocks: Vec::new(),
         instantiations: Vec::new(),
         unsupported: vec![Diagnostic {
             message: "non-ANSI modules are parsed but not lowered into the executable subset yet"
@@ -179,6 +183,12 @@ fn lower_module_or_generate_item(
             sv_parser::ModuleCommonItem::ContinuousAssign(assign) => {
                 match lower_continuous_assign(syntax_tree, assign, path) {
                     Ok(assignments) => module.continuous_assignments.extend(assignments),
+                    Err(diag) => module.unsupported.push(diag),
+                }
+            }
+            sv_parser::ModuleCommonItem::AlwaysConstruct(construct) => {
+                match lower_always_construct(syntax_tree, construct, path) {
+                    Ok(block) => module.proc_blocks.push(block),
                     Err(diag) => module.unsupported.push(diag),
                 }
             }
@@ -575,6 +585,256 @@ fn lower_module_instantiation(
     Ok(instances)
 }
 
+fn lower_always_construct(
+    syntax_tree: &SyntaxTree,
+    construct: &AlwaysConstruct,
+    path: &Path,
+) -> LowerResult<ProcBlock> {
+    let kind = match &construct.nodes.0 {
+        AlwaysKeyword::AlwaysComb(_) => ProcBlockKind::AlwaysComb,
+        AlwaysKeyword::Always(_) => {
+            return Err(unsupported(
+                "`always` blocks are not supported yet; use `always_comb` or `always_ff`",
+                None,
+            ));
+        }
+        AlwaysKeyword::AlwaysLatch(_) => {
+            return Err(unsupported(
+                "`always_latch` blocks are not supported yet",
+                None,
+            ));
+        }
+        AlwaysKeyword::AlwaysFf(_) => {
+            return Err(unsupported(
+                "`always_ff` blocks are not supported yet",
+                None,
+            ));
+        }
+    };
+
+    Ok(ProcBlock {
+        kind,
+        body: lower_statement(syntax_tree, &construct.nodes.1, path)?,
+        span: None,
+    })
+}
+
+fn lower_statement(
+    syntax_tree: &SyntaxTree,
+    statement: &Statement,
+    path: &Path,
+) -> LowerResult<Stmt> {
+    if statement.nodes.0.is_some() {
+        return Err(unsupported(
+            "named procedural blocks are not supported yet",
+            None,
+        ));
+    }
+    if !statement.nodes.1.is_empty() {
+        return Err(unsupported(
+            "statement attributes are not supported yet",
+            None,
+        ));
+    }
+
+    match &statement.nodes.2 {
+        StatementItem::BlockingAssignment(assignment) => {
+            lower_blocking_assignment(syntax_tree, &assignment.0, path)
+        }
+        StatementItem::SeqBlock(block) => lower_seq_block(syntax_tree, block, path),
+        StatementItem::ConditionalStatement(statement) => {
+            lower_conditional_statement(syntax_tree, statement, path)
+        }
+        StatementItem::CaseStatement(statement) => {
+            lower_case_statement(syntax_tree, statement, path)
+        }
+        _ => Err(unsupported(
+            "statement is outside the current executable subset",
+            None,
+        )),
+    }
+}
+
+fn lower_statement_or_null(
+    syntax_tree: &SyntaxTree,
+    statement: &StatementOrNull,
+    path: &Path,
+) -> LowerResult<Stmt> {
+    match statement {
+        StatementOrNull::Statement(statement) => lower_statement(syntax_tree, statement, path),
+        StatementOrNull::Attribute(_) => {
+            Err(unsupported("null statements are not supported yet", None))
+        }
+    }
+}
+
+fn lower_blocking_assignment(
+    syntax_tree: &SyntaxTree,
+    assignment: &sv_parser::BlockingAssignment,
+    path: &Path,
+) -> LowerResult<Stmt> {
+    match assignment {
+        sv_parser::BlockingAssignment::OperatorAssignment(assignment) => {
+            if symbol_text(syntax_tree, &assignment.nodes.1.nodes.0)? != "=" {
+                return Err(unsupported(
+                    "compound blocking assignments are not supported yet",
+                    None,
+                ));
+            }
+            Ok(Stmt::Assign {
+                target: lower_variable_lvalue(syntax_tree, &assignment.nodes.0, path)?,
+                expr: lower_expression(syntax_tree, &assignment.nodes.2, path)?,
+            })
+        }
+        sv_parser::BlockingAssignment::Variable(_) => Err(unsupported(
+            "blocking assignments with timing controls are not supported yet",
+            None,
+        )),
+        _ => Err(unsupported(
+            "blocking assignment is outside the current executable subset",
+            None,
+        )),
+    }
+}
+
+fn lower_seq_block(syntax_tree: &SyntaxTree, block: &SeqBlock, path: &Path) -> LowerResult<Stmt> {
+    if block.nodes.1.is_some() || block.nodes.5.is_some() {
+        return Err(unsupported(
+            "named begin/end blocks are not supported yet",
+            None,
+        ));
+    }
+    if !block.nodes.2.is_empty() {
+        return Err(unsupported(
+            "procedural blocks with local declarations are not supported yet",
+            None,
+        ));
+    }
+
+    let mut statements = Vec::new();
+    for statement in &block.nodes.3 {
+        statements.push(lower_statement_or_null(syntax_tree, statement, path)?);
+    }
+
+    Ok(Stmt::Block(statements))
+}
+
+fn lower_conditional_statement(
+    syntax_tree: &SyntaxTree,
+    statement: &ConditionalStatement,
+    path: &Path,
+) -> LowerResult<Stmt> {
+    if statement.nodes.0.is_some() {
+        return Err(unsupported(
+            "`unique`/`priority` procedural conditionals are not supported yet",
+            None,
+        ));
+    }
+
+    let mut else_branch = statement
+        .nodes
+        .5
+        .as_ref()
+        .map(|(_, branch)| lower_statement_or_null(syntax_tree, branch, path))
+        .transpose()?
+        .map(Box::new);
+
+    for (_, _, predicate, branch) in statement.nodes.4.iter().rev() {
+        else_branch = Some(Box::new(Stmt::If {
+            cond: lower_cond_predicate(syntax_tree, &predicate.nodes.1, path)?,
+            then_branch: Box::new(lower_statement_or_null(syntax_tree, branch, path)?),
+            else_branch,
+        }));
+    }
+
+    Ok(Stmt::If {
+        cond: lower_cond_predicate(syntax_tree, &statement.nodes.2.nodes.1, path)?,
+        then_branch: Box::new(lower_statement_or_null(
+            syntax_tree,
+            &statement.nodes.3,
+            path,
+        )?),
+        else_branch,
+    })
+}
+
+fn lower_case_statement(
+    syntax_tree: &SyntaxTree,
+    statement: &CaseStatement,
+    path: &Path,
+) -> LowerResult<Stmt> {
+    let (keyword, expr, first_item, rest_items) = match statement {
+        CaseStatement::Normal(statement) => (
+            &statement.nodes.1,
+            &statement.nodes.2.nodes.1.nodes.0,
+            &statement.nodes.3,
+            &statement.nodes.4,
+        ),
+        CaseStatement::Matches(_) | CaseStatement::Inside(_) => {
+            return Err(unsupported(
+                "only plain `case` statements are supported yet",
+                None,
+            ));
+        }
+    };
+
+    match keyword {
+        sv_parser::CaseKeyword::Case(_) => {}
+        sv_parser::CaseKeyword::Casez(_) | sv_parser::CaseKeyword::Casex(_) => {
+            return Err(unsupported("`casez`/`casex` are not supported yet", None));
+        }
+    }
+
+    let mut items = Vec::new();
+    let mut default = None;
+    lower_case_item(syntax_tree, first_item, path, &mut items, &mut default)?;
+    for item in rest_items {
+        lower_case_item(syntax_tree, item, path, &mut items, &mut default)?;
+    }
+
+    Ok(Stmt::Case {
+        expr: lower_expression(syntax_tree, expr, path)?,
+        items,
+        default,
+    })
+}
+
+fn lower_case_item(
+    syntax_tree: &SyntaxTree,
+    item: &SvCaseItem,
+    path: &Path,
+    items: &mut Vec<CaseStmtItem>,
+    default: &mut Option<Box<Stmt>>,
+) -> LowerResult<()> {
+    match item {
+        SvCaseItem::NonDefault(item) => {
+            let mut patterns = Vec::new();
+            for expr in item.nodes.0.contents() {
+                patterns.push(lower_expression(syntax_tree, &expr.nodes.0, path)?);
+            }
+            items.push(CaseStmtItem {
+                patterns,
+                body: lower_statement_or_null(syntax_tree, &item.nodes.2, path)?,
+            });
+        }
+        SvCaseItem::Default(item) => {
+            if default.is_some() {
+                return Err(unsupported(
+                    "multiple default case items are not supported",
+                    None,
+                ));
+            }
+            *default = Some(Box::new(lower_statement_or_null(
+                syntax_tree,
+                &item.nodes.2,
+                path,
+            )?));
+        }
+    }
+
+    Ok(())
+}
+
 fn lower_expression(syntax_tree: &SyntaxTree, expr: &Expression, path: &Path) -> LowerResult<Expr> {
     match expr {
         Expression::Primary(primary) => lower_primary(syntax_tree, primary, path),
@@ -968,6 +1228,12 @@ fn lower_binary_operator(
         "&" => Ok(BinaryOp::BitAnd),
         "|" => Ok(BinaryOp::BitOr),
         "^" => Ok(BinaryOp::BitXor),
+        "&&" => Ok(BinaryOp::LogicalAnd),
+        "||" => Ok(BinaryOp::LogicalOr),
+        "==" => Ok(BinaryOp::Eq),
+        "!=" => Ok(BinaryOp::NotEq),
+        "+" => Ok(BinaryOp::Add),
+        "-" => Ok(BinaryOp::Sub),
         _ => Err(unsupported("binary operator is not supported yet", None)),
     }
 }
@@ -1183,6 +1449,19 @@ mod tests {
         let module = &source.modules[0];
         assert_eq!(module.ports.len(), 4);
         assert_eq!(module.continuous_assignments.len(), 1);
+        assert!(module.unsupported.is_empty());
+    }
+
+    #[test]
+    fn parse_file_lowers_always_comb_blocks() {
+        let repo = repo_root();
+        let frontend = SvParserFrontend::default();
+        let source = frontend
+            .parse_file(&repo.join("parts/basic/mux_4to1_comb.sv"))
+            .expect("parse mux_4to1_comb");
+
+        let module = &source.modules[0];
+        assert_eq!(module.proc_blocks.len(), 1);
         assert!(module.unsupported.is_empty());
     }
 }

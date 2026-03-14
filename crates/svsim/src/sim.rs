@@ -4,7 +4,7 @@ use crate::design::CompiledDesign;
 use crate::diag::{Error, Result};
 use crate::hir::{
     BinaryOp, Expr, HirDesign, LValue, ModuleInstanceSummary, ModuleSummary, NumericLiteral,
-    PortDirection, UnaryOp,
+    PortDirection, ProcBlockKind, Stmt, UnaryOp,
 };
 
 #[derive(Debug, Clone)]
@@ -112,9 +112,12 @@ fn evaluate_module(
     }
 
     let mut values = build_signal_table(module, inputs)?;
-    let max_iterations =
-        ((module.continuous_assignments.len() + module.instantiations.len() + values.len()).max(1))
-            * 8;
+    let max_iterations = ((module.continuous_assignments.len()
+        + module.proc_blocks.len()
+        + module.instantiations.len()
+        + values.len())
+    .max(1))
+        * 8;
 
     stack.push(module_name.to_owned());
     let mut converged = false;
@@ -124,6 +127,10 @@ fn evaluate_module(
         for assign in &module.continuous_assignments {
             let value = eval_expr(&assign.expr, &values)?;
             changed |= apply_lvalue(&assign.target, value, module, &mut values)?;
+        }
+
+        for block in &module.proc_blocks {
+            changed |= execute_proc_block(block.kind.clone(), &block.body, module, &mut values)?;
         }
 
         for instance in &module.instantiations {
@@ -145,6 +152,70 @@ fn evaluate_module(
     }
 
     Ok(values)
+}
+
+fn execute_proc_block(
+    kind: ProcBlockKind,
+    body: &Stmt,
+    module: &ModuleSummary,
+    values: &mut HashMap<String, Value>,
+) -> Result<bool> {
+    match kind {
+        ProcBlockKind::AlwaysComb => execute_stmt(body, module, values),
+    }
+}
+
+fn execute_stmt(
+    stmt: &Stmt,
+    module: &ModuleSummary,
+    values: &mut HashMap<String, Value>,
+) -> Result<bool> {
+    match stmt {
+        Stmt::Empty => Ok(false),
+        Stmt::Block(statements) => {
+            let mut changed = false;
+            for statement in statements {
+                changed |= execute_stmt(statement, module, values)?;
+            }
+            Ok(changed)
+        }
+        Stmt::Assign { target, expr } => {
+            let value = eval_expr(expr, values)?;
+            apply_lvalue(target, value, module, values)
+        }
+        Stmt::If {
+            cond,
+            then_branch,
+            else_branch,
+        } => {
+            if eval_expr(cond, values)?.truthy() {
+                execute_stmt(then_branch, module, values)
+            } else if let Some(else_branch) = else_branch {
+                execute_stmt(else_branch, module, values)
+            } else {
+                Ok(false)
+            }
+        }
+        Stmt::Case {
+            expr,
+            items,
+            default,
+        } => {
+            let value = eval_expr(expr, values)?;
+            for item in items {
+                for pattern in &item.patterns {
+                    if values_equal(value, eval_expr(pattern, values)?) {
+                        return execute_stmt(&item.body, module, values);
+                    }
+                }
+            }
+            if let Some(default) = default {
+                execute_stmt(default, module, values)
+            } else {
+                Ok(false)
+            }
+        }
+    }
 }
 
 fn build_signal_table(
@@ -283,11 +354,31 @@ fn eval_expr(expr: &Expr, values: &HashMap<String, Value>) -> Result<Value> {
         Expr::Binary { left, op, right } => {
             let left = eval_expr(left, values)?;
             let right = eval_expr(right, values)?;
-            let width = left.width.max(right.width);
-            let bits = match op {
-                BinaryOp::BitAnd => left.normalized_bits() & right.normalized_bits(),
-                BinaryOp::BitOr => left.normalized_bits() | right.normalized_bits(),
-                BinaryOp::BitXor => left.normalized_bits() ^ right.normalized_bits(),
+            let (bits, width) = match op {
+                BinaryOp::BitAnd => (
+                    left.normalized_bits() & right.normalized_bits(),
+                    left.width.max(right.width),
+                ),
+                BinaryOp::BitOr => (
+                    left.normalized_bits() | right.normalized_bits(),
+                    left.width.max(right.width),
+                ),
+                BinaryOp::BitXor => (
+                    left.normalized_bits() ^ right.normalized_bits(),
+                    left.width.max(right.width),
+                ),
+                BinaryOp::LogicalAnd => ((left.truthy() && right.truthy()) as u64, 1),
+                BinaryOp::LogicalOr => ((left.truthy() || right.truthy()) as u64, 1),
+                BinaryOp::Eq => (values_equal(left, right) as u64, 1),
+                BinaryOp::NotEq => ((!values_equal(left, right)) as u64, 1),
+                BinaryOp::Add => (
+                    left.normalized_bits().wrapping_add(right.normalized_bits()),
+                    left.width.max(right.width),
+                ),
+                BinaryOp::Sub => (
+                    left.normalized_bits().wrapping_sub(right.normalized_bits()),
+                    left.width.max(right.width),
+                ),
             };
             Ok(Value::new(bits, width))
         }
@@ -308,6 +399,10 @@ fn eval_expr(expr: &Expr, values: &HashMap<String, Value>) -> Result<Value> {
 fn value_from_literal(literal: &NumericLiteral) -> Value {
     let width = literal.width.unwrap_or_else(|| minimum_width(literal.bits));
     Value::new(literal.bits, width)
+}
+
+fn values_equal(left: Value, right: Value) -> bool {
+    left.normalized_bits() == right.normalized_bits()
 }
 
 fn expr_to_lvalue(expr: &Expr) -> Option<LValue> {
@@ -420,7 +515,9 @@ fn mask(width: usize) -> u64 {
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
+    use std::fs;
     use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     use crate::Compiler;
 
@@ -494,5 +591,117 @@ mod tests {
             .expect("eval");
 
         assert_eq!(outputs.get("out"), Some(&0x4433_2211));
+    }
+
+    #[test]
+    fn eval_once_runs_always_comb_case_module() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .compile_file(repo.join("parts/basic/mux_4to1_comb.sv"))
+            .expect("compile mux_4to1_comb");
+        let mut sim = design.instantiate_top().expect("instantiate");
+        let outputs = sim
+            .eval_once(BTreeMap::from([
+                ("d0".into(), 10),
+                ("d1".into(), 20),
+                ("d2".into(), 30),
+                ("d3".into(), 40),
+                ("sel".into(), 2),
+            ]))
+            .expect("eval");
+
+        assert_eq!(outputs.get("out"), Some(&30));
+    }
+
+    #[test]
+    fn eval_once_runs_always_comb_if_else_module() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .compile_file(repo.join("parts/basic/alu_1bit.sv"))
+            .expect("compile alu_1bit");
+        let mut sim = design.instantiate_top().expect("instantiate");
+        let outputs = sim
+            .eval_once(BTreeMap::from([
+                ("a".into(), 0b1010_1010),
+                ("b".into(), 0b1100_1100),
+                ("op".into(), 0b01),
+            ]))
+            .expect("eval");
+
+        assert_eq!(outputs.get("out"), Some(&0b1110_1110));
+    }
+
+    #[test]
+    fn eval_once_runs_always_comb_case_with_arithmetic() {
+        let temp_dir = unique_temp_dir("always-comb-arithmetic");
+        let source = r#"
+module arithmetic_ops (
+    input  logic [7:0] a,
+    input  logic [7:0] b,
+    input  logic       sel,
+    output logic [7:0] out
+);
+    always_comb
+        if (sel == 1'b0)
+            out = a + b;
+        else
+            out = a - b;
+endmodule
+"#;
+        fs::write(temp_dir.join("arithmetic_ops.sv"), source).expect("write arithmetic_ops");
+
+        let design = Compiler::new()
+            .compile_file(temp_dir.join("arithmetic_ops.sv"))
+            .expect("compile arithmetic_ops");
+        let mut sim = design.instantiate_top().expect("instantiate");
+        let outputs = sim
+            .eval_once(BTreeMap::from([
+                ("a".into(), 5),
+                ("b".into(), 3),
+                ("sel".into(), 0),
+            ]))
+            .expect("eval");
+
+        assert_eq!(outputs.get("out"), Some(&8));
+    }
+
+    #[test]
+    fn eval_once_runs_always_comb_with_logical_operators() {
+        let temp_dir = unique_temp_dir("always-comb-logical");
+        let source = r#"
+module logical_ops (
+    input  logic a,
+    input  logic b,
+    output logic out
+);
+    always_comb
+        if ((a == 1'b0) && (b != 1'b0))
+            out = 1'b1;
+        else
+            out = 1'b0;
+endmodule
+"#;
+        fs::write(temp_dir.join("logical_ops.sv"), source).expect("write logical_ops");
+
+        let design = Compiler::new()
+            .compile_file(temp_dir.join("logical_ops.sv"))
+            .expect("compile logical_ops");
+        let mut sim = design.instantiate_top().expect("instantiate");
+        let outputs = sim
+            .eval_once(BTreeMap::from([("a".into(), 0), ("b".into(), 1)]))
+            .expect("eval");
+
+        assert_eq!(outputs.get("out"), Some(&1));
+    }
+
+    fn unique_temp_dir(name: &str) -> PathBuf {
+        let mut path = std::env::temp_dir();
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time before epoch")
+            .as_nanos();
+        path.push(format!("svsim-{name}-{}-{nonce}", std::process::id()));
+        fs::create_dir_all(&path).expect("create temp dir");
+        path
     }
 }

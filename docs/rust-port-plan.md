@@ -18,14 +18,17 @@ These product decisions are fixed for the first Rust pass:
 
 ## Current Status
 
-Current implementation status as of March 12, 2026:
+Current implementation status as of March 14, 2026:
 
 - Cargo workspace created with `svsim`, `svsim-cli`, and `svsim-render`
 - `sv-parser` integrated for file-based parsing
-- owned HIR started with source-file and module-declaration summaries
+- owned HIR covers source files, module summaries, continuous assignments, instantiations, and `always_comb` procedural blocks
 - library API started with `Compiler`, `CompiledDesign`, and `SimulationSession`
 - CLI can parse a SystemVerilog file and emit JSON describing discovered modules
-- simulation, elaboration, and memory binding are still pending
+- `SimulationSession::eval_once` can execute hierarchical combinational designs with fixed-point convergence across continuous assignments, module instances, and a basic `always_comb` subset
+- current procedural subset: blocking assignments, `if` / `else`, `case` / `default`, and `begin` / `end` statement blocks without local declarations
+- current expression subset adds logical `&&` / `||`, equality `==` / `!=`, and arithmetic `+` / `-` on top of literals, identifiers, slices, ternary expressions, and bitwise operators
+- sequential simulation, `always_ff`, memories, explicit elaboration, and test-runner/render integration are still pending
 
 ## Compatibility Target
 
@@ -104,11 +107,23 @@ Parse SystemVerilog with `sv-parser`, then lower only the supported constructs i
 - ports and net/variable declarations
 - packed ranges and unpacked memory arrays
 - continuous assignments
-- procedural blocks: `always_comb`, `always_ff`
+- procedural blocks: `always_comb` now, `always_ff` later
 - `if` / `else`
 - `case` / `default`
 - module instantiations with named port connections
-- expressions: literals, identifiers, indexing, slicing, concat, replication, unary and binary ops, ternary
+- expressions: literals, identifiers, indexing, slicing, unary and binary ops, ternary
+
+Current lowered subset in the tree today:
+
+- continuous assignments
+- `always_comb`
+- blocking procedural assignment
+- `if` / `else`
+- `case` / `default`
+- bit-select and part-select expressions
+- unary bitwise-not
+- binary `&`, `|`, `^`, `&&`, `||`, `==`, `!=`, `+`, `-`
+- ternary expressions
 
 Lowering should resolve syntax noise early so the simulator never touches parser-specific node shapes after compilation.
 
