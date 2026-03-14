@@ -27,10 +27,10 @@ Current implementation status as of March 14, 2026:
 - CLI can parse a SystemVerilog file and emit JSON describing discovered modules
 - `SimulationSession::eval_once` can execute hierarchical combinational designs with fixed-point convergence across continuous assignments, module instances, and a basic `always_comb` subset
 - `SimulationSession::step` now maintains per-instance state and can advance hierarchical designs using `always_ff @(posedge <clock>)` blocks with blocking immediate updates and nonblocking assignment staging
-- current procedural subset: blocking assignments in combinational blocks and inside a single `always_ff` block, nonblocking assignments in `always_ff`, `if` / `else`, `case` / `default`, and `begin` / `end` statement blocks
+- current procedural subset: blocking assignments in combinational blocks and `always_ff`, nonblocking assignments in `always_ff`, `if` / `else`, `case` / `default`, and `begin` / `end` statement blocks
 - current expression subset adds logical `&&` / `||`, equality `==` / `!=`, arithmetic `+` / `-`, and single-dimension memory reads on top of literals, identifiers, slices, ternary expressions, and bitwise operators
 - current sequential limits: only `posedge` event controls are lowered, `always_ff` clock expressions must be local identifiers, and cross-block race semantics are not modeled beyond deterministic source order
-- current memory subset supports fixed-size unpacked `reg` / `logic` arrays with zero-initialized reads, explicit programmatic preload/read access by instance path, and procedural single-element writes; file-backed ROM/RAM bindings, explicit elaboration, general event controls, and test-runner/render integration are still pending
+- current memory subset supports fixed-size unpacked `reg` / `logic` arrays with zero-initialized reads, explicit programmatic preload/read access by instance path, text-file ROM/RAM loading, and procedural single-element writes; explicit elaboration, JSON regression execution, general event controls, and test-runner/render integration are still pending
 
 ## Compatibility Target
 
@@ -242,7 +242,7 @@ Useful embedded surfaces:
 - compile from file
 - compile from string
 - configure module search paths
-- preload or inspect ROM/RAM contents explicitly by instance path
+- preload or inspect ROM/RAM contents explicitly by instance path, including text-file initialization
 - inspect ports, widths, and instance hierarchy
 - evaluate combinational top modules
 - step sequential top modules
@@ -347,16 +347,15 @@ Current progress:
 - `always_ff @(posedge <clock>)` lowering is implemented
 - cycle-stepped state is preserved per instance across `step()` calls
 - blocking and nonblocking assignment semantics work for the supported subset
-- zero-initialized single-dimension memory reads, explicit memory preload/read APIs, and procedural single-element memory writes are implemented
-- remaining work is broader event controls, file-backed memory bindings, JSON regression execution, and larger Overture sequential regressions
+- zero-initialized single-dimension memory reads, explicit memory preload/read APIs, text-file memory loading, and procedural single-element memory writes are implemented
+- remaining work is broader event controls, JSON regression execution, and larger Overture sequential regressions
 
 Exit criterion:
 - parity for sequential register/counter tests and the math sequence stubs
 
 ### Phase 3: Memories And Overture
 
-- file-backed ROM/RAM bindings
-- JSON sequential regression execution
+- JSON-driven memory binding and regression execution
 - Overture CPU regression suite
 
 Exit criterion:

@@ -1,4 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
+use std::fs;
+use std::path::Path;
 
 use crate::design::CompiledDesign;
 use crate::diag::{Error, Result};
@@ -111,6 +113,41 @@ impl SimulationSession {
         Ok(())
     }
 
+    pub fn load_memory_file(
+        &mut self,
+        instance_path: &[&str],
+        memory_name: &str,
+        path: impl AsRef<Path>,
+    ) -> Result<()> {
+        let path = path.as_ref();
+        let hir = self.design.hir();
+        let module_state = resolve_instance_path_mut(hir, &mut self.state, instance_path)?;
+        let module = resolve_supported_module(hir, &module_state.module_name)?;
+        let memory_decl = module.memory_decl(memory_name).ok_or_else(|| {
+            Error::Resolve(format!(
+                "memory '{}' is not declared in '{}'",
+                memory_name, module.name
+            ))
+        })?;
+        let writes = parse_memory_file(path, memory_decl.element_width(), memory_decl.depth())?;
+        let memory_state = module_state.memories.get_mut(memory_name).ok_or_else(|| {
+            Error::Resolve(format!(
+                "memory '{}' has no runtime storage in '{}'",
+                memory_name, module.name
+            ))
+        })?;
+
+        for (index, word) in writes {
+            memory_state.write(
+                index,
+                Value::new(word, memory_decl.element_width()),
+                memory_name,
+            )?;
+        }
+
+        Ok(())
+    }
+
     pub fn read_memory_word(
         &self,
         instance_path: &[&str],
@@ -156,6 +193,117 @@ impl SimulationSession {
             &mut settle_stack,
         )?;
         Ok(collect_outputs(module, &values))
+    }
+}
+
+fn parse_memory_file(path: &Path, word_width: usize, depth: usize) -> Result<Vec<(usize, u64)>> {
+    let text = fs::read_to_string(path)?;
+    parse_memory_text(&text, path, word_width, depth)
+}
+
+fn parse_memory_text(
+    text: &str,
+    path: &Path,
+    word_width: usize,
+    depth: usize,
+) -> Result<Vec<(usize, u64)>> {
+    let mut writes = Vec::new();
+    let mut current_address = 0usize;
+
+    for (line_number, raw_line) in text.lines().enumerate() {
+        let Some(line) = strip_memory_comments(raw_line) else {
+            continue;
+        };
+
+        let (address, value_text) = if let Some((address_text, value_text)) = line.split_once(':') {
+            let address = parse_memory_address(address_text, path, line_number + 1)?;
+            (address, value_text.trim())
+        } else {
+            (current_address, line)
+        };
+
+        if address >= depth {
+            return Err(Error::Parse(format!(
+                "memory file '{}' line {} writes address {} outside depth {}",
+                path.display(),
+                line_number + 1,
+                address,
+                depth
+            )));
+        }
+
+        let value = parse_memory_value(value_text, path, line_number + 1)?;
+        writes.push((address, value & mask(word_width)));
+        current_address = address + 1;
+    }
+
+    Ok(writes)
+}
+
+fn strip_memory_comments(line: &str) -> Option<&str> {
+    let mut end = line.len();
+    for marker in ["//", "#"] {
+        if let Some(index) = line.find(marker) {
+            end = end.min(index);
+        }
+    }
+
+    let trimmed = line[..end].trim();
+    (!trimmed.is_empty()).then_some(trimmed)
+}
+
+fn parse_memory_address(text: &str, path: &Path, line_number: usize) -> Result<usize> {
+    let raw = text.trim().replace('_', "");
+    if let Ok(value) = parse_prefixed_u64(&raw) {
+        usize::try_from(value).map_err(|_| {
+            Error::Parse(format!(
+                "memory file '{}' line {} has an address too large for this host",
+                path.display(),
+                line_number
+            ))
+        })
+    } else {
+        Err(Error::Parse(format!(
+            "memory file '{}' line {} has an invalid address '{}'",
+            path.display(),
+            line_number,
+            text.trim()
+        )))
+    }
+}
+
+fn parse_memory_value(text: &str, path: &Path, line_number: usize) -> Result<u64> {
+    let raw = text.trim().replace('_', "");
+    if raw.chars().all(|ch| matches!(ch, '0' | '1')) {
+        return u64::from_str_radix(&raw, 2).map_err(|_| {
+            Error::Parse(format!(
+                "memory file '{}' line {} has an invalid binary value '{}'",
+                path.display(),
+                line_number,
+                text.trim()
+            ))
+        });
+    }
+
+    parse_prefixed_u64(&raw).map_err(|_| {
+        Error::Parse(format!(
+            "memory file '{}' line {} has an invalid value '{}'",
+            path.display(),
+            line_number,
+            text.trim()
+        ))
+    })
+}
+
+fn parse_prefixed_u64(raw: &str) -> std::result::Result<u64, std::num::ParseIntError> {
+    if let Some(rest) = raw.strip_prefix("0x").or_else(|| raw.strip_prefix("0X")) {
+        u64::from_str_radix(rest, 16)
+    } else if let Some(rest) = raw.strip_prefix("0b").or_else(|| raw.strip_prefix("0B")) {
+        u64::from_str_radix(rest, 2)
+    } else if let Some(rest) = raw.strip_prefix("0o").or_else(|| raw.strip_prefix("0O")) {
+        u64::from_str_radix(rest, 8)
+    } else {
+        raw.parse()
     }
 }
 
@@ -1394,6 +1542,61 @@ endmodule
     }
 
     #[test]
+    fn eval_once_reads_memory_loaded_from_binary_text_file() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .compile_file(repo.join("parts/overture/overture_fetch.sv"))
+            .expect("compile overture_fetch");
+        let mut sim = design.instantiate_top().expect("instantiate");
+        sim.load_memory_file(&[], "rom", repo.join("parts/basic/deadbeef.txt"))
+            .expect("load rom from file");
+
+        let outputs = sim
+            .eval_once(BTreeMap::from([("addr".into(), 2)]))
+            .expect("eval");
+
+        assert_eq!(outputs.get("data"), Some(&0xbe));
+    }
+
+    #[test]
+    fn load_memory_file_supports_sparse_address_overrides() {
+        let temp_dir = unique_temp_dir("memory-file-addresses");
+        let memory_file = temp_dir.join("sparse_rom.txt");
+        fs::write(
+            &memory_file,
+            "\
+// leave address 0 untouched
+2: 0x2a
+3: 0b0000_1111
+",
+        )
+        .expect("write sparse memory file");
+
+        let repo = repo_root();
+        let design = Compiler::new()
+            .compile_file(repo.join("parts/overture/overture_fetch.sv"))
+            .expect("compile overture_fetch");
+        let mut sim = design.instantiate_top().expect("instantiate");
+        sim.load_memory_file(&[], "rom", &memory_file)
+            .expect("load rom from sparse file");
+
+        let outputs = sim
+            .eval_once(BTreeMap::from([("addr".into(), 0)]))
+            .expect("eval addr 0");
+        assert_eq!(outputs.get("data"), Some(&0));
+
+        let outputs = sim
+            .eval_once(BTreeMap::from([("addr".into(), 2)]))
+            .expect("eval addr 2");
+        assert_eq!(outputs.get("data"), Some(&0x2a));
+
+        let outputs = sim
+            .eval_once(BTreeMap::from([("addr".into(), 3)]))
+            .expect("eval addr 3");
+        assert_eq!(outputs.get("data"), Some(&0x0f));
+    }
+
+    #[test]
     fn step_runs_memory_cpu_stub_with_preloaded_rom_and_ram_write() {
         let repo = repo_root();
         let design = Compiler::new()
@@ -1485,6 +1688,38 @@ endmodule
             sim.read_memory_word(&["fetch_unit"], "rom", 0)
                 .expect("read child rom"),
             0x05
+        );
+    }
+
+    #[test]
+    fn load_memory_file_reads_decimal_program_file_into_child_rom() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .add_search_path(repo.join("parts/overture"))
+            .compile_file(repo.join("parts/overture/overture_cpu.sv"))
+            .expect("compile overture_cpu");
+        let mut sim = design.instantiate_top().expect("instantiate");
+        sim.load_memory_file(
+            &["fetch_unit"],
+            "rom",
+            repo.join("parts/overture/overture_prog_alu.txt"),
+        )
+        .expect("load overture program");
+
+        assert_eq!(
+            sim.read_memory_word(&["fetch_unit"], "rom", 0)
+                .expect("read instruction 0"),
+            0x05
+        );
+        assert_eq!(
+            sim.read_memory_word(&["fetch_unit"], "rom", 1)
+                .expect("read instruction 1"),
+            0x81
+        );
+        assert_eq!(
+            sim.read_memory_word(&["fetch_unit"], "rom", 16)
+                .expect("read instruction 16"),
+            0x9e
         );
     }
 
