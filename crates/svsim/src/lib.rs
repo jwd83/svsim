@@ -15,6 +15,6 @@ pub use hir::{
 };
 pub use sim::SimulationSession;
 pub use test::{
-    JsonTestCaseReport, JsonTestDirectoryReport, JsonTestFailure, JsonTestReport, JsonTestSuite,
-    JsonTestSuiteRunReport,
+    JsonTestCaseReport, JsonTestCorpusReport, JsonTestDirectoryReport, JsonTestDirectoryRunReport,
+    JsonTestFailure, JsonTestReport, JsonTestSuite, JsonTestSuiteRunReport,
 };

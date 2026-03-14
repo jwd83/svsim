@@ -8,7 +8,10 @@ use crate::design::CompiledDesign;
 use crate::diag::{Error, Result};
 use crate::frontend::SvParserFrontend;
 use crate::hir::SourceFile;
-use crate::test::{JsonTestDirectoryReport, JsonTestSuiteRunReport, build_directory_report};
+use crate::test::{
+    JsonTestCorpusReport, JsonTestDirectoryReport, JsonTestDirectoryRunReport,
+    JsonTestSuiteRunReport, build_corpus_report, build_directory_report,
+};
 
 #[derive(Debug, Clone, Default)]
 pub struct Compiler {
@@ -69,6 +72,24 @@ impl Compiler {
         suites.sort_by(|left, right| left.source_path.cmp(&right.source_path));
 
         Ok(build_directory_report(suites))
+    }
+
+    pub fn run_json_test_dirs(&self, paths: &[PathBuf]) -> Result<JsonTestCorpusReport> {
+        if paths.is_empty() {
+            return Err(Error::Resolve(
+                "at least one JSON regression directory is required".into(),
+            ));
+        }
+
+        let mut directories = Vec::with_capacity(paths.len());
+        for path in paths {
+            directories.push(JsonTestDirectoryRunReport {
+                directory: path.clone(),
+                report: self.run_json_test_dir(path)?,
+            });
+        }
+
+        Ok(build_corpus_report(directories))
     }
 
     fn run_json_test_suite(&self, suite: JsonTestSuitePaths) -> JsonTestSuiteRunReport {
@@ -562,6 +583,53 @@ mod tests {
                 .error
                 .as_deref()
                 .is_some_and(|message| message.contains("missing_dep"))
+        );
+    }
+
+    #[test]
+    fn run_json_test_dirs_aggregates_directory_reports() {
+        let temp_dir = unique_temp_dir("json-test-dirs");
+        let passing_dir = temp_dir.join("passing");
+        let failing_dir = temp_dir.join("failing");
+        fs::create_dir_all(&passing_dir).expect("create passing dir");
+        fs::create_dir_all(&failing_dir).expect("create failing dir");
+
+        fs::write(
+            passing_dir.join("pass.sv"),
+            "module pass(output logic one); assign one = 1'b1; endmodule\n",
+        )
+        .expect("write passing suite");
+        fs::write(passing_dir.join("pass.json"), "[{\"expect\":{\"one\":1}}]")
+            .expect("write passing json");
+
+        fs::write(
+            failing_dir.join("fail.sv"),
+            "module fail(output logic zero); assign zero = 1'b0; endmodule\n",
+        )
+        .expect("write failing suite");
+        fs::write(failing_dir.join("fail.json"), "[{\"expect\":{\"zero\":1}}]")
+            .expect("write failing json");
+
+        let report = Compiler::new()
+            .run_json_test_dirs(&[passing_dir.clone(), failing_dir.clone()])
+            .expect("run corpus regression");
+
+        assert_eq!(report.passed, 1);
+        assert_eq!(report.total, 2);
+        assert!(!report.all_passed());
+        assert_eq!(
+            report
+                .directories
+                .iter()
+                .map(|directory| {
+                    (
+                        directory.directory.clone(),
+                        directory.report.passed,
+                        directory.report.total,
+                    )
+                })
+                .collect::<Vec<_>>(),
+            vec![(passing_dir, 1, 1), (failing_dir, 0, 1)],
         );
     }
 

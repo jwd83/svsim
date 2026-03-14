@@ -34,6 +34,25 @@ impl JsonTestDirectoryReport {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct JsonTestCorpusReport {
+    pub passed: usize,
+    pub total: usize,
+    pub directories: Vec<JsonTestDirectoryRunReport>,
+}
+
+impl JsonTestCorpusReport {
+    pub fn all_passed(&self) -> bool {
+        self.passed == self.total
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct JsonTestDirectoryRunReport {
+    pub directory: PathBuf,
+    pub report: JsonTestDirectoryReport,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct JsonTestSuiteRunReport {
     pub source_path: PathBuf,
     pub json_path: PathBuf,
@@ -471,6 +490,24 @@ pub(crate) fn build_directory_report(
         passed,
         total,
         suites,
+    }
+}
+
+pub(crate) fn build_corpus_report(
+    directories: Vec<JsonTestDirectoryRunReport>,
+) -> JsonTestCorpusReport {
+    let passed = directories
+        .iter()
+        .map(|directory| directory.report.passed)
+        .sum();
+    let total = directories
+        .iter()
+        .map(|directory| directory.report.total)
+        .sum();
+    JsonTestCorpusReport {
+        passed,
+        total,
+        directories,
     }
 }
 

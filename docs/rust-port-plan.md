@@ -26,8 +26,8 @@ Current implementation status as of March 14, 2026:
 - library API now exposes `Compiler`, `CompiledDesign`, and `SimulationSession`, including `compile_file` and `compile_str`
 - `CompiledDesign::hierarchy()` now exposes an owned top-down instance tree so embedding callers can discover valid instance paths before using per-instance memory APIs
 - library-side JSON regression execution is now available through `CompiledDesign::run_json_file` / `svsim::JsonTestSuite` for combinational arrays, sequential `test_cases`, and relative memory-file preload
-- `Compiler::run_json_test_dir` and CLI `--json-test-dir` now batch-discover sibling `*.sv` / `*.json` regression pairs under a directory, execute suites in parallel, and emit structured per-suite pass/fail or compile/runtime error reports in deterministic path order
-- CLI can parse a SystemVerilog file and emit JSON describing discovered modules, or run single-suite / directory JSON regressions via `--json-test` and `--json-test-dir`
+- `Compiler::run_json_test_dir`, `Compiler::run_json_test_dirs`, and repeated CLI `--json-test-dir` flags now cover both per-directory and multi-directory corpus regressions, execute suites in parallel within each directory, and emit deterministic structured reports
+- CLI can parse a SystemVerilog file and emit JSON describing discovered modules, or run single-suite, single-directory, and aggregated multi-directory JSON regressions via `--json-test` and `--json-test-dir`
 - `SimulationSession::eval_once` can execute hierarchical combinational designs with fixed-point convergence across continuous assignments, module instances, and a basic `always_comb` subset
 - `always_comb` execution now compares each block's final post-statement state against the prior iteration, so blocks that assign the same signal multiple times per execution settle correctly instead of oscillating
 - `SimulationSession::step` now maintains per-instance state and can advance hierarchical designs using `always_ff @(posedge <clock>)` blocks with blocking immediate updates and nonblocking assignment staging
@@ -38,8 +38,8 @@ Current implementation status as of March 14, 2026:
 - current sequential limits: only `posedge` event controls are lowered, `always_ff` clock expressions must be local identifiers, and cross-block race semantics are not modeled beyond deterministic source order
 - current memory subset supports fixed-size unpacked `reg` / `logic` arrays with zero-initialized reads, explicit programmatic preload/read access by instance path, text-file ROM/RAM loading, procedural single-element writes, and JSON-driven regression preload; explicit elaboration, broader event controls, and render integration are still pending
 - regression compatibility now covers the legacy corpus conventions that still matter in `parts/`: interface-only `rom_*` wrappers auto-load sibling ROM text files at runtime, and `pgm_*` JSON suites auto-bind `overture_fetch.rom` from a sibling program text file when no explicit memory bindings are present
-- measured verification: `cargo test -p svsim` passes, targeted legacy regressions now pass for `parts/basic/rom_deadbeef` and `parts/overture/pgm_overture_add5`, and `parts/testing` remains `39/40` with only `019-Vector5` failing for the known replication-order reference mismatch
-- measured batch status: `parts/testing` currently passes `39/40` suites, with only `019-Vector5` failing because the checked-in JSON preserves a Python reference replication-order bug
+- measured verification: `cargo test` passes, `parts/testing` is `39/40`, and `parts/overture` is `41/41`; the new aggregated corpus report can also measure those directories together in one CLI invocation
+- measured batch status: `parts/testing` currently passes `39/40` suites, `parts/overture` passes `41/41`, and the lone known mismatch remains `019-Vector5`
 - known compatibility gap: `parts/testing/019-Vector5` now lowers and evaluates with standard concatenation/replication bit ordering, but its checked-in JSON reflects a Python reference parser bug for multi-expression replication (`{5{a, b, c, d, e}}`), so Rust and JSON parity still diverge there until the compatibility policy is decided
 
 ## Compatibility Target
@@ -53,7 +53,7 @@ The first meaningful milestone is feature parity with the subset exercised by th
 - `always_ff @(posedge clk)` with blocking and nonblocking assignment
 - ROM and RAM style memory arrays
 - JSON-backed combinational and sequential tests
-- structured truth-table and waveform results
+- structured JSON test and corpus reports
 
 This is not a full IEEE 1800 simulator. The Rust version should intentionally support a well-defined executable subset and emit good diagnostics for unsupported constructs.
 
@@ -75,7 +75,7 @@ Use standard crates where possible instead of building custom infrastructure:
 - Parsing / syntax: `sv-parser`
   - Use it as the front end for tokenization, preprocessing, and syntax parsing.
   - Do not use its parse tree as the execution model. Lower once into our own owned HIR.
-- Image output: `image`
+- Future image output: `image`
   - Use it for image buffers and PNG encoding.
   - Add `imageproc` plus `ab_glyph` only for drawing helpers and text.
 - JSON test I/O: `serde` and `serde_json`
@@ -95,19 +95,19 @@ crates/
   svsim-cli/     # thin CLI wrapper
 ```
 
-Inside `svsim`, keep these modules:
+Inside `svsim`, the implemented modules today are:
 
 ```text
+svsim::compiler  # file/string compilation and batch regression entry points
+svsim::design    # compiled design handle plus hierarchy inspection
+svsim::diag      # diagnostics and unsupported-feature errors
 svsim::frontend  # sv-parser integration and lowering
 svsim::hir       # owned executable subset
-svsim::elab      # hierarchy resolution and instance expansion
-svsim::value     # bit-vector values and memory storage
 svsim::sim       # combinational + sequential engine
-svsim::test      # JSON test execution
-svsim::diag      # diagnostics and unsupported-feature errors
+svsim::test      # JSON test execution and report types
 ```
 
-This keeps the public API simple for embedding while still separating concerns internally.
+This keeps the public API simple for embedding while still separating concerns internally. A separate elaboration/value/compiled-IR split is still future work, not a current module boundary in the tree.
 
 ## Execution Model
 
@@ -183,6 +183,8 @@ This is also where the current Python naming conventions should become explicit 
 Make resolution and memory binding explicit through the library API rather than hardcoded globals.
 
 ### 4. Compiled IR
+
+This section is future architecture, not the current runtime shape.
 
 Do not interpret HIR directly on every cycle. Compile it into a simulation IR.
 
@@ -355,7 +357,7 @@ Current progress:
 - in-memory top-level compilation via `compile_str` is implemented, with dependency lookup anchored at the virtual path plus explicit search paths
 - callers can now inspect the compiled instance tree directly instead of reverse-engineering valid instance paths from raw HIR module summaries
 - library-side JSON-backed combinational regression execution is implemented
-- remaining work is deciding whether to preserve or retire the Python reference bug encoded in `parts/testing/019-Vector5.json`, then broadening batch execution across larger corpus slices and reference comparisons
+- remaining work is deciding whether to preserve or retire the Python reference bug encoded in `parts/testing/019-Vector5.json`, then using the new corpus report to record and close any remaining `parts/basic` parity gaps
 
 Exit criterion:
 - parity for the combinational modules and tests in `parts/basic/` and `parts/testing/`
@@ -385,9 +387,10 @@ Exit criterion:
 - batch regression entry points over the existing CLI regression mode
 
 Current progress:
-- library and CLI batch regression entry points now exist for directory-backed `*.sv` / `*.json` discovery, and per-suite execution now runs in parallel while keeping the report sorted by source path
+- library and CLI batch regression entry points now exist for both single-directory and multi-directory `*.sv` / `*.json` discovery, and per-suite execution runs in parallel while reports stay sorted by source path
 - legacy corpus compatibility for `rom_*` wrappers and `pgm_*` program harnesses now exists without reintroducing those naming conventions into the main library memory API
-- remaining work is using that runner to establish wider measured Overture parity and tighten unsupported-construct diagnostics where batch coverage finds gaps
+- measured parity for `parts/overture/` is now established at `41/41`
+- remaining work is turning that runner into regular whole-corpus measurement and tightening unsupported-construct diagnostics where wider coverage finds gaps
 
 Exit criterion:
 - parity for `parts/overture/` tests
@@ -447,6 +450,6 @@ The first concrete implementation target should be:
 5. add explicit memory binding configuration
 6. broaden Rust CLI regression coverage across Overture and add scalable batch execution
 
-That library milestone, the first CLI regression path, and a parallel batch runner are now in place; the next pragmatic target is using that runner to broaden measured coverage across the Overture corpus and close the highest-value compatibility gaps it exposes.
+That library milestone, the first CLI regression path, and the aggregated corpus runner are now in place; the next pragmatic target is using that runner to keep whole-corpus status current and resolve the highest-value remaining compatibility decision around `parts/testing/019-Vector5`.
 
 At that point the project has replaced the Python simulator for core use, even before image rendering exists.
