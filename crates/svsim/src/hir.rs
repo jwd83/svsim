@@ -158,6 +158,10 @@ pub enum LValue {
         msb: usize,
         lsb: usize,
     },
+    MemoryElement {
+        memory: String,
+        index: Box<Expr>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

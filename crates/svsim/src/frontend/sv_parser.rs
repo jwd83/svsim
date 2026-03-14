@@ -12,7 +12,8 @@ use sv_parser::{
     NonPortModuleItem, PackageOrGenerateItemDeclaration, PartSelectRange, PortDirection, Primary,
     PsOrHierarchicalNetIdentifier, RefNode, Select, SeqBlock, Statement, StatementItem,
     StatementOrNull, SyntaxTree, UnaryOperator, UnpackedDimension, VariableAssignment,
-    VariableDimension, VariableLvalue, VariablePortType, parse_sv, unwrap_node,
+    VariableDeclAssignment, VariableDimension, VariableLvalue, VariablePortType, parse_sv,
+    unwrap_node,
 };
 
 use crate::diag::{Diagnostic, Error, Result, SourceSpan};
@@ -903,14 +904,16 @@ fn lower_seq_block(
             None,
         ));
     }
-    if !block.nodes.2.is_empty() {
-        return Err(unsupported(
-            "procedural blocks with local declarations are not supported yet",
-            None,
-        ));
-    }
 
     let mut statements = Vec::new();
+    for declaration in &block.nodes.2 {
+        statements.push(lower_block_item_declaration_stmt(
+            syntax_tree,
+            declaration,
+            module,
+            path,
+        )?);
+    }
     for statement in &block.nodes.3 {
         statements.push(lower_statement_or_null(
             syntax_tree,
@@ -921,6 +924,69 @@ fn lower_seq_block(
     }
 
     Ok(Stmt::Block(statements))
+}
+
+fn lower_block_item_declaration_stmt(
+    syntax_tree: &SyntaxTree,
+    declaration: &sv_parser::BlockItemDeclaration,
+    module: &ModuleSummary,
+    path: &Path,
+) -> LowerResult<Stmt> {
+    let sv_parser::BlockItemDeclaration::Data(declaration) = declaration else {
+        return Err(unsupported(
+            "procedural blocks with local declarations are not supported yet",
+            None,
+        ));
+    };
+
+    let DataDeclaration::Variable(declaration) = &declaration.nodes.1 else {
+        return Err(unsupported(
+            "procedural blocks with local declarations are not supported yet",
+            None,
+        ));
+    };
+
+    let assignments = declaration.nodes.4.nodes.0.contents();
+    let [assignment] = assignments.as_slice() else {
+        return Err(unsupported(
+            "procedural blocks with local declarations are not supported yet",
+            None,
+        ));
+    };
+    let VariableDeclAssignment::Variable(assignment) = assignment else {
+        return Err(unsupported(
+            "procedural blocks with local declarations are not supported yet",
+            None,
+        ));
+    };
+    if !assignment.nodes.1.is_empty() {
+        return Err(unsupported(
+            "procedural blocks with local declarations are not supported yet",
+            None,
+        ));
+    }
+
+    let (name, _) = identifier_name_from_node(syntax_tree, RefNode::from(&assignment.nodes.0))
+        .ok_or_else(|| unsupported("failed to determine procedural declaration name", None))?;
+    if module.signal_width(&name).is_none() {
+        return Err(unsupported(
+            "procedural blocks with local declarations are not supported yet",
+            None,
+        ));
+    }
+
+    let Some((_, expr)) = assignment.nodes.2.as_ref() else {
+        return Err(unsupported(
+            "procedural blocks with local declarations are not supported yet",
+            None,
+        ));
+    };
+
+    Ok(Stmt::Assign {
+        kind: AssignmentKind::Blocking,
+        target: LValue::Signal(name),
+        expr: lower_expression(syntax_tree, expr, module, path)?,
+    })
 }
 
 fn lower_conditional_statement(
@@ -1371,10 +1437,20 @@ fn lower_select_lvalue(
     }
 
     if module.memory_decl(&name).is_some() {
-        return Err(unsupported(
-            "memory element assignments are not supported yet",
-            None,
-        ));
+        return match select.nodes.1.nodes.0.as_slice() {
+            [index] if select.nodes.2.is_none() => Ok(LValue::MemoryElement {
+                memory: name,
+                index: Box::new(lower_expression(syntax_tree, &index.nodes.1, module, path)?),
+            }),
+            [] => Err(unsupported(
+                "assignments must target a single memory element",
+                None,
+            )),
+            _ => Err(unsupported(
+                "memory element assignments only support a single element index today",
+                None,
+            )),
+        };
     }
 
     match select.nodes.1.nodes.0.as_slice() {
@@ -1679,7 +1755,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::SvParserFrontend;
-    use crate::hir::{AssignmentKind, Expr, ProcBlockKind, Stmt};
+    use crate::hir::{AssignmentKind, Expr, LValue, ProcBlockKind, Stmt};
 
     fn repo_root() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -1784,6 +1860,50 @@ mod tests {
         match &module.continuous_assignments[0].expr {
             Expr::MemoryRead { memory, .. } => assert_eq!(memory, "rom"),
             other => panic!("unexpected memory read expression: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_file_lowers_memory_element_write_in_always_ff() {
+        let repo = repo_root();
+        let frontend = SvParserFrontend::default();
+        let source = frontend
+            .parse_file(&repo.join("parts/testing/memory_cpu_stub.sv"))
+            .expect("parse memory_cpu_stub");
+
+        let module = &source.modules[0];
+        assert!(module.unsupported.is_empty());
+        match &module.proc_blocks[0].body {
+            Stmt::Block(statements) => match &statements[0] {
+                Stmt::If { else_branch, .. } => match else_branch.as_deref() {
+                    Some(Stmt::If { then_branch, .. }) => match then_branch.as_ref() {
+                        Stmt::Block(statements) => {
+                            let case_stmt = statements
+                                .iter()
+                                .find_map(|statement| match statement {
+                                    Stmt::Case { items, .. } => Some(items),
+                                    _ => None,
+                                })
+                                .expect("run branch should contain a case statement");
+                            match &case_stmt[2].body {
+                                Stmt::Assign {
+                                    kind,
+                                    target: LValue::MemoryElement { memory, .. },
+                                    ..
+                                } => {
+                                    assert_eq!(*kind, AssignmentKind::Nonblocking);
+                                    assert_eq!(memory, "ram");
+                                }
+                                other => panic!("unexpected memory write statement: {other:?}"),
+                            }
+                        }
+                        other => panic!("unexpected run branch body: {other:?}"),
+                    },
+                    other => panic!("unexpected else branch: {other:?}"),
+                },
+                other => panic!("unexpected first statement: {other:?}"),
+            },
+            other => panic!("unexpected always_ff body: {other:?}"),
         }
     }
 }

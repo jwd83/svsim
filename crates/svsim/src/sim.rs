@@ -42,6 +42,23 @@ impl MemoryState {
         })?;
         Ok(self.words[offset])
     }
+
+    fn write(&mut self, index: usize, value: Value, memory_name: &str) -> Result<bool> {
+        let offset = self.index_range.index_offset(index).ok_or_else(|| {
+            Error::Resolve(format!(
+                "memory index [{}] is out of range for '{}'",
+                index, memory_name
+            ))
+        })?;
+        let current = self
+            .words
+            .get_mut(offset)
+            .expect("memory offset is guaranteed to be in range");
+        let next = Value::new(value.normalized_bits(), current.width);
+        let changed = *current != next;
+        *current = next;
+        Ok(changed)
+    }
 }
 
 impl SimulationSession {
@@ -58,6 +75,64 @@ impl SimulationSession {
         self.design
             .top_module()
             .expect("compiled designs always carry a top module")
+    }
+
+    pub fn load_memory_words(
+        &mut self,
+        instance_path: &[&str],
+        memory_name: &str,
+        words: &[u64],
+    ) -> Result<()> {
+        let hir = self.design.hir();
+        let module_state = resolve_instance_path_mut(hir, &mut self.state, instance_path)?;
+        let module = resolve_supported_module(hir, &module_state.module_name)?;
+        let memory_decl = module.memory_decl(memory_name).ok_or_else(|| {
+            Error::Resolve(format!(
+                "memory '{}' is not declared in '{}'",
+                memory_name, module.name
+            ))
+        })?;
+        let memory_state = module_state.memories.get_mut(memory_name).ok_or_else(|| {
+            Error::Resolve(format!(
+                "memory '{}' has no runtime storage in '{}'",
+                memory_name, module.name
+            ))
+        })?;
+
+        for (offset, word) in words.iter().enumerate() {
+            let index = memory_decl.index_range.low() + offset;
+            memory_state.write(
+                index,
+                Value::new(*word, memory_decl.element_width()),
+                memory_name,
+            )?;
+        }
+
+        Ok(())
+    }
+
+    pub fn read_memory_word(
+        &self,
+        instance_path: &[&str],
+        memory_name: &str,
+        index: usize,
+    ) -> Result<u64> {
+        let hir = self.design.hir();
+        let module_state = resolve_instance_path(hir, &self.state, instance_path)?;
+        let module = resolve_supported_module(hir, &module_state.module_name)?;
+        if module.memory_decl(memory_name).is_none() {
+            return Err(Error::Resolve(format!(
+                "memory '{}' is not declared in '{}'",
+                memory_name, module.name
+            )));
+        }
+        let memory_state = module_state.memories.get(memory_name).ok_or_else(|| {
+            Error::Resolve(format!(
+                "memory '{}' has no runtime storage in '{}'",
+                memory_name, module.name
+            ))
+        })?;
+        Ok(memory_state.read(index, memory_name)?.normalized_bits())
     }
 
     pub fn eval_once(&mut self, inputs: BTreeMap<String, u64>) -> Result<BTreeMap<String, u64>> {
@@ -178,7 +253,15 @@ fn settle_module(
 
         for assign in &module.continuous_assignments {
             let value = eval_expr(&assign.expr, &values, &state.memories)?;
-            changed |= apply_lvalue(&assign.target, value, module, &mut values)?;
+            let target = resolve_lvalue(&assign.target, module, &values, &state.memories)?;
+            if matches!(target, ResolvedLValue::MemoryElement { .. }) {
+                return Err(Error::Unsupported(
+                    "continuous assignments to memory elements are not supported".into(),
+                ));
+            }
+            let mut no_memories = HashMap::new();
+            changed |=
+                apply_resolved_lvalue(&target, value, module, &mut values, &mut no_memories)?;
         }
 
         for block in &module.proc_blocks {
@@ -236,6 +319,7 @@ fn step_module(
     }
 
     let mut staged = state.persisted.clone();
+    let mut staged_memories = state.memories.clone();
     for block in &module.proc_blocks {
         match &block.kind {
             ProcBlockKind::AlwaysComb => {}
@@ -247,12 +331,15 @@ fn step_module(
                     ))
                 })?;
                 if clock_value.truthy() {
+                    let mut exec_values = pre_values.clone();
+                    let mut exec_memories = state.memories.clone();
                     execute_sequential_stmt(
                         &block.body,
                         module,
-                        &pre_values,
-                        &state.memories,
+                        &mut exec_values,
+                        &mut exec_memories,
                         &mut staged,
+                        &mut staged_memories,
                     )?;
                 }
             }
@@ -260,6 +347,7 @@ fn step_module(
     }
 
     state.persisted = staged;
+    state.memories = staged_memories;
     Ok(())
 }
 
@@ -294,7 +382,15 @@ fn execute_comb_stmt(
         Stmt::Assign { kind, target, expr } => match kind {
             AssignmentKind::Blocking => {
                 let value = eval_expr(expr, values, memories)?;
-                apply_lvalue(target, value, module, values)
+                let target = resolve_lvalue(target, module, values, memories)?;
+                if matches!(target, ResolvedLValue::MemoryElement { .. }) {
+                    return Err(Error::Unsupported(
+                        "memory element assignments are only supported inside `always_ff` blocks"
+                            .into(),
+                    ));
+                }
+                let mut no_memories = HashMap::new();
+                apply_resolved_lvalue(&target, value, module, values, &mut no_memories)
             }
             AssignmentKind::Nonblocking => Err(Error::Unsupported(
                 "nonblocking assignments are only supported inside `always_ff` blocks".into(),
@@ -338,9 +434,10 @@ fn execute_comb_stmt(
 fn execute_sequential_stmt(
     stmt: &Stmt,
     module: &ModuleSummary,
-    current_values: &HashMap<String, Value>,
-    memories: &HashMap<String, MemoryState>,
+    current_values: &mut HashMap<String, Value>,
+    memories: &mut HashMap<String, MemoryState>,
     staged_values: &mut HashMap<String, Value>,
+    staged_memories: &mut HashMap<String, MemoryState>,
 ) -> Result<()> {
     match stmt {
         Stmt::Empty => Ok(()),
@@ -352,6 +449,7 @@ fn execute_sequential_stmt(
                     current_values,
                     memories,
                     staged_values,
+                    staged_memories,
                 )?;
             }
             Ok(())
@@ -359,12 +457,16 @@ fn execute_sequential_stmt(
         Stmt::Assign { kind, target, expr } => match kind {
             AssignmentKind::Nonblocking => {
                 let value = eval_expr(expr, current_values, memories)?;
-                apply_lvalue(target, value, module, staged_values)?;
+                let target = resolve_lvalue(target, module, current_values, memories)?;
+                apply_resolved_lvalue(&target, value, module, staged_values, staged_memories)?;
                 Ok(())
             }
-            AssignmentKind::Blocking => Err(Error::Unsupported(
-                "blocking assignments inside `always_ff` blocks are not supported yet".into(),
-            )),
+            AssignmentKind::Blocking => {
+                let value = eval_expr(expr, current_values, memories)?;
+                let target = resolve_lvalue(target, module, current_values, memories)?;
+                apply_resolved_lvalue(&target, value, module, current_values, memories)?;
+                Ok(())
+            }
         },
         Stmt::If {
             cond,
@@ -378,6 +480,7 @@ fn execute_sequential_stmt(
                     current_values,
                     memories,
                     staged_values,
+                    staged_memories,
                 )
             } else if let Some(else_branch) = else_branch {
                 execute_sequential_stmt(
@@ -386,6 +489,7 @@ fn execute_sequential_stmt(
                     current_values,
                     memories,
                     staged_values,
+                    staged_memories,
                 )
             } else {
                 Ok(())
@@ -406,12 +510,20 @@ fn execute_sequential_stmt(
                             current_values,
                             memories,
                             staged_values,
+                            staged_memories,
                         );
                     }
                 }
             }
             if let Some(default) = default {
-                execute_sequential_stmt(default, module, current_values, memories, staged_values)
+                execute_sequential_stmt(
+                    default,
+                    module,
+                    current_values,
+                    memories,
+                    staged_values,
+                    staged_memories,
+                )
             } else {
                 Ok(())
             }
@@ -550,10 +662,30 @@ fn evaluate_instance(
             .get(&port.name)
             .copied()
             .unwrap_or_else(|| Value::zero(port.width()));
-        changed |= apply_lvalue(&lvalue, value, parent, values)?;
+        let target = resolve_lvalue(&lvalue, parent, values, memories)?;
+        let mut no_memories = HashMap::new();
+        changed |= apply_resolved_lvalue(&target, value, parent, values, &mut no_memories)?;
     }
 
     Ok(changed)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ResolvedLValue {
+    Signal(String),
+    BitSelect {
+        signal: String,
+        index: usize,
+    },
+    PartSelect {
+        signal: String,
+        msb: usize,
+        lsb: usize,
+    },
+    MemoryElement {
+        memory: String,
+        index: usize,
+    },
 }
 
 fn collect_outputs(
@@ -735,14 +867,47 @@ fn expr_to_lvalue(expr: &Expr) -> Option<LValue> {
     }
 }
 
-fn apply_lvalue(
+fn resolve_lvalue(
     lvalue: &LValue,
+    module: &ModuleSummary,
+    values: &HashMap<String, Value>,
+    memories: &HashMap<String, MemoryState>,
+) -> Result<ResolvedLValue> {
+    match lvalue {
+        LValue::Signal(name) => {
+            if module.signal_width(name).is_none() {
+                return Err(Error::Resolve(format!(
+                    "signal '{}' is not declared in '{}'",
+                    name, module.name
+                )));
+            }
+            Ok(ResolvedLValue::Signal(name.clone()))
+        }
+        LValue::BitSelect { signal, index } => Ok(ResolvedLValue::BitSelect {
+            signal: signal.clone(),
+            index: *index,
+        }),
+        LValue::PartSelect { signal, msb, lsb } => Ok(ResolvedLValue::PartSelect {
+            signal: signal.clone(),
+            msb: *msb,
+            lsb: *lsb,
+        }),
+        LValue::MemoryElement { memory, index } => Ok(ResolvedLValue::MemoryElement {
+            memory: memory.clone(),
+            index: eval_expr(index, values, memories)?.normalized_bits() as usize,
+        }),
+    }
+}
+
+fn apply_resolved_lvalue(
+    lvalue: &ResolvedLValue,
     value: Value,
     module: &ModuleSummary,
     values: &mut HashMap<String, Value>,
+    memories: &mut HashMap<String, MemoryState>,
 ) -> Result<bool> {
     match lvalue {
-        LValue::Signal(name) => {
+        ResolvedLValue::Signal(name) => {
             let current = values.get_mut(name).ok_or_else(|| {
                 Error::Resolve(format!(
                     "signal '{}' is not declared in '{}'",
@@ -754,7 +919,7 @@ fn apply_lvalue(
             *current = next;
             Ok(changed)
         }
-        LValue::BitSelect { signal, index } => {
+        ResolvedLValue::BitSelect { signal, index } => {
             let current = values.get_mut(signal).ok_or_else(|| {
                 Error::Resolve(format!(
                     "signal '{}' is not declared in '{}'",
@@ -776,7 +941,7 @@ fn apply_lvalue(
             *current = next;
             Ok(changed)
         }
-        LValue::PartSelect { signal, msb, lsb } => {
+        ResolvedLValue::PartSelect { signal, msb, lsb } => {
             let current = values.get_mut(signal).ok_or_else(|| {
                 Error::Resolve(format!(
                     "signal '{}' is not declared in '{}'",
@@ -801,7 +966,62 @@ fn apply_lvalue(
             *current = next;
             Ok(changed)
         }
+        ResolvedLValue::MemoryElement { memory, index } => {
+            let memory_state = memories.get_mut(memory).ok_or_else(|| {
+                Error::Resolve(format!(
+                    "memory '{}' is not declared in '{}'",
+                    memory, module.name
+                ))
+            })?;
+            memory_state.write(*index, value, memory)
+        }
     }
+}
+
+fn resolve_instance_path<'a>(
+    hir: &'a HirDesign,
+    state: &'a ModuleState,
+    instance_path: &[&str],
+) -> Result<&'a ModuleState> {
+    let Some((segment, rest)) = instance_path.split_first() else {
+        return Ok(state);
+    };
+    let module = resolve_supported_module(hir, &state.module_name)?;
+    let child_index = module
+        .instantiations
+        .iter()
+        .position(|instance| instance.instance_name == *segment)
+        .ok_or_else(|| {
+            Error::Resolve(format!(
+                "instance path '{}' does not exist under module '{}'",
+                instance_path.join("."),
+                module.name
+            ))
+        })?;
+    resolve_instance_path(hir, state.children[child_index].state.as_ref(), rest)
+}
+
+fn resolve_instance_path_mut<'a>(
+    hir: &HirDesign,
+    state: &'a mut ModuleState,
+    instance_path: &[&str],
+) -> Result<&'a mut ModuleState> {
+    let Some((segment, rest)) = instance_path.split_first() else {
+        return Ok(state);
+    };
+    let module = resolve_supported_module(hir, &state.module_name)?;
+    let child_index = module
+        .instantiations
+        .iter()
+        .position(|instance| instance.instance_name == *segment)
+        .ok_or_else(|| {
+            Error::Resolve(format!(
+                "instance path '{}' does not exist under module '{}'",
+                instance_path.join("."),
+                module.name
+            ))
+        })?;
+    resolve_instance_path_mut(hir, state.children[child_index].state.as_mut(), rest)
 }
 
 fn minimum_width(bits: u64) -> usize {
@@ -1154,6 +1374,118 @@ endmodule
             .expect("eval");
 
         assert_eq!(outputs.get("data"), Some(&0));
+    }
+
+    #[test]
+    fn eval_once_reads_preloaded_memory() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .compile_file(repo.join("parts/overture/overture_fetch.sv"))
+            .expect("compile overture_fetch");
+        let mut sim = design.instantiate_top().expect("instantiate");
+        sim.load_memory_words(&[], "rom", &[0x12, 0x34, 0x56])
+            .expect("load rom");
+
+        let outputs = sim
+            .eval_once(BTreeMap::from([("addr".into(), 1)]))
+            .expect("eval");
+
+        assert_eq!(outputs.get("data"), Some(&0x34));
+    }
+
+    #[test]
+    fn step_runs_memory_cpu_stub_with_preloaded_rom_and_ram_write() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .compile_file(repo.join("parts/testing/memory_cpu_stub.sv"))
+            .expect("compile memory_cpu_stub");
+        let mut sim = design.instantiate_top().expect("instantiate");
+        sim.load_memory_words(&[], "rom", &[0x03, 0x42, 0x80, 0xc0])
+            .expect("load rom");
+
+        let outputs = sim
+            .step(BTreeMap::from([
+                ("clk".into(), 1),
+                ("reset".into(), 1),
+                ("run".into(), 0),
+            ]))
+            .expect("reset");
+        assert_eq!(outputs.get("pc"), Some(&0));
+        assert_eq!(outputs.get("acc"), Some(&0));
+        assert_eq!(outputs.get("ram_out"), Some(&0));
+
+        let outputs = sim
+            .step(BTreeMap::from([
+                ("clk".into(), 1),
+                ("reset".into(), 0),
+                ("run".into(), 1),
+            ]))
+            .expect("load immediate");
+        assert_eq!(outputs.get("pc"), Some(&1));
+        assert_eq!(outputs.get("acc"), Some(&3));
+        assert_eq!(outputs.get("ram_out"), Some(&0));
+
+        let outputs = sim
+            .step(BTreeMap::from([
+                ("clk".into(), 1),
+                ("reset".into(), 0),
+                ("run".into(), 1),
+            ]))
+            .expect("add immediate");
+        assert_eq!(outputs.get("pc"), Some(&2));
+        assert_eq!(outputs.get("acc"), Some(&5));
+        assert_eq!(outputs.get("ram_out"), Some(&0));
+
+        let outputs = sim
+            .step(BTreeMap::from([
+                ("clk".into(), 1),
+                ("reset".into(), 0),
+                ("run".into(), 1),
+            ]))
+            .expect("store acc");
+        assert_eq!(outputs.get("pc"), Some(&3));
+        assert_eq!(outputs.get("acc"), Some(&5));
+        assert_eq!(outputs.get("ram_out"), Some(&5));
+        assert_eq!(sim.read_memory_word(&[], "ram", 0).expect("read ram"), 5);
+    }
+
+    #[test]
+    fn step_runs_overture_cpu_with_preloaded_child_rom() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .add_search_path(repo.join("parts/overture"))
+            .compile_file(repo.join("parts/overture/overture_cpu.sv"))
+            .expect("compile overture_cpu");
+        let mut sim = design.instantiate_top().expect("instantiate");
+        sim.load_memory_words(&["fetch_unit"], "rom", &[0x05])
+            .expect("load child rom");
+
+        let outputs = sim
+            .step(BTreeMap::from([
+                ("clk".into(), 1),
+                ("reset".into(), 1),
+                ("run".into(), 0),
+                ("in_port".into(), 0),
+            ]))
+            .expect("reset");
+        assert_eq!(outputs.get("pc"), Some(&0));
+
+        let outputs = sim
+            .step(BTreeMap::from([
+                ("clk".into(), 1),
+                ("reset".into(), 0),
+                ("run".into(), 1),
+                ("in_port".into(), 0),
+            ]))
+            .expect("execute immediate");
+        assert_eq!(outputs.get("pc"), Some(&1));
+        assert_eq!(outputs.get("instr_debug"), Some(&0x05));
+        assert_eq!(outputs.get("r0_out"), Some(&0x05));
+        assert_eq!(
+            sim.read_memory_word(&["fetch_unit"], "rom", 0)
+                .expect("read child rom"),
+            0x05
+        );
     }
 
     fn unique_temp_dir(name: &str) -> PathBuf {
