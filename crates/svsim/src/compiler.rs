@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use rayon::prelude::*;
+use serde::Deserialize;
 
 use crate::design::CompiledDesign;
 use crate::diag::{Error, Result};
@@ -269,6 +270,12 @@ struct JsonTestSuitePaths {
     json_path: PathBuf,
 }
 
+#[derive(Debug, Deserialize)]
+struct JsonTestSuiteSourceMetadata {
+    #[serde(default)]
+    source: Option<PathBuf>,
+}
+
 fn elapsed_millis(started_at: Instant) -> u64 {
     u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX)
 }
@@ -276,7 +283,11 @@ fn elapsed_millis(started_at: Instant) -> u64 {
 fn collect_json_test_suites(root: &Path) -> Result<Vec<JsonTestSuitePaths>> {
     let mut suites = Vec::new();
     collect_json_test_suites_recursive(root, &mut suites)?;
-    suites.sort_by(|left, right| left.source_path.cmp(&right.source_path));
+    suites.sort_by(|left, right| {
+        left.source_path
+            .cmp(&right.source_path)
+            .then_with(|| left.json_path.cmp(&right.json_path))
+    });
     Ok(suites)
 }
 
@@ -285,15 +296,7 @@ fn collect_json_test_suites_recursive(
     suites: &mut Vec<JsonTestSuitePaths>,
 ) -> Result<()> {
     if root.is_file() {
-        if root.extension().and_then(|ext| ext.to_str()) == Some("sv") {
-            let json_path = root.with_extension("json");
-            if json_path.is_file() {
-                suites.push(JsonTestSuitePaths {
-                    source_path: root.to_path_buf(),
-                    json_path,
-                });
-            }
-        }
+        collect_json_test_suite_file(root, suites)?;
         return Ok(());
     }
 
@@ -307,20 +310,71 @@ fn collect_json_test_suites_recursive(
             continue;
         }
 
-        if path.extension().and_then(|ext| ext.to_str()) != Some("sv") {
-            continue;
-        }
-
-        let json_path = path.with_extension("json");
-        if json_path.is_file() {
-            suites.push(JsonTestSuitePaths {
-                source_path: path,
-                json_path,
-            });
-        }
+        collect_json_test_suite_file(&path, suites)?;
     }
 
     Ok(())
+}
+
+fn collect_json_test_suite_file(path: &Path, suites: &mut Vec<JsonTestSuitePaths>) -> Result<()> {
+    match path.extension().and_then(|ext| ext.to_str()) {
+        Some("sv") => {
+            let json_path = path.with_extension("json");
+            if json_path.is_file() {
+                suites.push(JsonTestSuitePaths {
+                    source_path: path.to_path_buf(),
+                    json_path,
+                });
+            }
+        }
+        Some("json") => {
+            let Some(source_path) = resolve_json_test_source_path(path)? else {
+                return Ok(());
+            };
+            if source_path != path.with_extension("sv") {
+                suites.push(JsonTestSuitePaths {
+                    source_path,
+                    json_path: path.to_path_buf(),
+                });
+            }
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+fn resolve_json_test_source_path(json_path: &Path) -> Result<Option<PathBuf>> {
+    let sibling_source = json_path.with_extension("sv");
+    if sibling_source.is_file() {
+        return Ok(Some(sibling_source));
+    }
+
+    let text = fs::read_to_string(json_path)?;
+    let Ok(metadata) = serde_json::from_str::<JsonTestSuiteSourceMetadata>(&text) else {
+        return Ok(None);
+    };
+    let Some(source) = metadata.source else {
+        return Ok(None);
+    };
+
+    let source_path = if source.is_absolute() {
+        source
+    } else {
+        json_path
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .join(source)
+    };
+    if !source_path.is_file() {
+        return Err(Error::Resolve(format!(
+            "json test '{}' declares source '{}' but that file was not found",
+            json_path.display(),
+            source_path.display()
+        )));
+    }
+
+    Ok(Some(source_path))
 }
 
 #[cfg(test)]
@@ -594,6 +648,64 @@ mod tests {
                 .error
                 .as_deref()
                 .is_some_and(|message| message.contains("missing_dep"))
+        );
+    }
+
+    #[test]
+    fn run_json_test_dir_discovers_json_only_suite_with_explicit_source() {
+        let temp_dir = unique_temp_dir("json-test-dir-explicit-source");
+
+        fs::write(
+            temp_dir.join("top.sv"),
+            concat!(
+                "module top(",
+                "input logic clk, input logic reset, output logic outY",
+                "); ",
+                "always_ff @(posedge clk) begin ",
+                "if (reset) outY <= 1'b0; else outY <= 1'b1; ",
+                "end ",
+                "endmodule\n"
+            ),
+        )
+        .expect("write top.sv");
+        fs::write(
+            temp_dir.join("top_alias.json"),
+            concat!(
+                "{",
+                "\"source\":\"top.sv\",",
+                "\"sequential\":true,",
+                "\"test_cases\":[",
+                "{",
+                "\"sequence\":[",
+                "{\"inputs\":{\"clk\":1,\"reset\":1},\"expected\":{\"outY\":0}},",
+                "{\"inputs\":{\"clk\":1,\"reset\":0},\"expected\":{\"outY\":1}}",
+                "]",
+                "}",
+                "]",
+                "}"
+            ),
+        )
+        .expect("write top_alias.json");
+
+        let report = Compiler::new()
+            .run_json_test_dir(&temp_dir)
+            .expect("run batch regression");
+
+        assert_eq!(report.total, 1);
+        assert_eq!(report.passed, 1);
+        assert_eq!(
+            report.suites[0]
+                .source_path
+                .file_name()
+                .and_then(|name| name.to_str()),
+            Some("top.sv")
+        );
+        assert_eq!(
+            report.suites[0]
+                .json_path
+                .file_name()
+                .and_then(|name| name.to_str()),
+            Some("top_alias.json")
         );
     }
 

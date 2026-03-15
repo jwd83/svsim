@@ -1,4 +1,5 @@
 {
+  "source": "overture_cpu.sv",
   "sequential": true,
   "memory_files": {
     "rom": {

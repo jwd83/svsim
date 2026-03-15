@@ -18,7 +18,7 @@ These product decisions are fixed for the first Rust pass:
 
 ## Current Status
 
-Current implementation status as of March 14, 2026:
+Current implementation status as of March 15, 2026:
 
 - Cargo workspace created with `svsim`, `svsim-cli`, and `svsim-render`
 - `sv-parser` integrated for file-based parsing and in-memory source parsing via virtual paths
@@ -26,7 +26,7 @@ Current implementation status as of March 14, 2026:
 - library API now exposes `Compiler`, `CompiledDesign`, and `SimulationSession`, including `compile_file` and `compile_str`
 - `CompiledDesign::hierarchy()` now exposes an owned top-down instance tree so embedding callers can discover valid instance paths before using per-instance memory APIs
 - library-side JSON regression execution is now available through `CompiledDesign::run_json_file` / `svsim::JsonTestSuite` for combinational arrays, sequential `test_cases`, and relative memory-file preload
-- `Compiler::run_json_test_dir`, `Compiler::run_json_test_dirs`, and repeated CLI `--json-test-dir` flags now cover both per-directory and multi-directory corpus regressions, execute suites in parallel within each directory, and emit deterministic structured reports
+- `Compiler::run_json_test_dir`, `Compiler::run_json_test_dirs`, and repeated CLI `--json-test-dir` flags now cover both per-directory and multi-directory corpus regressions, execute suites in parallel within each directory, emit deterministic structured reports, and can discover JSON-only suites that explicitly declare a shared source file
 - CLI can parse a SystemVerilog file and emit JSON describing discovered modules, or run single-suite, single-directory, and aggregated multi-directory JSON regressions via `--json-test` and `--json-test-dir`
 - `SimulationSession::eval_once` can execute hierarchical combinational designs with fixed-point convergence across continuous assignments, module instances, and a basic `always_comb` subset
 - `always_comb` execution now compares each block's final post-statement state against the prior iteration, so blocks that assign the same signal multiple times per execution settle correctly instead of oscillating
@@ -38,8 +38,8 @@ Current implementation status as of March 14, 2026:
 - current sequential limits: only `posedge` event controls are lowered, `always_ff` clock expressions must be local identifiers, and cross-block race semantics are not modeled beyond deterministic source order
 - current memory subset supports fixed-size unpacked `reg` / `logic` arrays with zero-initialized reads, explicit programmatic preload/read access by instance path, text-file ROM/RAM loading, procedural single-element writes, and JSON-driven regression preload; explicit elaboration, broader event controls, and render integration are still pending
 - regression compatibility now covers the legacy corpus conventions that still matter in `parts/`: interface-only `rom_*` wrappers auto-load sibling ROM text files at runtime, and `pgm_*` JSON suites auto-bind `overture_fetch.rom` from a sibling program text file when no explicit memory bindings are present
-- measured verification: `cargo test` passes, `parts/testing` is `40/40`, and `parts/overture` is `41/41`; the new aggregated corpus report can also measure those directories together in one CLI invocation
-- measured batch status: `parts/testing` currently passes `40/40` suites and `parts/overture` passes `41/41`; the next open measurement task is recording a fresh aggregate status for `parts/basic`
+- measured verification: `cargo test` passes, `parts/testing` is `40/40`, and the two standalone Overture CPU program suites (`overture_cpu_program_branch.json` and `overture_cpu_program_io.json`) pass when run directly against `overture_cpu.sv`
+- measured batch status: `parts/testing` is green under directory regression, and `parts/overture` now has `43` discoverable JSON suites (`41` sibling-source suites plus `2` explicit-source program variants); recording a fresh clean full-directory `parts/basic` / `parts/overture` timing snapshot is still pending because those batches remain long-running
 - `parts/testing/019-Vector5.json` now matches the standard SystemVerilog bit ordering for multi-expression replication (`{5{a, b, c, d, e}}`), retiring the old Python reference divergence from the checked-in corpus
 
 ## Compatibility Target
@@ -357,7 +357,7 @@ Current progress:
 - in-memory top-level compilation via `compile_str` is implemented, with dependency lookup anchored at the virtual path plus explicit search paths
 - callers can now inspect the compiled instance tree directly instead of reverse-engineering valid instance paths from raw HIR module summaries
 - library-side JSON-backed combinational regression execution is implemented
-- remaining work is using the new corpus report to record and close any remaining `parts/basic` parity gaps
+- remaining work is keeping whole-corpus measurements current and adding compile-only coverage if progress tracking needs to include future `.sv` files without JSON suites
 
 Exit criterion:
 - parity for the combinational modules and tests in `parts/basic/` and `parts/testing/`
@@ -387,9 +387,9 @@ Exit criterion:
 - batch regression entry points over the existing CLI regression mode
 
 Current progress:
-- library and CLI batch regression entry points now exist for both single-directory and multi-directory `*.sv` / `*.json` discovery, and per-suite execution runs in parallel while reports stay sorted by source path
+- library and CLI batch regression entry points now exist for both single-directory and multi-directory corpus discovery, per-suite execution runs in parallel while reports stay sorted by source path, and JSON suites can explicitly reuse a shared source file through a `source` field
 - legacy corpus compatibility for `rom_*` wrappers and `pgm_*` program harnesses now exists without reintroducing those naming conventions into the main library memory API
-- measured parity for `parts/overture/` is now established at `41/41`
+- measured Overture status now includes `41/41` passing sibling-source suites plus two additional passing program suites that run against `overture_cpu.sv`
 - remaining work is turning that runner into regular whole-corpus measurement and tightening unsupported-construct diagnostics where wider coverage finds gaps
 
 Exit criterion:
@@ -450,6 +450,6 @@ The first concrete implementation target should be:
 5. add explicit memory binding configuration
 6. broaden Rust CLI regression coverage across Overture and add scalable batch execution
 
-That library milestone, the first CLI regression path, and the aggregated corpus runner are now in place; the next pragmatic target is using that runner to keep whole-corpus status current and close the remaining `parts/basic` parity/documentation gaps.
+That library milestone, the first CLI regression path, and the aggregated corpus runner are now in place; the next pragmatic target is using that runner to keep whole-corpus status current without silently dropping shared-source JSON suites, then adding compile-only coverage if new unpaired `.sv` files appear.
 
 At that point the project has replaced the Python simulator for core use, even before image rendering exists.

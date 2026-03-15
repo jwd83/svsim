@@ -151,6 +151,66 @@ fn cli_runs_multiple_json_regression_directories() {
     assert_eq!(json["report"]["directories"][1]["report"]["passed"], 1);
 }
 
+#[test]
+fn cli_runs_json_regression_directory_with_explicit_source_suite() {
+    let temp_dir = unique_temp_dir("cli-json-test-dir-explicit-source");
+    fs::write(
+        temp_dir.join("top.sv"),
+        concat!(
+            "module top(",
+            "input logic clk, input logic reset, output logic outY",
+            "); ",
+            "always_ff @(posedge clk) begin ",
+            "if (reset) outY <= 1'b0; else outY <= 1'b1; ",
+            "end ",
+            "endmodule\n"
+        ),
+    )
+    .expect("write top.sv");
+    fs::write(
+        temp_dir.join("top_alias.json"),
+        concat!(
+            "{",
+            "\"source\":\"top.sv\",",
+            "\"sequential\":true,",
+            "\"test_cases\":[",
+            "{",
+            "\"sequence\":[",
+            "{\"inputs\":{\"clk\":1,\"reset\":1},\"expected\":{\"outY\":0}},",
+            "{\"inputs\":{\"clk\":1,\"reset\":0},\"expected\":{\"outY\":1}}",
+            "]",
+            "}",
+            "]",
+            "}"
+        ),
+    )
+    .expect("write top_alias.json");
+
+    let output = Command::new(svsim_bin())
+        .arg("--json-test-dir")
+        .arg(&temp_dir)
+        .output()
+        .expect("run svsim");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let json: Value = serde_json::from_slice(&output.stdout).expect("parse stdout json");
+    assert_eq!(json["report"]["passed"], 1);
+    assert_eq!(json["report"]["total"], 1);
+    assert_eq!(
+        json["report"]["suites"][0]["source_path"],
+        temp_dir.join("top.sv").display().to_string()
+    );
+    assert_eq!(
+        json["report"]["suites"][0]["json_path"],
+        temp_dir.join("top_alias.json").display().to_string()
+    );
+}
+
 fn unique_temp_dir(name: &str) -> PathBuf {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
