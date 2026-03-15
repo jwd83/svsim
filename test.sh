@@ -4,7 +4,7 @@ set -uo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PARTS_DIR="$ROOT_DIR/parts"
 RESULTS_DIR="$ROOT_DIR/results"
-BINARY="$ROOT_DIR/target/debug/svsim"
+BINARY="$ROOT_DIR/target/release/svsim"
 
 mkdir -p "$RESULTS_DIR"
 
@@ -20,8 +20,8 @@ if [[ ${#dirs[@]} -eq 0 ]]; then
     exit 1
 fi
 
-echo "Building svsim CLI..."
-cargo build -q -p svsim-cli --manifest-path "$ROOT_DIR/Cargo.toml"
+echo "Building svsim CLI (release)..."
+cargo build -q -p svsim-cli --release --manifest-path "$ROOT_DIR/Cargo.toml"
 build_status=$?
 if [[ $build_status -ne 0 ]]; then
     exit "$build_status"
