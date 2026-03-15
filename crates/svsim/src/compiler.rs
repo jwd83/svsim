@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 use rayon::prelude::*;
 
@@ -56,6 +57,7 @@ impl Compiler {
     }
 
     pub fn run_json_test_dir(&self, path: impl AsRef<Path>) -> Result<JsonTestDirectoryReport> {
+        let started_at = Instant::now();
         let root = path.as_ref();
         let suite_paths = collect_json_test_suites(root)?;
         if suite_paths.is_empty() {
@@ -71,10 +73,11 @@ impl Compiler {
             .collect::<Vec<_>>();
         suites.sort_by(|left, right| left.source_path.cmp(&right.source_path));
 
-        Ok(build_directory_report(suites))
+        Ok(build_directory_report(suites, started_at.elapsed()))
     }
 
     pub fn run_json_test_dirs(&self, paths: &[PathBuf]) -> Result<JsonTestCorpusReport> {
+        let started_at = Instant::now();
         if paths.is_empty() {
             return Err(Error::Resolve(
                 "at least one JSON regression directory is required".into(),
@@ -89,10 +92,11 @@ impl Compiler {
             });
         }
 
-        Ok(build_corpus_report(directories))
+        Ok(build_corpus_report(directories, started_at.elapsed()))
     }
 
     fn run_json_test_suite(&self, suite: JsonTestSuitePaths) -> JsonTestSuiteRunReport {
+        let started_at = Instant::now();
         match self.compile_file(&suite.source_path) {
             Ok(design) => {
                 let top_module = design.top_module().map(str::to_owned);
@@ -103,6 +107,7 @@ impl Compiler {
                             source_path: suite.source_path,
                             json_path: suite.json_path,
                             top_module,
+                            duration_ms: elapsed_millis(started_at),
                             passed,
                             report: Some(report),
                             error: None,
@@ -112,6 +117,7 @@ impl Compiler {
                         source_path: suite.source_path,
                         json_path: suite.json_path,
                         top_module,
+                        duration_ms: elapsed_millis(started_at),
                         passed: false,
                         report: None,
                         error: Some(error.to_string()),
@@ -122,6 +128,7 @@ impl Compiler {
                 source_path: suite.source_path,
                 json_path: suite.json_path,
                 top_module: None,
+                duration_ms: elapsed_millis(started_at),
                 passed: false,
                 report: None,
                 error: Some(error.to_string()),
@@ -260,6 +267,10 @@ impl Compiler {
 struct JsonTestSuitePaths {
     source_path: PathBuf,
     json_path: PathBuf,
+}
+
+fn elapsed_millis(started_at: Instant) -> u64 {
+    u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX)
 }
 
 fn collect_json_test_suites(root: &Path) -> Result<Vec<JsonTestSuitePaths>> {

@@ -1,0 +1,3582 @@
+{
+  "directory": "parts/basic",
+  "report": {
+    "duration_ms": 237070,
+    "passed": 44,
+    "total": 44,
+    "suites": [
+      {
+        "source_path": "parts/basic/adder_16bit.sv",
+        "json_path": "parts/basic/adder_16bit.json",
+        "top_module": "adder_16bit",
+        "duration_ms": 1580,
+        "passed": true,
+        "report": {
+          "duration_ms": 1454,
+          "passed": 8,
+          "total": 8,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/adder_32bit.sv",
+        "json_path": "parts/basic/adder_32bit.json",
+        "top_module": "adder_32bit",
+        "duration_ms": 3735,
+        "passed": true,
+        "report": {
+          "duration_ms": 3653,
+          "passed": 8,
+          "total": 8,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/adder_4bit.sv",
+        "json_path": "parts/basic/adder_4bit.json",
+        "top_module": "adder_4bit",
+        "duration_ms": 151,
+        "passed": true,
+        "report": {
+          "duration_ms": 107,
+          "passed": 10,
+          "total": 10,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 9",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 10",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/adder_64bit.sv",
+        "json_path": "parts/basic/adder_64bit.json",
+        "top_module": "adder_64bit",
+        "duration_ms": 12194,
+        "passed": true,
+        "report": {
+          "duration_ms": 12074,
+          "passed": 8,
+          "total": 8,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/adder_8bit.sv",
+        "json_path": "parts/basic/adder_8bit.json",
+        "top_module": "adder_8bit",
+        "duration_ms": 613,
+        "passed": true,
+        "report": {
+          "duration_ms": 533,
+          "passed": 10,
+          "total": 10,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 9",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 10",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/adder_cs_16bit.sv",
+        "json_path": "parts/basic/adder_cs_16bit.json",
+        "top_module": "adder_cs_16bit",
+        "duration_ms": 9460,
+        "passed": true,
+        "report": {
+          "duration_ms": 9243,
+          "passed": 12,
+          "total": 12,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 9",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 10",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 11",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 12",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/adder_cs_32bit.sv",
+        "json_path": "parts/basic/adder_cs_32bit.json",
+        "top_module": "adder_cs_32bit",
+        "duration_ms": 56356,
+        "passed": true,
+        "report": {
+          "duration_ms": 56040,
+          "passed": 12,
+          "total": 12,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 9",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 10",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 11",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 12",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/adder_cs_64bit.sv",
+        "json_path": "parts/basic/adder_cs_64bit.json",
+        "top_module": "adder_cs_64bit",
+        "duration_ms": 235996,
+        "passed": true,
+        "report": {
+          "duration_ms": 235547,
+          "passed": 8,
+          "total": 8,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/adder_cs_8bit.sv",
+        "json_path": "parts/basic/adder_cs_8bit.json",
+        "top_module": "adder_cs_8bit",
+        "duration_ms": 1133,
+        "passed": true,
+        "report": {
+          "duration_ms": 983,
+          "passed": 10,
+          "total": 10,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 9",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 10",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/alu_1bit.sv",
+        "json_path": "parts/basic/alu_1bit.json",
+        "top_module": "alu_1bit",
+        "duration_ms": 21,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "passed": 12,
+          "total": 12,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 9",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 10",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 11",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 12",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/and_gate.sv",
+        "json_path": "parts/basic/and_gate.json",
+        "top_module": "and_gate",
+        "duration_ms": 6,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "passed": 4,
+          "total": 4,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/and_gate_8bit.sv",
+        "json_path": "parts/basic/and_gate_8bit.json",
+        "top_module": "and_gate_8bit",
+        "duration_ms": 92,
+        "passed": true,
+        "report": {
+          "duration_ms": 7,
+          "passed": 12,
+          "total": 12,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 9",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 10",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 11",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 12",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/counter8.sv",
+        "json_path": "parts/basic/counter8.json",
+        "top_module": "counter8",
+        "duration_ms": 10,
+        "passed": true,
+        "report": {
+          "duration_ms": 1,
+          "passed": 11,
+          "total": 11,
+          "cases": [
+            {
+              "name": "Reset functionality",
+              "description": "Counter resets to 0 when reset is asserted",
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Basic increment",
+              "description": "Counter increments when enabled",
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Hold when disabled",
+              "description": "Counter holds value when enable is low",
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Complete counter sequence",
+              "description": "Test reset, increment, hold, and multiple increments",
+              "steps": 7,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Mid-count reset",
+              "description": "Reset should work after counting",
+              "steps": 6,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Extended hold test",
+              "description": "Counter holds value across multiple disabled cycles",
+              "steps": 9,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Count to 10",
+              "description": "Count from 0 to 10 continuously",
+              "steps": 11,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Multiple reset cycles",
+              "description": "Test multiple consecutive resets",
+              "steps": 7,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Enable toggle test",
+              "description": "Rapid enable toggling",
+              "steps": 8,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Overflow test - 255 to 0",
+              "description": "Test counter wrapping from 255 to 0",
+              "steps": 17,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Count high values",
+              "description": "Test counting at higher values",
+              "steps": 21,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/decoder_3to8.sv",
+        "json_path": "parts/basic/decoder_3to8.json",
+        "top_module": "decoder_3to8",
+        "duration_ms": 113,
+        "passed": true,
+        "report": {
+          "duration_ms": 24,
+          "passed": 8,
+          "total": 8,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/full_adder.sv",
+        "json_path": "parts/basic/full_adder.json",
+        "top_module": "full_adder",
+        "duration_ms": 48,
+        "passed": true,
+        "report": {
+          "duration_ms": 10,
+          "passed": 8,
+          "total": 8,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/half_adder.sv",
+        "json_path": "parts/basic/half_adder.json",
+        "top_module": "half_adder",
+        "duration_ms": 14,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "passed": 4,
+          "total": 4,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/mux_2to1_16bit.sv",
+        "json_path": "parts/basic/mux_2to1_16bit.json",
+        "top_module": "mux_2to1_16bit",
+        "duration_ms": 402,
+        "passed": true,
+        "report": {
+          "duration_ms": 241,
+          "passed": 12,
+          "total": 12,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 9",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 10",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 11",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 12",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/mux_2to1_1bit.sv",
+        "json_path": "parts/basic/mux_2to1_1bit.json",
+        "top_module": "mux_2to1_1bit",
+        "duration_ms": 34,
+        "passed": true,
+        "report": {
+          "duration_ms": 3,
+          "passed": 8,
+          "total": 8,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/mux_2to1_32bit.sv",
+        "json_path": "parts/basic/mux_2to1_32bit.json",
+        "top_module": "mux_2to1_32bit",
+        "duration_ms": 632,
+        "passed": true,
+        "report": {
+          "duration_ms": 501,
+          "passed": 12,
+          "total": 12,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 9",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 10",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 11",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 12",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/mux_2to1_4bit.sv",
+        "json_path": "parts/basic/mux_2to1_4bit.json",
+        "top_module": "mux_2to1_4bit",
+        "duration_ms": 89,
+        "passed": true,
+        "report": {
+          "duration_ms": 41,
+          "passed": 8,
+          "total": 8,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/mux_2to1_8bit.sv",
+        "json_path": "parts/basic/mux_2to1_8bit.json",
+        "top_module": "mux_2to1_8bit",
+        "duration_ms": 183,
+        "passed": true,
+        "report": {
+          "duration_ms": 128,
+          "passed": 12,
+          "total": 12,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 9",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 10",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 11",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 12",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/mux_4to1_8bit.sv",
+        "json_path": "parts/basic/mux_4to1_8bit.json",
+        "top_module": "mux_4to1_8bit",
+        "duration_ms": 1466,
+        "passed": true,
+        "report": {
+          "duration_ms": 1383,
+          "passed": 24,
+          "total": 24,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 9",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 10",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 11",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 12",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 13",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 14",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 15",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 16",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 17",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 18",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 19",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 20",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 21",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 22",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 23",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 24",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/mux_4to1_comb.sv",
+        "json_path": "parts/basic/mux_4to1_comb.json",
+        "top_module": "mux_4to1_comb",
+        "duration_ms": 58,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "passed": 8,
+          "total": 8,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/mux_8to1_8bit.sv",
+        "json_path": "parts/basic/mux_8to1_8bit.json",
+        "top_module": "mux_8to1_8bit",
+        "duration_ms": 6684,
+        "passed": true,
+        "report": {
+          "duration_ms": 6559,
+          "passed": 28,
+          "total": 28,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 9",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 10",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 11",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 12",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 13",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 14",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 15",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 16",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 17",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 18",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 19",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 20",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 21",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 22",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 23",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 24",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 25",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 26",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 27",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 28",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/nand_gate.sv",
+        "json_path": "parts/basic/nand_gate.json",
+        "top_module": "nand_gate",
+        "duration_ms": 6,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "passed": 4,
+          "total": 4,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/nand_gate_8bit.sv",
+        "json_path": "parts/basic/nand_gate_8bit.json",
+        "top_module": "nand_gate_8bit",
+        "duration_ms": 49,
+        "passed": true,
+        "report": {
+          "duration_ms": 1,
+          "passed": 12,
+          "total": 12,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 9",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 10",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 11",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 12",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/nor_gate.sv",
+        "json_path": "parts/basic/nor_gate.json",
+        "top_module": "nor_gate",
+        "duration_ms": 9,
+        "passed": true,
+        "report": {
+          "duration_ms": 1,
+          "passed": 4,
+          "total": 4,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/nor_gate_8bit.sv",
+        "json_path": "parts/basic/nor_gate_8bit.json",
+        "top_module": "nor_gate_8bit",
+        "duration_ms": 147,
+        "passed": true,
+        "report": {
+          "duration_ms": 49,
+          "passed": 12,
+          "total": 12,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 9",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 10",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 11",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 12",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/not_gate.sv",
+        "json_path": "parts/basic/not_gate.json",
+        "top_module": "not_gate",
+        "duration_ms": 3,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "passed": 2,
+          "total": 2,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/not_gate_8bit.sv",
+        "json_path": "parts/basic/not_gate_8bit.json",
+        "top_module": "not_gate_8bit",
+        "duration_ms": 41,
+        "passed": true,
+        "report": {
+          "duration_ms": 1,
+          "passed": 8,
+          "total": 8,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/or_gate.sv",
+        "json_path": "parts/basic/or_gate.json",
+        "top_module": "or_gate",
+        "duration_ms": 11,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "passed": 4,
+          "total": 4,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/or_gate_8bit.sv",
+        "json_path": "parts/basic/or_gate_8bit.json",
+        "top_module": "or_gate_8bit",
+        "duration_ms": 47,
+        "passed": true,
+        "report": {
+          "duration_ms": 14,
+          "passed": 12,
+          "total": 12,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 9",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 10",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 11",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 12",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/regfile_8x8.sv",
+        "json_path": "parts/basic/regfile_8x8.json",
+        "top_module": "regfile_8x8",
+        "duration_ms": 96696,
+        "passed": true,
+        "report": {
+          "duration_ms": 96492,
+          "passed": 8,
+          "total": 8,
+          "cases": [
+            {
+              "name": "Write and read each register",
+              "description": "Write unique values to all 8 registers, read back via port 1",
+              "steps": 8,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Dual port simultaneous read",
+              "description": "Write values then read two different registers simultaneously",
+              "steps": 7,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Write enable gating",
+              "description": "Verify write_en=0 prevents writes",
+              "steps": 5,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Register independence",
+              "description": "Writing one register does not affect others",
+              "steps": 5,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Overwrite test",
+              "description": "Overwriting a register replaces the old value",
+              "steps": 4,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Read while writing different register",
+              "description": "Reading one register while writing another",
+              "steps": 5,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Boundary value patterns",
+              "description": "Test with 0x00, 0xFF, 0xAA, 0x55",
+              "steps": 6,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Walking ones across all registers",
+              "description": "Write walking-one pattern to each register, verify all",
+              "steps": 10,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/register_16bit.sv",
+        "json_path": "parts/basic/register_16bit.json",
+        "top_module": "register_16bit",
+        "duration_ms": 56,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "passed": 10,
+          "total": 10,
+          "cases": [
+            {
+              "name": "Initialize to zero",
+              "description": "First load zeros into register",
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Store 0xAAAA pattern",
+              "description": "Store alternating bit pattern 1010101010101010",
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Hold test - enable low",
+              "description": "Data changes but enable is low, should hold 0xAAAA",
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Store 0x5555 pattern",
+              "description": "Store opposite alternating pattern 0101010101010101",
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Store max value 0xFFFF",
+              "description": "Store all ones (65535)",
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Comprehensive sequence test",
+              "description": "Test enable hold, boundary values, and state transitions",
+              "steps": 13,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Extended hold test",
+              "description": "Multiple cycles with enable low",
+              "steps": 6,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Rapid toggle test",
+              "description": "Quick enable toggling with different data",
+              "steps": 7,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Byte boundary test",
+              "description": "Test values at byte boundaries",
+              "steps": 6,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Walking ones - high byte",
+              "description": "Test individual bit positions in high byte",
+              "steps": 8,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/register_1bit.sv",
+        "json_path": "parts/basic/register_1bit.json",
+        "top_module": "register_1bit",
+        "duration_ms": 5,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "passed": 7,
+          "total": 7,
+          "cases": [
+            {
+              "name": "Initialize to zero",
+              "description": "First load zero into register",
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Store one",
+              "description": "Store 1 in register",
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Hold when disabled",
+              "description": "Value should hold when enable is low",
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Comprehensive 1-bit test",
+              "description": "Test all transitions and hold states",
+              "steps": 8,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Extended hold test",
+              "description": "Multiple cycles with enable low",
+              "steps": 10,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Rapid toggle test",
+              "description": "Quick enable toggling",
+              "steps": 7,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Toggle value continuously",
+              "description": "Alternate between 0 and 1 with enable always high",
+              "steps": 8,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/register_32bit.sv",
+        "json_path": "parts/basic/register_32bit.json",
+        "top_module": "register_32bit",
+        "duration_ms": 14,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "passed": 11,
+          "total": 11,
+          "cases": [
+            {
+              "name": "Initialize to zero",
+              "description": "First load zeros into register",
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Store 0xAAAAAAAA pattern",
+              "description": "Store alternating bit pattern",
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Hold test - enable low",
+              "description": "Data changes but enable is low",
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Store 0x55555555 pattern",
+              "description": "Store opposite alternating pattern",
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Store max value 0xFFFFFFFF",
+              "description": "Store all ones",
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Comprehensive sequence test",
+              "description": "Test enable hold, boundary values, and state transitions",
+              "steps": 11,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Extended hold test",
+              "description": "Multiple cycles with enable low",
+              "steps": 6,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Rapid toggle test",
+              "description": "Quick enable toggling with different data",
+              "steps": 7,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Word boundary test",
+              "description": "Test values at word boundaries",
+              "steps": 6,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Walking ones - upper bits",
+              "description": "Test individual bit positions in upper word",
+              "steps": 8,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Hex pattern tests",
+              "description": "Common hex patterns",
+              "steps": 4,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/register_64bit.sv",
+        "json_path": "parts/basic/register_64bit.json",
+        "top_module": "register_64bit",
+        "duration_ms": 11,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "passed": 11,
+          "total": 11,
+          "cases": [
+            {
+              "name": "Initialize to zero",
+              "description": "First load zeros into register",
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Store 0xAAAAAAAAAAAAAAAA pattern",
+              "description": "Store alternating bit pattern",
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Hold test - enable low",
+              "description": "Data changes but enable is low",
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Store 0x5555555555555555 pattern",
+              "description": "Store opposite alternating pattern",
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Store max value 0xFFFFFFFFFFFFFFFF",
+              "description": "Store all ones",
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Comprehensive sequence test",
+              "description": "Test enable hold, boundary values, and state transitions",
+              "steps": 10,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Extended hold test",
+              "description": "Multiple cycles with enable low",
+              "steps": 6,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Rapid toggle test",
+              "description": "Quick enable toggling with different data",
+              "steps": 7,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Dword boundary test",
+              "description": "Test values at 32-bit boundaries",
+              "steps": 6,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Hex pattern tests",
+              "description": "Common 64-bit hex patterns",
+              "steps": 4,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "MSB/LSB test",
+              "description": "Test most and least significant bits",
+              "steps": 4,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/register_8bit.sv",
+        "json_path": "parts/basic/register_8bit.json",
+        "top_module": "register_8bit",
+        "duration_ms": 11,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "passed": 10,
+          "total": 10,
+          "cases": [
+            {
+              "name": "Initialize to zero",
+              "description": "First load zeros into register",
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Store 0xAA pattern",
+              "description": "Store alternating bit pattern 10101010",
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Hold test - enable low",
+              "description": "Data changes but enable is low, should hold 0xAA",
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Store 0x55 pattern",
+              "description": "Store opposite alternating pattern 01010101",
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Store max value 0xFF",
+              "description": "Store all ones (255)",
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Comprehensive sequence test",
+              "description": "Test enable hold, boundary values, and state transitions",
+              "steps": 16,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Extended hold test",
+              "description": "Multiple cycles with enable low",
+              "steps": 7,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Rapid toggle test",
+              "description": "Quick enable toggling with different data",
+              "steps": 7,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Bit pattern walking ones",
+              "description": "Test individual bit positions",
+              "steps": 8,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Bit pattern walking zeros",
+              "description": "Test complement of individual bit positions",
+              "steps": 8,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/rom_deadbeef.sv",
+        "json_path": "parts/basic/rom_deadbeef.json",
+        "top_module": "rom_deadbeef",
+        "duration_ms": 48,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "passed": 4,
+          "total": 4,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/ternary_mux.sv",
+        "json_path": "parts/basic/ternary_mux.json",
+        "top_module": "ternary_mux",
+        "duration_ms": 4,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "passed": 8,
+          "total": 8,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/xnor_gate.sv",
+        "json_path": "parts/basic/xnor_gate.json",
+        "top_module": "xnor_gate",
+        "duration_ms": 15,
+        "passed": true,
+        "report": {
+          "duration_ms": 1,
+          "passed": 4,
+          "total": 4,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/xnor_gate_8bit.sv",
+        "json_path": "parts/basic/xnor_gate_8bit.json",
+        "top_module": "xnor_gate_8bit",
+        "duration_ms": 90,
+        "passed": true,
+        "report": {
+          "duration_ms": 37,
+          "passed": 12,
+          "total": 12,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 9",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 10",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 11",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 12",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/xor_gate.sv",
+        "json_path": "parts/basic/xor_gate.json",
+        "top_module": "xor_gate",
+        "duration_ms": 10,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "passed": 4,
+          "total": 4,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/basic/xor_gate_8bit.sv",
+        "json_path": "parts/basic/xor_gate_8bit.json",
+        "top_module": "xor_gate_8bit",
+        "duration_ms": 57,
+        "passed": true,
+        "report": {
+          "duration_ms": 15,
+          "passed": 12,
+          "total": 12,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 9",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 10",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 11",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 12",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      }
+    ]
+  }
+}

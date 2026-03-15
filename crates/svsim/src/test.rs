@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
 
@@ -9,6 +10,7 @@ use crate::diag::{Error, Result};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct JsonTestReport {
+    pub duration_ms: u64,
     pub passed: usize,
     pub total: usize,
     pub cases: Vec<JsonTestCaseReport>,
@@ -22,6 +24,7 @@ impl JsonTestReport {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct JsonTestDirectoryReport {
+    pub duration_ms: u64,
     pub passed: usize,
     pub total: usize,
     pub suites: Vec<JsonTestSuiteRunReport>,
@@ -35,6 +38,7 @@ impl JsonTestDirectoryReport {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct JsonTestCorpusReport {
+    pub duration_ms: u64,
     pub passed: usize,
     pub total: usize,
     pub directories: Vec<JsonTestDirectoryRunReport>,
@@ -57,6 +61,7 @@ pub struct JsonTestSuiteRunReport {
     pub source_path: PathBuf,
     pub json_path: PathBuf,
     pub top_module: Option<String>,
+    pub duration_ms: u64,
     pub passed: bool,
     pub report: Option<JsonTestReport>,
     pub error: Option<String>,
@@ -176,6 +181,7 @@ impl JsonTestSuite {
         design: &CompiledDesign,
         cases: &[CombinationalTestCase],
     ) -> Result<JsonTestReport> {
+        let started_at = Instant::now();
         let mut sim = design.instantiate_top()?;
         let mut results = Vec::with_capacity(cases.len());
 
@@ -191,7 +197,7 @@ impl JsonTestSuite {
             });
         }
 
-        Ok(build_report(results))
+        Ok(build_report(results, started_at.elapsed()))
     }
 
     fn run_sequential(
@@ -199,6 +205,7 @@ impl JsonTestSuite {
         design: &CompiledDesign,
         suite: &SequentialTestSuite,
     ) -> Result<JsonTestReport> {
+        let started_at = Instant::now();
         let mut sim = design.instantiate_top()?;
         let memory_bindings = suite.memory_bindings_for_top_module(
             design
@@ -229,7 +236,7 @@ impl JsonTestSuite {
             });
         }
 
-        Ok(build_report(results))
+        Ok(build_report(results, started_at.elapsed()))
     }
 }
 
@@ -471,10 +478,11 @@ fn compare_outputs(
     failures
 }
 
-fn build_report(cases: Vec<JsonTestCaseReport>) -> JsonTestReport {
+fn build_report(cases: Vec<JsonTestCaseReport>, duration: std::time::Duration) -> JsonTestReport {
     let passed = cases.iter().filter(|case| case.passed).count();
     let total = cases.len();
     JsonTestReport {
+        duration_ms: duration_millis(duration),
         passed,
         total,
         cases,
@@ -483,10 +491,12 @@ fn build_report(cases: Vec<JsonTestCaseReport>) -> JsonTestReport {
 
 pub(crate) fn build_directory_report(
     suites: Vec<JsonTestSuiteRunReport>,
+    duration: std::time::Duration,
 ) -> JsonTestDirectoryReport {
     let passed = suites.iter().filter(|suite| suite.passed).count();
     let total = suites.len();
     JsonTestDirectoryReport {
+        duration_ms: duration_millis(duration),
         passed,
         total,
         suites,
@@ -495,6 +505,7 @@ pub(crate) fn build_directory_report(
 
 pub(crate) fn build_corpus_report(
     directories: Vec<JsonTestDirectoryRunReport>,
+    duration: std::time::Duration,
 ) -> JsonTestCorpusReport {
     let passed = directories
         .iter()
@@ -505,10 +516,15 @@ pub(crate) fn build_corpus_report(
         .map(|directory| directory.report.total)
         .sum();
     JsonTestCorpusReport {
+        duration_ms: duration_millis(duration),
         passed,
         total,
         directories,
     }
+}
+
+fn duration_millis(duration: std::time::Duration) -> u64 {
+    u64::try_from(duration.as_millis()).unwrap_or(u64::MAX)
 }
 
 #[derive(Debug, Deserialize)]
