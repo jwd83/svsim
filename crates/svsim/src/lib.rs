@@ -6,7 +6,10 @@ pub mod hir;
 pub mod sim;
 pub mod test;
 
-pub use compiler::Compiler;
+pub use compiler::{
+    CompileCorpusReport, CompileDirectoryReport, CompileDirectoryRunReport, CompileFileReport,
+    Compiler,
+};
 pub use design::{CompiledDesign, DesignHierarchy, InstanceHierarchy};
 pub use diag::{Diagnostic, Error, Result, SourceSpan};
 pub use hir::{

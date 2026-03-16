@@ -4,16 +4,61 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use rayon::prelude::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::design::CompiledDesign;
-use crate::diag::{Error, Result};
+use crate::diag::{Diagnostic, Error, Result};
 use crate::frontend::SvParserFrontend;
 use crate::hir::SourceFile;
 use crate::test::{
     JsonTestCorpusReport, JsonTestDirectoryReport, JsonTestDirectoryRunReport,
     JsonTestSuiteRunReport, build_corpus_report, build_directory_report,
 };
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct CompileFileReport {
+    pub source_path: PathBuf,
+    pub top_module: Option<String>,
+    pub module_count: usize,
+    pub duration_ms: u64,
+    pub passed: bool,
+    pub diagnostics: Vec<Diagnostic>,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct CompileDirectoryReport {
+    pub duration_ms: u64,
+    pub passed: usize,
+    pub total: usize,
+    pub files: Vec<CompileFileReport>,
+}
+
+impl CompileDirectoryReport {
+    pub fn all_passed(&self) -> bool {
+        self.passed == self.total
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct CompileCorpusReport {
+    pub duration_ms: u64,
+    pub passed: usize,
+    pub total: usize,
+    pub directories: Vec<CompileDirectoryRunReport>,
+}
+
+impl CompileCorpusReport {
+    pub fn all_passed(&self) -> bool {
+        self.passed == self.total
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct CompileDirectoryRunReport {
+    pub directory: PathBuf,
+    pub report: CompileDirectoryReport,
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct Compiler {
@@ -77,6 +122,26 @@ impl Compiler {
         Ok(build_directory_report(suites, started_at.elapsed()))
     }
 
+    pub fn run_compile_dir(&self, path: impl AsRef<Path>) -> Result<CompileDirectoryReport> {
+        let started_at = Instant::now();
+        let root = path.as_ref();
+        let source_paths = collect_systemverilog_sources(root)?;
+        if source_paths.is_empty() {
+            return Err(Error::Resolve(format!(
+                "no SystemVerilog source files found under {}",
+                root.display()
+            )));
+        }
+
+        let mut files = source_paths
+            .into_par_iter()
+            .map(|source_path| self.run_compile_file(source_path))
+            .collect::<Vec<_>>();
+        files.sort_by(|left, right| left.source_path.cmp(&right.source_path));
+
+        Ok(build_compile_directory_report(files, started_at.elapsed()))
+    }
+
     pub fn run_json_test_dirs(&self, paths: &[PathBuf]) -> Result<JsonTestCorpusReport> {
         let started_at = Instant::now();
         if paths.is_empty() {
@@ -94,6 +159,28 @@ impl Compiler {
         }
 
         Ok(build_corpus_report(directories, started_at.elapsed()))
+    }
+
+    pub fn run_compile_dirs(&self, paths: &[PathBuf]) -> Result<CompileCorpusReport> {
+        let started_at = Instant::now();
+        if paths.is_empty() {
+            return Err(Error::Resolve(
+                "at least one compile-only directory is required".into(),
+            ));
+        }
+
+        let mut directories = Vec::with_capacity(paths.len());
+        for path in paths {
+            directories.push(CompileDirectoryRunReport {
+                directory: path.clone(),
+                report: self.run_compile_dir(path)?,
+            });
+        }
+
+        Ok(build_compile_corpus_report(
+            directories,
+            started_at.elapsed(),
+        ))
     }
 
     fn run_json_test_suite(&self, suite: JsonTestSuitePaths) -> JsonTestSuiteRunReport {
@@ -132,6 +219,34 @@ impl Compiler {
                 duration_ms: elapsed_millis(started_at),
                 passed: false,
                 report: None,
+                error: Some(error.to_string()),
+            },
+        }
+    }
+
+    fn run_compile_file(&self, source_path: PathBuf) -> CompileFileReport {
+        let started_at = Instant::now();
+        match self.compile_file(&source_path) {
+            Ok(design) => {
+                let diagnostics = collect_unsupported_diagnostics(&design);
+                let passed = diagnostics.is_empty();
+                CompileFileReport {
+                    source_path,
+                    top_module: design.top_module().map(str::to_owned),
+                    module_count: design.hir().module_count(),
+                    duration_ms: elapsed_millis(started_at),
+                    passed,
+                    diagnostics,
+                    error: None,
+                }
+            }
+            Err(error) => CompileFileReport {
+                source_path,
+                top_module: None,
+                module_count: 0,
+                duration_ms: elapsed_millis(started_at),
+                passed: false,
+                diagnostics: Vec::new(),
                 error: Some(error.to_string()),
             },
         }
@@ -278,6 +393,85 @@ struct JsonTestSuiteSourceMetadata {
 
 fn elapsed_millis(started_at: Instant) -> u64 {
     u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX)
+}
+
+fn build_compile_directory_report(
+    files: Vec<CompileFileReport>,
+    duration: std::time::Duration,
+) -> CompileDirectoryReport {
+    let passed = files.iter().filter(|file| file.passed).count();
+    let total = files.len();
+    CompileDirectoryReport {
+        duration_ms: u64::try_from(duration.as_millis()).unwrap_or(u64::MAX),
+        passed,
+        total,
+        files,
+    }
+}
+
+fn build_compile_corpus_report(
+    directories: Vec<CompileDirectoryRunReport>,
+    duration: std::time::Duration,
+) -> CompileCorpusReport {
+    let passed = directories
+        .iter()
+        .map(|directory| directory.report.passed)
+        .sum();
+    let total = directories
+        .iter()
+        .map(|directory| directory.report.total)
+        .sum();
+    CompileCorpusReport {
+        duration_ms: u64::try_from(duration.as_millis()).unwrap_or(u64::MAX),
+        passed,
+        total,
+        directories,
+    }
+}
+
+fn collect_unsupported_diagnostics(design: &CompiledDesign) -> Vec<Diagnostic> {
+    design
+        .hir()
+        .files()
+        .iter()
+        .flat_map(|file| file.modules.iter())
+        .flat_map(|module| module.unsupported.iter().cloned())
+        .collect()
+}
+
+fn collect_systemverilog_sources(root: &Path) -> Result<Vec<PathBuf>> {
+    let mut sources = Vec::new();
+    collect_systemverilog_sources_recursive(root, &mut sources)?;
+    sources.sort();
+    Ok(sources)
+}
+
+fn collect_systemverilog_sources_recursive(root: &Path, sources: &mut Vec<PathBuf>) -> Result<()> {
+    if root.is_file() {
+        collect_systemverilog_source_file(root, sources);
+        return Ok(());
+    }
+
+    let mut entries = fs::read_dir(root)?.collect::<std::io::Result<Vec<_>>>()?;
+    entries.sort_by_key(|entry| entry.path());
+
+    for entry in entries {
+        let path = entry.path();
+        if entry.file_type()?.is_dir() {
+            collect_systemverilog_sources_recursive(&path, sources)?;
+            continue;
+        }
+
+        collect_systemverilog_source_file(&path, sources);
+    }
+
+    Ok(())
+}
+
+fn collect_systemverilog_source_file(path: &Path, sources: &mut Vec<PathBuf>) {
+    if path.extension().and_then(|ext| ext.to_str()) == Some("sv") {
+        sources.push(path.to_path_buf());
+    }
 }
 
 fn collect_json_test_suites(root: &Path) -> Result<Vec<JsonTestSuitePaths>> {
@@ -564,6 +758,137 @@ mod tests {
                 .into_iter()
                 .collect::<BTreeSet<_>>(),
             BTreeSet::from(["child", "top"]),
+        );
+    }
+
+    #[test]
+    fn run_compile_dir_reports_supported_and_unsupported_files() {
+        let temp_dir = unique_temp_dir("compile-dir");
+        let nested_dir = temp_dir.join("nested");
+        fs::create_dir_all(&nested_dir).expect("create nested dir");
+
+        fs::write(
+            temp_dir.join("pass.sv"),
+            "module pass(output logic one); assign one = 1'b1; endmodule\n",
+        )
+        .expect("write pass.sv");
+
+        fs::write(
+            nested_dir.join("unsupported.sv"),
+            concat!(
+                "module unsupported(",
+                "input logic clk, input logic d, output logic q",
+                "); ",
+                "always_latch begin q <= d; end ",
+                "endmodule\n"
+            ),
+        )
+        .expect("write unsupported.sv");
+
+        let report = Compiler::new()
+            .run_compile_dir(&temp_dir)
+            .expect("run compile-only batch");
+
+        assert_eq!(report.total, 2);
+        assert_eq!(report.passed, 1);
+        assert!(!report.all_passed());
+        assert_eq!(
+            report
+                .files
+                .iter()
+                .map(|file| {
+                    (
+                        file.source_path
+                            .file_name()
+                            .and_then(|name| name.to_str())
+                            .expect("file name"),
+                        file.passed,
+                    )
+                })
+                .collect::<Vec<_>>(),
+            vec![("unsupported.sv", false), ("pass.sv", true)],
+        );
+        assert!(report.files[0].error.is_none());
+        assert!(
+            report.files[0]
+                .diagnostics
+                .iter()
+                .any(|diag| diag.message.contains("always_latch"))
+        );
+    }
+
+    #[test]
+    fn run_compile_dir_keeps_compile_errors_in_report() {
+        let temp_dir = unique_temp_dir("compile-dir-compile-error");
+
+        fs::write(
+            temp_dir.join("top.sv"),
+            "module top(output logic outY); missing_dep u_missing (.outY(outY)); endmodule\n",
+        )
+        .expect("write top.sv");
+
+        let report = Compiler::new()
+            .run_compile_dir(&temp_dir)
+            .expect("run compile-only batch");
+
+        assert_eq!(report.total, 1);
+        assert_eq!(report.passed, 0);
+        assert!(!report.all_passed());
+        assert!(report.files[0].diagnostics.is_empty());
+        assert!(
+            report.files[0]
+                .error
+                .as_deref()
+                .is_some_and(|message| message.contains("missing_dep"))
+        );
+    }
+
+    #[test]
+    fn run_compile_dirs_aggregates_directory_reports() {
+        let temp_dir = unique_temp_dir("compile-dirs");
+        let passing_dir = temp_dir.join("passing");
+        let failing_dir = temp_dir.join("failing");
+        fs::create_dir_all(&passing_dir).expect("create passing dir");
+        fs::create_dir_all(&failing_dir).expect("create failing dir");
+
+        fs::write(
+            passing_dir.join("pass.sv"),
+            "module pass(output logic one); assign one = 1'b1; endmodule\n",
+        )
+        .expect("write passing suite");
+
+        fs::write(
+            failing_dir.join("unsupported.sv"),
+            concat!(
+                "module unsupported(",
+                "input logic clk, input logic d, output logic q",
+                "); ",
+                "always_latch begin q <= d; end ",
+                "endmodule\n"
+            ),
+        )
+        .expect("write failing suite");
+
+        let report = Compiler::new()
+            .run_compile_dirs(&[passing_dir.clone(), failing_dir.clone()])
+            .expect("run compile-only corpus");
+
+        assert_eq!(report.passed, 1);
+        assert_eq!(report.total, 2);
+        assert!(!report.all_passed());
+        assert_eq!(
+            report
+                .directories
+                .iter()
+                .map(|directory| {
+                    (
+                        directory.directory.clone(),
+                        directory.report.passed,
+                        directory.report.total,
+                    )
+                })
+                .collect::<Vec<_>>(),
+            vec![(passing_dir, 1, 1), (failing_dir, 0, 1)],
         );
     }
 

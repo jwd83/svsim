@@ -3,7 +3,10 @@ use std::process::ExitCode;
 
 use clap::Parser;
 use serde::Serialize;
-use svsim::{Compiler, HirDesign, JsonTestCorpusReport, JsonTestDirectoryReport, JsonTestReport};
+use svsim::{
+    CompileCorpusReport, CompileDirectoryReport, Compiler, HirDesign, JsonTestCorpusReport,
+    JsonTestDirectoryReport, JsonTestReport,
+};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -20,16 +23,29 @@ struct Args {
     #[arg(
         long = "json-test",
         conflicts_with = "json_test_dirs",
+        conflicts_with = "compile_dirs",
         requires = "file"
     )]
     json_test: Option<PathBuf>,
 
     /// Run all sibling *.sv/*.json regression pairs under a directory.
-    #[arg(long = "json-test-dir", conflicts_with = "json_test")]
+    #[arg(
+        long = "json-test-dir",
+        conflicts_with = "json_test",
+        conflicts_with = "compile_dirs"
+    )]
     json_test_dirs: Vec<PathBuf>,
 
+    /// Compile every *.sv file under a directory without running JSON suites.
+    #[arg(
+        long = "compile-dir",
+        conflicts_with = "json_test",
+        conflicts_with = "json_test_dirs"
+    )]
+    compile_dirs: Vec<PathBuf>,
+
     /// SystemVerilog source file to compile.
-    #[arg(required_unless_present = "json_test_dirs")]
+    #[arg(required_unless_present_any = ["json_test_dirs", "compile_dirs"])]
     file: Option<PathBuf>,
 }
 
@@ -56,11 +72,23 @@ struct CorpusTestOutput {
     report: JsonTestCorpusReport,
 }
 
+#[derive(Debug, Serialize)]
+struct CompileBatchOutput {
+    directory: PathBuf,
+    report: CompileDirectoryReport,
+}
+
+#[derive(Debug, Serialize)]
+struct CompileCorpusOutput {
+    report: CompileCorpusReport,
+}
+
 fn main() -> ExitCode {
     let Args {
         search_paths,
         json_test,
         json_test_dirs,
+        compile_dirs,
         file,
     } = Args::parse();
 
@@ -70,7 +98,49 @@ fn main() -> ExitCode {
             compiler.add_search_path(path)
         });
 
-    if !json_test_dirs.is_empty() {
+    if !compile_dirs.is_empty() {
+        if compile_dirs.len() == 1 {
+            let compile_dir = compile_dirs.into_iter().next().expect("one directory");
+            match compiler.run_compile_dir(&compile_dir) {
+                Ok(report) => {
+                    let all_passed = report.all_passed();
+                    let output = CompileBatchOutput {
+                        directory: compile_dir,
+                        report,
+                    };
+                    if write_json(&output).is_err() {
+                        ExitCode::FAILURE
+                    } else if all_passed {
+                        ExitCode::SUCCESS
+                    } else {
+                        ExitCode::FAILURE
+                    }
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::FAILURE
+                }
+            }
+        } else {
+            match compiler.run_compile_dirs(&compile_dirs) {
+                Ok(report) => {
+                    let all_passed = report.all_passed();
+                    let output = CompileCorpusOutput { report };
+                    if write_json(&output).is_err() {
+                        ExitCode::FAILURE
+                    } else if all_passed {
+                        ExitCode::SUCCESS
+                    } else {
+                        ExitCode::FAILURE
+                    }
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
+    } else if !json_test_dirs.is_empty() {
         if json_test_dirs.len() == 1 {
             let json_test_dir = json_test_dirs.into_iter().next().expect("one directory");
             match compiler.run_json_test_dir(&json_test_dir) {

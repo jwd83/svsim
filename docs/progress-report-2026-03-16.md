@@ -4,43 +4,45 @@ Date: March 16, 2026
 
 ## Executive Summary
 
-- The rewrite remains functionally solid at the simulator-core level: parsing, lowering, hierarchical compilation, combinational evaluation, sequential stepping, memory preload/read APIs, and JSON regression execution are all implemented in `svsim`.
-- The next defensible step from the March 15 report was not more syntax. It was making the existing whole-corpus measurement path practical enough to run regularly on the checked-in designs.
-- That bottleneck is now materially reduced. The fixed-point evaluator caches child instance outputs within a `settle_module` pass whenever a child's input map has not changed, which avoids re-running unchanged subtrees across convergence iterations.
-- The result is large enough to change project status, not just a benchmark number: the full `parts/basic` + `parts/testing` + `parts/overture` corpus now completes at `127/127` in about `17.2s`.
-- Rendering is still deferred. `svsim-render` remains a placeholder crate, and the runtime is still a direct HIR interpreter rather than the future compiled-IR architecture described in the long-term plan.
+- The Rust rewrite remains solid at the simulator-core level: parsing, lowering, hierarchical compilation, combinational evaluation, sequential stepping, memory preload/read APIs, and JSON regression execution are all in place.
+- The next defensible step after making whole-corpus JSON regressions practical was to separate compile coverage from runtime regression coverage.
+- `svsim` now exposes compile-only corpus reporting through `Compiler::run_compile_dir`, `Compiler::run_compile_dirs`, and repeated CLI `--compile-dir` flags.
+- Compile-only reports are intentionally stricter than raw parse success: a file is marked failing if compilation errors occur or if any lowered module carries unsupported-feature diagnostics.
+- The checked-in corpus now has two explicit health signals: `125/125` SystemVerilog source files compile cleanly in about `1.7s`, and `127/127` JSON suites pass in about `18.4s`.
+- Rendering is still deferred. `svsim-render` remains a placeholder crate, and the runtime is still the current direct HIR interpreter rather than the future compiled-IR architecture from the long-term plan.
 
 ## What Changed Today
 
-- `crates/svsim/src/sim.rs` now memoizes per-instance child outputs inside each `settle_module` call, keyed by the child input map built for that iteration.
-- The optimization is local to the current evaluator. It does not change the supported SystemVerilog subset, public library surface, or JSON report format.
-- `docs/rust-port-plan.md` has been updated to reflect that regular whole-corpus measurement is now practical on the checked-in suites.
+- Added compile-only batch report types in `svsim` for per-file, per-directory, and multi-directory corpus runs.
+- Added `Compiler::run_compile_dir` and `Compiler::run_compile_dirs` to discover `*.sv` files recursively, compile them in parallel within each directory, and emit deterministic structured reports.
+- Added repeated CLI `--compile-dir` support so the compile-only path matches the existing JSON batch runner shape.
+- Compile-only reports now surface unsupported lowering diagnostics directly instead of counting every parseable file as success.
+- Added unit and CLI coverage for successful compile-only runs, unsupported-feature failures, hard compile failures, and multi-directory aggregation.
 
 ## Verified Current State
 
 - `cargo test`: pass
-- `parts/basic` directory regression: `44/44` in about `7.3s`
-- `parts/testing` is still green under directory regression and contributes `40/40` to the full corpus run
-- `parts/overture` directory regression: `43/43` in about `10.0s`
-- full multi-directory corpus regression (`parts/basic` + `parts/testing` + `parts/overture`): `127/127` in about `17.2s`
-
-Targeted before/after spot checks from this review:
-
-- `parts/basic/adder_cs_64bit.sv` with `adder_cs_64bit.json`: about `85.7s` before, about `2.2s` after
-- `parts/overture/overture_cpu.sv` with `overture_cpu_program_io.json`: about `24.7s` before, about `3.0s` after
+- compile-only multi-directory corpus (`parts/basic` + `parts/testing` + `parts/overture`): `125/125` in about `1.7s`
+- compile-only per-directory status:
+  - `parts/basic`: `44/44` in about `0.8s`
+  - `parts/testing`: `40/40` in about `0.2s`
+  - `parts/overture`: `41/41` in about `0.7s`
+- JSON regression multi-directory corpus (`parts/basic` + `parts/testing` + `parts/overture`): `127/127` in about `18.4s`
+- JSON regression per-directory status from the same fresh run:
+  - `parts/basic`: `44/44` in about `7.8s`
+  - `parts/testing`: `40/40` in about `0.1s`
+  - `parts/overture`: `43/43` in about `10.5s`
 
 ## Recommended Follow-Up
 
-- Add compile-only corpus coverage if future progress reporting needs to include `.sv` files that intentionally do not ship with sibling JSON suites.
-- Tighten unsupported-construct diagnostics if wider corpus additions uncover frontend or runtime gaps.
-- Keep rendering and trace artifacts deferred until there is a concrete consumer for them; the core simulator and measurement path are now in better shape than the output layer.
+- Tighten unsupported-construct diagnostics where wider syntax coverage finds partial-lowering gaps.
+- Keep using compile-only coverage for new `.sv` additions before they have stable JSON suites.
+- Continue deferring rendering and trace artifacts until there is a concrete consumer for them; the core compiler/simulator/reporting path is still the highest-value area.
 
 ## Commands Run
 
 ```text
 cargo test
-target/debug/svsim parts/basic/adder_cs_64bit.sv --json-test parts/basic/adder_cs_64bit.json
-target/debug/svsim parts/overture/overture_cpu.sv --json-test parts/overture/overture_cpu_program_io.json
-target/debug/svsim --json-test-dir parts/basic
+target/debug/svsim --compile-dir parts/basic --compile-dir parts/testing --compile-dir parts/overture
 target/debug/svsim --json-test-dir parts/basic --json-test-dir parts/testing --json-test-dir parts/overture
 ```
