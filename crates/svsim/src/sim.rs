@@ -30,6 +30,12 @@ struct ChildState {
 }
 
 #[derive(Debug, Clone)]
+struct InstanceEvalCache {
+    inputs: BTreeMap<String, u64>,
+    outputs: HashMap<String, Value>,
+}
+
+#[derive(Debug, Clone)]
 struct MemoryState {
     index_range: PackedRange,
     words: Vec<Value>,
@@ -406,6 +412,7 @@ fn settle_module(
         + values.len())
     .max(1))
         * 8;
+    let mut instance_caches = vec![None; module.instantiations.len()];
 
     stack.push(state.module_name.clone());
     let mut converged = false;
@@ -435,7 +442,12 @@ fn settle_module(
             )?;
         }
 
-        for (instance, child_state) in module.instantiations.iter().zip(&state.children) {
+        for ((instance, child_state), cache) in module
+            .instantiations
+            .iter()
+            .zip(&state.children)
+            .zip(instance_caches.iter_mut())
+        {
             changed |= evaluate_instance(
                 hir,
                 module,
@@ -444,6 +456,7 @@ fn settle_module(
                 &mut values,
                 &state.memories,
                 stack,
+                cache,
             )?;
         }
 
@@ -911,6 +924,7 @@ fn evaluate_instance(
     values: &mut HashMap<String, Value>,
     memories: &HashMap<String, MemoryState>,
     stack: &mut Vec<String>,
+    cache: &mut Option<InstanceEvalCache>,
 ) -> Result<bool> {
     let child = resolve_supported_module(hir, &instance.module_name).map_err(|_| {
         Error::Resolve(format!(
@@ -920,7 +934,20 @@ fn evaluate_instance(
     })?;
 
     let child_inputs = build_child_inputs(child, instance, values, memories)?;
-    let child_values = settle_module(hir, child, child_state, &child_inputs, stack)?;
+    let needs_refresh = cache
+        .as_ref()
+        .is_none_or(|cached| cached.inputs != child_inputs);
+    if needs_refresh {
+        let child_values = settle_module(hir, child, child_state, &child_inputs, stack)?;
+        *cache = Some(InstanceEvalCache {
+            inputs: child_inputs,
+            outputs: child_values,
+        });
+    }
+    let child_values = &cache
+        .as_ref()
+        .expect("instance cache is initialized before applying outputs")
+        .outputs;
     let mut changed = false;
 
     for port in child
