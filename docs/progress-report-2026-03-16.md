@@ -8,7 +8,7 @@ Date: March 16, 2026
 - The next defensible step after making whole-corpus JSON regressions practical was to separate compile coverage from runtime regression coverage.
 - `svsim` now exposes compile-only corpus reporting through `Compiler::run_compile_dir`, `Compiler::run_compile_dirs`, and repeated CLI `--compile-dir` flags.
 - Compile-only reports are intentionally stricter than raw parse success: a file is marked failing if compilation errors occur or if any lowered module carries unsupported-feature diagnostics.
-- The checked-in corpus now has two explicit health signals: `125/125` SystemVerilog source files compile cleanly in about `1.7s`, and `127/127` JSON suites pass in about `18.4s`.
+- The checked-in corpus now has two explicit health signals: `125/125` SystemVerilog source files compile cleanly in about `1.1s`, and `127/127` JSON suites pass in about `15.7s`.
 - Rendering is still deferred. `svsim-render` remains a placeholder crate, and the runtime is still the current direct HIR interpreter rather than the future compiled-IR architecture from the long-term plan.
 
 ## What Changed Today
@@ -22,16 +22,16 @@ Date: March 16, 2026
 ## Verified Current State
 
 - `cargo test`: pass
-- compile-only multi-directory corpus (`parts/basic` + `parts/testing` + `parts/overture`): `125/125` in about `1.7s`
+- compile-only multi-directory corpus (`parts/basic` + `parts/testing` + `parts/overture`): `125/125` in about `1.1s`
 - compile-only per-directory status:
-  - `parts/basic`: `44/44` in about `0.8s`
-  - `parts/testing`: `40/40` in about `0.2s`
-  - `parts/overture`: `41/41` in about `0.7s`
-- JSON regression multi-directory corpus (`parts/basic` + `parts/testing` + `parts/overture`): `127/127` in about `18.4s`
-- JSON regression per-directory status from the same fresh run:
-  - `parts/basic`: `44/44` in about `7.8s`
+  - `parts/basic`: `44/44` in about `0.4s`
   - `parts/testing`: `40/40` in about `0.1s`
-  - `parts/overture`: `43/43` in about `10.5s`
+  - `parts/overture`: `41/41` in about `0.5s`
+- JSON regression multi-directory corpus (`parts/basic` + `parts/testing` + `parts/overture`): `127/127` in about `15.7s`
+- JSON regression per-directory status from the same fresh run:
+  - `parts/basic`: `44/44` in about `6.9s`
+  - `parts/testing`: `40/40` in about `0.2s`
+  - `parts/overture`: `43/43` in about `8.7s`
 
 ## Recommended Follow-Up
 

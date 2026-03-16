@@ -39,8 +39,8 @@ Current implementation status as of March 16, 2026:
 - current sequential limits: only `posedge` event controls are lowered, `always_ff` clock expressions must be local identifiers, and cross-block race semantics are not modeled beyond deterministic source order
 - current memory subset supports fixed-size unpacked `reg` / `logic` arrays with zero-initialized reads, explicit programmatic preload/read access by instance path, text-file ROM/RAM loading, procedural single-element writes, and JSON-driven regression preload; explicit elaboration, broader event controls, and render integration are still pending
 - regression compatibility now covers the legacy corpus conventions that still matter in `parts/`: interface-only `rom_*` wrappers auto-load sibling ROM text files at runtime, and `pgm_*` JSON suites auto-bind `overture_fetch.rom` from a sibling program text file when no explicit memory bindings are present
-- measured verification: `cargo test` passes; the compile-only multi-directory corpus reports `parts/basic` at `44/44`, `parts/testing` at `40/40`, `parts/overture` at `41/41`, and the full `parts/basic` + `parts/testing` + `parts/overture` compile surface at `125/125` in about `1.7s`; the JSON regression corpus remains green at `127/127` in about `18.4s`
-- measured batch status: the compile-only multi-directory runner completes `parts/basic` in about `0.8s`, `parts/testing` in about `0.2s`, and `parts/overture` in about `0.7s`; the JSON multi-directory runner completes them in about `7.8s`, `0.1s`, and `10.5s`
+- measured verification: `cargo test` passes; the compile-only multi-directory corpus reports `parts/basic` at `44/44`, `parts/testing` at `40/40`, `parts/overture` at `41/41`, and the full `parts/basic` + `parts/testing` + `parts/overture` compile surface at `125/125` in about `1.1s`; the JSON regression corpus remains green at `127/127` in about `15.7s`
+- measured batch status: the compile-only multi-directory runner completes `parts/basic` in about `0.4s`, `parts/testing` in about `0.1s`, and `parts/overture` in about `0.5s`; the JSON multi-directory runner completes them in about `6.9s`, `0.2s`, and `8.7s`
 - `parts/testing/019-Vector5.json` now matches the standard SystemVerilog bit ordering for multi-expression replication (`{5{a, b, c, d, e}}`), retiring the old Python reference divergence from the checked-in corpus
 
 ## Compatibility Target
@@ -392,7 +392,7 @@ Exit criterion:
 Current progress:
 - library and CLI batch entry points now exist for both compile-only `*.sv` discovery and JSON regression discovery, runs stay sorted by source path, and JSON suites can explicitly reuse a shared source file through a `source` field
 - legacy corpus compatibility for `rom_*` wrappers and `pgm_*` program harnesses now exists without reintroducing those naming conventions into the main library memory API
-- measured Overture status now includes `41/41` clean compile-only source files and `43/43` passing JSON suites, including the two explicit-source `overture_cpu` program variants; the full multi-directory corpus snapshot is `125/125` compile-only in about `1.7s` and `127/127` JSON regressions in about `18.4s`
+- measured Overture status now includes `41/41` clean compile-only source files and `43/43` passing JSON suites, including the two explicit-source `overture_cpu` program variants; the full multi-directory corpus snapshot is `125/125` compile-only in about `1.1s` and `127/127` JSON regressions in about `15.7s`
 - remaining work is tightening unsupported-construct diagnostics where wider coverage finds gaps
 
 Exit criterion:
