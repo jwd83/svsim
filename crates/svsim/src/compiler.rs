@@ -14,6 +14,7 @@ use crate::test::{
     JsonTestCorpusReport, JsonTestDirectoryReport, JsonTestDirectoryRunReport,
     JsonTestSuiteRunReport, build_corpus_report, build_directory_report,
 };
+use crate::validate::validate_design;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct CompileFileReport {
@@ -331,11 +332,9 @@ impl Compiler {
             files.push(source_file);
         }
 
-        Ok(CompiledDesign::new(
-            self.search_paths.clone(),
-            files,
-            top_module,
-        ))
+        let design = CompiledDesign::new(self.search_paths.clone(), files, top_module);
+        validate_design(design.hir())?;
+        Ok(design)
     }
 
     fn register_source_file(
@@ -759,6 +758,118 @@ mod tests {
                 .collect::<BTreeSet<_>>(),
             BTreeSet::from(["child", "top"]),
         );
+    }
+
+    #[test]
+    fn compile_str_errors_on_undeclared_signal_reference() {
+        let error = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                "module top(input logic a, output logic y); assign y = missing; endmodule\n",
+            )
+            .expect_err("missing signal should fail validation");
+
+        match error {
+            Error::Resolve(message) => {
+                assert!(message.contains("missing"), "unexpected message: {message}");
+            }
+            other => panic!("unexpected error: {other}"),
+        }
+    }
+
+    #[test]
+    fn compile_str_errors_on_duplicate_declaration_name() {
+        let error = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module top(input logic a, output logic y); ",
+                    "logic a; ",
+                    "assign y = a; ",
+                    "endmodule\n"
+                ),
+            )
+            .expect_err("duplicate declaration should fail validation");
+
+        match error {
+            Error::Resolve(message) => {
+                assert!(message.contains("declares 'a' more than once"));
+            }
+            other => panic!("unexpected error: {other}"),
+        }
+    }
+
+    #[test]
+    fn compile_str_errors_on_unknown_instance_port() {
+        let error = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module child(input logic a, output logic y); assign y = a; endmodule\n",
+                    "module top(input logic a, output logic y); ",
+                    "child u_child (.missing(a), .y(y)); ",
+                    "endmodule\n"
+                ),
+            )
+            .expect_err("unknown port connection should fail validation");
+
+        match error {
+            Error::Resolve(message) => {
+                assert!(
+                    message.contains("unknown port 'missing'"),
+                    "unexpected message: {message}"
+                );
+            }
+            other => panic!("unexpected error: {other}"),
+        }
+    }
+
+    #[test]
+    fn compile_str_errors_on_duplicate_instance_port_connection() {
+        let error = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module child(input logic a, output logic y); assign y = a; endmodule\n",
+                    "module top(input logic a, output logic y); ",
+                    "child u_child (.a(a), .a(a), .y(y)); ",
+                    "endmodule\n"
+                ),
+            )
+            .expect_err("duplicate port connection should fail validation");
+
+        match error {
+            Error::Resolve(message) => {
+                assert!(message.contains("connects port 'a' more than once"));
+            }
+            other => panic!("unexpected error: {other}"),
+        }
+    }
+
+    #[test]
+    fn compile_str_errors_on_output_port_connected_to_non_lvalue() {
+        let error = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module child(input logic a, output logic y); assign y = a; endmodule\n",
+                    "module top(input logic a, input logic b, output logic y); ",
+                    "child u_child (.a(a), .y(a & b)); ",
+                    "assign y = a; ",
+                    "endmodule\n"
+                ),
+            )
+            .expect_err("non-lvalue output connection should fail validation");
+
+        match error {
+            Error::Unsupported(message) => {
+                assert!(
+                    message.contains("non-lvalue expression"),
+                    "unexpected message: {message}"
+                );
+            }
+            other => panic!("unexpected error: {other}"),
+        }
     }
 
     #[test]

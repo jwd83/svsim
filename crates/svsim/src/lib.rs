@@ -5,6 +5,7 @@ pub mod frontend;
 pub mod hir;
 pub mod sim;
 pub mod test;
+mod validate;
 
 pub use compiler::{
     CompileCorpusReport, CompileDirectoryReport, CompileDirectoryRunReport, CompileFileReport,
