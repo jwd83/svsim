@@ -32,7 +32,7 @@ Current implementation status as of March 17, 2026:
 - CLI can parse a SystemVerilog file and emit JSON describing discovered modules, or run compile-only and JSON batch regressions through repeated `--compile-dir` and `--json-test-dir` flags plus single-suite `--json-test`
 - `SimulationSession::eval_once` can execute hierarchical combinational designs with fixed-point convergence across continuous assignments, module instances, and a basic `always_comb` subset, and now memoizes child instance outputs within each settle pass when their input maps remain unchanged
 - `always_comb` execution now compares each block's final post-statement state against the prior iteration, so blocks that assign the same signal multiple times per execution settle correctly instead of oscillating
-- runtime width handling now includes a shared lowered-expression width helper plus fixed-width ternary evaluation, so self-determined `?:` results no longer shrink on the chosen branch before concatenation, replication, or later coercion
+- runtime width handling now includes a shared lowered-expression width helper, fixed-width ternary evaluation, and an explicit coercion path for assignments and instance-port handoff, so self-determined `?:` results and in-range truncation/zero-extension no longer depend on scattered incidental `u64` shaping
 - `SimulationSession::step` now maintains per-instance state and can advance hierarchical designs using `always_ff @(posedge <clock>)` blocks with blocking immediate updates and nonblocking assignment staging
 - current procedural subset: blocking assignments in combinational blocks and `always_ff`, nonblocking assignments in `always_ff`, `if` / `else`, `case` / `default`, and `begin` / `end` statement blocks
 - current expression subset adds concatenation, replication, logical `&&` / `||`, equality `==` / `!=`, arithmetic `+` / `-`, and single-dimension memory reads on top of literals, identifiers, slices, ternary expressions, and bitwise operators
@@ -41,15 +41,16 @@ Current implementation status as of March 17, 2026:
 - current sequential limits: only `posedge` event controls are lowered, `always_ff` clock expressions must be local identifiers, and cross-block race semantics are not modeled beyond deterministic source order
 - current memory subset supports fixed-size unpacked `reg` / `logic` arrays with zero-initialized reads, explicit programmatic preload/read access by instance path, text-file ROM/RAM loading, procedural single-element writes, and JSON-driven regression preload; explicit elaboration, broader event controls, and render integration are still pending
 - regression compatibility now covers the legacy corpus conventions that still matter in `parts/`: compile-time validation now enforces the supported interface-only `rom_*` wrapper shape and backing text-file lookup, and `pgm_*` JSON suites auto-bind `overture_fetch.rom` from a sibling program text file when no explicit memory bindings are present
-- measured verification: `cargo test` passes; the compile-only multi-directory corpus reports `parts/basic` at `44/44`, `parts/testing` at `40/40`, `parts/overture` at `41/41`, and the full `parts/basic` + `parts/testing` + `parts/overture` compile surface at `125/125` in about `1.0s`; the JSON regression corpus remains green at `127/127` in about `17.1s`
-- measured batch status: the compile-only multi-directory runner completes `parts/basic` in about `0.4s`, `parts/testing` in about `0.1s`, and `parts/overture` in about `0.5s`; the JSON multi-directory runner completes them in about `7.2s`, `0.2s`, and `9.7s`
+- measured verification: `cargo test` passes; the compile-only multi-directory corpus reports `parts/basic` at `44/44`, `parts/testing` at `41/41`, `parts/overture` at `41/41`, and the full `parts/basic` + `parts/testing` + `parts/overture` compile surface at `126/126` in about `1.2s`; the JSON regression corpus remains green at `128/128` in about `18.3s`
+- measured batch status: the compile-only multi-directory runner completes `parts/basic` in about `0.5s`, `parts/testing` in about `0.1s`, and `parts/overture` in about `0.5s`; the JSON multi-directory runner completes them in about `7.4s`, `0.2s`, and `10.7s`
+- `parts/testing/020-WidthCoercion.sv` and `parts/testing/020-WidthCoercion.json` now pin widened and narrowed assignment/instance-port coercion behavior in the green corpus
 - `parts/testing/019-Vector5.json` now matches the standard SystemVerilog bit ordering for multi-expression replication (`{5{a, b, c, d, e}}`), retiring the old Python reference divergence from the checked-in corpus
 
 ## Compatibility Target
 
 The first meaningful milestone is feature parity with the subset exercised by the current repository:
 
-- `125` SystemVerilog files under `parts/`
+- `126` SystemVerilog files under `parts/`
 - hierarchical modules built from gates up through the Overture CPU
 - combinational logic with buses, slices, concatenation, replication, arithmetic, comparisons, and ternary expressions
 - `always_comb`
@@ -190,7 +191,7 @@ Current status:
 
 - the first slice of elaboration is now present as source-registration checks plus a compile-time validation pass over lowered HIR
 - duplicate module definitions, duplicate declarations, duplicate instance names, identifier/memory resolution, lowered select bounds, unsupported `inout` / `ref` ports, input-port drive attempts, the most obvious invalid named-port bindings including missing child input connections, malformed legacy `rom_*` wrappers, missing legacy ROM backing files, and lowered width checks for declarations plus zero-width or overwide literals/concatenations/replications/concatenated lvalues are now rejected before simulation
-- the first width-normalization slice is now landed for self-determined ternary expressions through a shared lowered-expression width helper, but assignment and port coercions inside the supported `1..=64` bit subset are still future work
+- the first runtime width-normalization slices are now landed for self-determined ternary expressions plus explicit assignment and instance-port coercions inside the supported `1..=64` bit subset
 
 ### 4. Compiled IR
 
@@ -368,6 +369,7 @@ Current progress:
 - `always_comb` convergence now uses each block's final assigned state, which fixes Overture-style blocks that seed an output before overriding it inside `case` or `if` logic
 - child instance outputs are now memoized within each `settle_module` convergence pass when their inputs are unchanged, which removes the worst repeated subtree work from deep hierarchical combinational designs
 - self-determined ternary expressions now preserve their fixed width at runtime via a shared lowered-expression width helper, which keeps concatenation and replication behavior aligned with validation
+- assignment and instance-port coercion now flow through an explicit shared runtime path, and child-instance cache keys now use the coerced child-visible input value rather than the raw parent expression bits
 - grouped ANSI port declarations and initialized net declarations from the vector corpus are now lowered
 - in-memory top-level compilation via `compile_str` is implemented, with dependency lookup anchored at the virtual path plus explicit search paths
 - compilation now rejects several design-shape errors before simulation, including duplicate module definitions, undeclared identifiers, duplicate declarations, duplicate instance names, unsupported `inout` / `ref` ports, input-port drive attempts, unknown named ports, duplicate named-port bindings, missing child input bindings, non-lvalue output bindings, malformed legacy `rom_*` wrappers, missing legacy ROM backing files, and overwide declarations or concatenation-style value shapes that exceed the current 64-bit runtime limit
@@ -406,8 +408,8 @@ Exit criterion:
 Current progress:
 - library and CLI batch entry points now exist for both compile-only `*.sv` discovery and JSON regression discovery, runs stay sorted by source path, and JSON suites can explicitly reuse a shared source file through a `source` field
 - legacy corpus compatibility for `rom_*` wrappers and `pgm_*` program harnesses now exists without reintroducing those naming conventions into the main library memory API, and malformed `rom_*` wrappers now fail at compile time instead of degrading into empty modules or late runtime errors
-- measured Overture status now includes `41/41` clean compile-only source files and `43/43` passing JSON suites, including the two explicit-source `overture_cpu` program variants; the full multi-directory corpus snapshot is `125/125` compile-only in about `1.0s` and `127/127` JSON regressions in about `17.1s`
-- remaining work is folding more in-range resolution checks into a single elaboration/validation layer, especially assignment and port coercions within the supported `1..=64` bit subset now that self-determined ternary width normalization is in place, and tightening unsupported-construct diagnostics where wider coverage finds gaps
+- measured Overture status now includes `41/41` clean compile-only source files and `43/43` passing JSON suites, including the two explicit-source `overture_cpu` program variants; the full multi-directory corpus snapshot is `126/126` compile-only in about `1.2s` and `128/128` JSON regressions in about `18.3s`
+- remaining work is folding more in-range resolution and connection-shape checks into a single elaboration/validation layer now that the first runtime coercion slice is explicit, and tightening unsupported-construct diagnostics where wider coverage finds gaps
 
 Exit criterion:
 - parity for `parts/overture/` tests
@@ -467,6 +469,6 @@ The first concrete implementation target should be:
 5. add explicit memory binding configuration
 6. broaden Rust CLI regression coverage across Overture and add scalable batch execution
 
-That library milestone, the compile-only and JSON corpus runners, the first compile-time semantic validation pass, the initial width-normalization slice for self-determined ternary expressions, and the current fixpoint engine are now in place. The next pragmatic target is to keep pulling in-range resolution checks into a single elaboration layer, with assignment and port coercions inside the supported `1..=64` bit subset now the clearest remaining width-normalization slice, then continue the runtime shift away from iterative hot paths toward a more explicit compiled evaluation model.
+That library milestone, the compile-only and JSON corpus runners, the first compile-time semantic validation pass, the initial runtime width-normalization slices for self-determined ternary expressions plus assignment/instance-port coercion, and the current fixpoint engine are now in place. The next pragmatic target is to keep pulling in-range resolution checks into a single elaboration layer, then continue the runtime shift away from iterative hot paths toward a more explicit compiled evaluation model.
 
 At that point the project has replaced the Python simulator for core use, even before image rendering exists.

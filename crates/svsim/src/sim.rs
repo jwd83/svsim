@@ -71,7 +71,7 @@ impl MemoryState {
             .words
             .get_mut(offset)
             .expect("memory offset is guaranteed to be in range");
-        let next = Value::new(value.normalized_bits(), current.width);
+        let next = value.coerced_to(current.width);
         let changed = *current != next;
         *current = next;
         Ok(changed)
@@ -335,6 +335,10 @@ impl Value {
             bits: bits & mask(width),
             width,
         }
+    }
+
+    fn coerced_to(self, width: usize) -> Self {
+        Self::new(self.normalized_bits(), width)
     }
 
     fn zero(width: usize) -> Self {
@@ -912,7 +916,9 @@ fn build_child_inputs(
         let Some(connection) = find_connection(instance, &port.name) else {
             continue;
         };
-        let value = eval_expr(&connection.expr, parent, parent_values, parent_memories)?;
+        // Cache keys should reflect the child-visible port value, not the raw parent expression.
+        let value = eval_expr(&connection.expr, parent, parent_values, parent_memories)?
+            .coerced_to(port.width());
         child_inputs.insert(port.name.clone(), value.normalized_bits());
     }
 
@@ -970,7 +976,8 @@ fn evaluate_instance(
         let value = child_values
             .get(&port.name)
             .copied()
-            .unwrap_or_else(|| Value::zero(port.width()));
+            .unwrap_or_else(|| Value::zero(port.width()))
+            .coerced_to(port.width());
         let target = resolve_lvalue(&lvalue, parent, values, memories)?;
         let mut no_memories = HashMap::new();
         changed |= apply_resolved_lvalue(&target, value, parent, values, &mut no_memories)?;
@@ -1012,7 +1019,8 @@ fn collect_outputs(
         let value = values
             .get(&port.name)
             .copied()
-            .unwrap_or_else(|| Value::zero(port.width()));
+            .unwrap_or_else(|| Value::zero(port.width()))
+            .coerced_to(port.width());
         outputs.insert(port.name.clone(), value.normalized_bits());
     }
 
@@ -1344,14 +1352,14 @@ fn apply_resolved_lvalue(
                     name, module.name
                 ))
             })?;
-            let next = Value::new(value.normalized_bits(), current.width);
+            let next = value.coerced_to(current.width);
             let changed = *current != next;
             *current = next;
             Ok(changed)
         }
         ResolvedLValue::Concat(items) => {
             let total_width = resolved_lvalue_width(lvalue, module)?;
-            let normalized = value.normalized_bits() & mask(total_width);
+            let normalized = value.coerced_to(total_width).normalized_bits();
             let mut remaining_width = total_width;
             let mut changed = false;
             for item in items {
@@ -1378,7 +1386,7 @@ fn apply_resolved_lvalue(
                     index, signal
                 )));
             }
-            let bit = value.normalized_bits() & 1;
+            let bit = value.coerced_to(1).normalized_bits();
             let mut bits = current.normalized_bits();
             bits &= !(1u64 << index);
             bits |= bit << index;
@@ -1406,7 +1414,7 @@ fn apply_resolved_lvalue(
             let select_mask = mask(width) << low;
             let mut bits = current.normalized_bits();
             bits &= !select_mask;
-            bits |= (value.normalized_bits() & mask(width)) << low;
+            bits |= value.coerced_to(width).normalized_bits() << low;
             let next = Value::new(bits, current.width);
             let changed = *current != next;
             *current = next;
@@ -1599,6 +1607,77 @@ mod tests {
             .eval_once(BTreeMap::from([("sel".into(), 1)]))
             .expect("eval true branch");
         assert_eq!(outputs.get("out"), Some(&0b1010));
+    }
+
+    #[test]
+    fn eval_once_coerces_assignment_and_instance_port_widths() {
+        let design = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module pass4(",
+                    "input logic [3:0] in, ",
+                    "output logic [3:0] out",
+                    "); ",
+                    "assign out = in; ",
+                    "endmodule\n",
+                    "module pass2(",
+                    "input logic [1:0] in, ",
+                    "output logic [1:0] out",
+                    "); ",
+                    "assign out = in; ",
+                    "endmodule\n",
+                    "module bit_driver(",
+                    "output logic out",
+                    "); ",
+                    "assign out = 1'b1; ",
+                    "endmodule\n",
+                    "module bus_driver(",
+                    "output logic [4:0] out",
+                    "); ",
+                    "assign out = 5'b10101; ",
+                    "endmodule\n",
+                    "module top(",
+                    "input logic a, ",
+                    "input logic [7:0] wide_in, ",
+                    "output logic [3:0] assign_widened, ",
+                    "output logic [1:0] assign_narrowed, ",
+                    "output logic [3:0] child_input_widened, ",
+                    "output logic [1:0] child_input_narrowed, ",
+                    "output logic [5:0] child_output_widened, ",
+                    "output logic [2:0] child_output_narrowed",
+                    "); ",
+                    "assign assign_widened = a; ",
+                    "assign assign_narrowed = wide_in; ",
+                    "pass4 widen_input(.in(a), .out(child_input_widened)); ",
+                    "pass2 narrow_input(.in(wide_in), .out(child_input_narrowed)); ",
+                    "bit_driver widen_output(.out(child_output_widened)); ",
+                    "bus_driver narrow_output(.out(child_output_narrowed)); ",
+                    "endmodule\n"
+                ),
+            )
+            .expect("compile virtual design");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let outputs = sim
+            .eval_once(BTreeMap::from([("a".into(), 1), ("wide_in".into(), 0xab)]))
+            .expect("eval coercion case");
+        assert_eq!(outputs.get("assign_widened"), Some(&0b0001));
+        assert_eq!(outputs.get("assign_narrowed"), Some(&0b11));
+        assert_eq!(outputs.get("child_input_widened"), Some(&0b0001));
+        assert_eq!(outputs.get("child_input_narrowed"), Some(&0b11));
+        assert_eq!(outputs.get("child_output_widened"), Some(&0b000001));
+        assert_eq!(outputs.get("child_output_narrowed"), Some(&0b101));
+
+        let outputs = sim
+            .eval_once(BTreeMap::from([("a".into(), 0), ("wide_in".into(), 0x04)]))
+            .expect("eval truncated-away bits case");
+        assert_eq!(outputs.get("assign_widened"), Some(&0));
+        assert_eq!(outputs.get("assign_narrowed"), Some(&0));
+        assert_eq!(outputs.get("child_input_widened"), Some(&0));
+        assert_eq!(outputs.get("child_input_narrowed"), Some(&0));
+        assert_eq!(outputs.get("child_output_widened"), Some(&0b000001));
+        assert_eq!(outputs.get("child_output_narrowed"), Some(&0b101));
     }
 
     #[test]

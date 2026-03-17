@@ -1,0 +1,38 @@
+[
+    {
+        "a": 0,
+        "wide_in": 0,
+        "expect": {
+            "assign_widened": 0,
+            "assign_narrowed": 0,
+            "child_input_widened": 0,
+            "child_input_narrowed": 0,
+            "child_output_widened": 1,
+            "child_output_narrowed": 5
+        }
+    },
+    {
+        "a": 1,
+        "wide_in": 171,
+        "expect": {
+            "assign_widened": 1,
+            "assign_narrowed": 3,
+            "child_input_widened": 1,
+            "child_input_narrowed": 3,
+            "child_output_widened": 1,
+            "child_output_narrowed": 5
+        }
+    },
+    {
+        "a": 1,
+        "wide_in": 4,
+        "expect": {
+            "assign_widened": 1,
+            "assign_narrowed": 0,
+            "child_input_widened": 1,
+            "child_input_narrowed": 0,
+            "child_output_widened": 1,
+            "child_output_narrowed": 5
+        }
+    }
+]
