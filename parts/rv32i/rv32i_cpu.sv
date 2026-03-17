@@ -17,8 +17,8 @@ module rv32i_cpu (
 
     // Minimal RV32I demo core:
     // - Byte-addressed 32-bit PC
-    // - Word-aligned LW/SW into an internal RAM
-    // - Real RV32I encodings for ADDI/SLLI/SRLI/SRAI/ADD/SUB/SLL/SRL/SRA/AND/OR/XOR/LUI/LW/SW/BEQ/BNE/JAL
+    // - 32-bit internal RAM with byte and halfword lane selection inside each word
+    // - Real RV32I encodings for arithmetic, logical, compare, branch, jump, and simple load/store ops
     // - Treats `jal x0, 0` as a demo halt instruction
 
     reg [31:0] regs [31:0];
@@ -29,6 +29,7 @@ module rv32i_cpu (
     reg        store_en;
     reg [31:0] next_pc;
     reg [31:0] rd_write_value;
+    reg [31:0] store_write_value;
 
     wire [31:0] instr;
     assign instr = imem[pc[7:2]];
@@ -57,9 +58,13 @@ module rv32i_cpu (
     wire is_store  = opcode == 7'b0100011;
     wire is_branch = opcode == 7'b1100011;
     wire is_lui    = opcode == 7'b0110111;
+    wire is_auipc  = opcode == 7'b0010111;
     wire is_jal    = opcode == 7'b1101111;
+    wire is_jalr   = opcode == 7'b1100111;
 
     wire is_addi = is_op_imm & (funct3 == 3'b000);
+    wire is_slti = is_op_imm & (funct3 == 3'b010);
+    wire is_sltiu = is_op_imm & (funct3 == 3'b011);
     wire is_slli = is_op_imm & (funct3 == 3'b001) & (funct7 == 7'b0000000);
     wire is_xori = is_op_imm & (funct3 == 3'b100);
     wire is_srli = is_op_imm & (funct3 == 3'b101) & (funct7 == 7'b0000000);
@@ -69,6 +74,8 @@ module rv32i_cpu (
 
     wire is_add = is_op & (funct3 == 3'b000) & (funct7 == 7'b0000000);
     wire is_sll = is_op & (funct3 == 3'b001) & (funct7 == 7'b0000000);
+    wire is_slt = is_op & (funct3 == 3'b010) & (funct7 == 7'b0000000);
+    wire is_sltu = is_op & (funct3 == 3'b011) & (funct7 == 7'b0000000);
     wire is_sub = is_op & (funct3 == 3'b000) & (funct7 == 7'b0100000);
     wire is_xor = is_op & (funct3 == 3'b100) & (funct7 == 7'b0000000);
     wire is_srl = is_op & (funct3 == 3'b101) & (funct7 == 7'b0000000);
@@ -76,19 +83,69 @@ module rv32i_cpu (
     wire is_or  = is_op & (funct3 == 3'b110) & (funct7 == 7'b0000000);
     wire is_and = is_op & (funct3 == 3'b111) & (funct7 == 7'b0000000);
 
+    wire is_lb  = is_load & (funct3 == 3'b000);
+    wire is_lh  = is_load & (funct3 == 3'b001);
     wire is_lw  = is_load & (funct3 == 3'b010);
+    wire is_lbu = is_load & (funct3 == 3'b100);
+    wire is_lhu = is_load & (funct3 == 3'b101);
+    wire is_sb  = is_store & (funct3 == 3'b000);
+    wire is_sh  = is_store & (funct3 == 3'b001);
     wire is_sw  = is_store & (funct3 == 3'b010);
     wire is_beq = is_branch & (funct3 == 3'b000);
     wire is_bne = is_branch & (funct3 == 3'b001);
+    wire is_blt = is_branch & (funct3 == 3'b100);
+    wire is_bge = is_branch & (funct3 == 3'b101);
+    wire is_bltu = is_branch & (funct3 == 3'b110);
+    wire is_bgeu = is_branch & (funct3 == 3'b111);
 
-    wire [31:0] data_addr = rs1_value + (is_sw ? imm_s : imm_i);
+    wire [31:0] data_addr = rs1_value + (is_store ? imm_s : imm_i);
     wire [5:0] data_word_index = data_addr[7:2];
+    wire [1:0] data_byte_offset = data_addr[1:0];
     wire [31:0] load_word = dmem[data_word_index];
+    wire [31:0] store_word = dmem[data_word_index];
+    wire [7:0] load_byte =
+        (data_byte_offset == 2'b00) ? load_word[7:0] :
+        (data_byte_offset == 2'b01) ? load_word[15:8] :
+        (data_byte_offset == 2'b10) ? load_word[23:16] :
+                                      load_word[31:24];
+    wire [15:0] load_half = data_byte_offset[1] ? load_word[31:16] : load_word[15:0];
+    wire [31:0] load_lb_value = {{24{load_byte[7]}}, load_byte};
+    wire [31:0] load_lh_value = {{16{load_half[15]}}, load_half};
+    wire [31:0] load_lbu_value = {24'b0, load_byte};
+    wire [31:0] load_lhu_value = {16'b0, load_half};
+    wire [31:0] load_value =
+        is_lb ? load_lb_value :
+        is_lh ? load_lh_value :
+        is_lw ? load_word :
+        is_lbu ? load_lbu_value :
+        is_lhu ? load_lhu_value :
+        32'b0;
+    wire [31:0] store_byte_word =
+        (data_byte_offset == 2'b00) ? {store_word[31:8], rs2_value[7:0]} :
+        (data_byte_offset == 2'b01) ? {store_word[31:16], rs2_value[7:0], store_word[7:0]} :
+        (data_byte_offset == 2'b10) ? {store_word[31:24], rs2_value[7:0], store_word[15:0]} :
+                                      {rs2_value[7:0], store_word[23:0]};
+    wire [31:0] store_half_word =
+        data_byte_offset[1] ? {rs2_value[15:0], store_word[15:0]} :
+                              {store_word[31:16], rs2_value[15:0]};
     wire [31:0] srai_fill = rs1_value[31] ? ~(32'hffffffff >> shamt_i) : 32'b0;
     wire [31:0] sra_fill = rs1_value[31] ? ~(32'hffffffff >> shamt_r) : 32'b0;
+    wire [31:0] jalr_target = (rs1_value + imm_i) & 32'hfffffffe;
+    wire [31:0] rs_sub = rs1_value - rs2_value;
+    wire [31:0] imm_sub = rs1_value - imm_i;
 
     wire rs_equal = rs1_value == rs2_value;
-    wire branch_taken = (is_beq & rs_equal) | (is_bne & (rs_equal == 1'b0));
+    wire rs_signed_lt = (rs1_value[31] == rs2_value[31]) ? rs_sub[31] : rs1_value[31];
+    wire rs_unsigned_lt = rs1_value < rs2_value;
+    wire imm_signed_lt = (rs1_value[31] == imm_i[31]) ? imm_sub[31] : rs1_value[31];
+    wire imm_unsigned_lt = rs1_value < imm_i;
+    wire branch_taken =
+        (is_beq & rs_equal) |
+        (is_bne & (rs_equal == 1'b0)) |
+        (is_blt & rs_signed_lt) |
+        (is_bge & (rs_signed_lt == 1'b0)) |
+        (is_bltu & rs_unsigned_lt) |
+        (is_bgeu & (rs_unsigned_lt == 1'b0));
     wire is_halt = instr == 32'h0000006f;
 
     always_comb begin
@@ -96,6 +153,7 @@ module rv32i_cpu (
         store_en = 1'b0;
         next_pc = pc + 32'd4;
         rd_write_value = 32'b0;
+        store_write_value = 32'b0;
 
         if (is_halt) begin
             next_pc = pc;
@@ -105,12 +163,25 @@ module rv32i_cpu (
             reg_write_en = 1'b1;
             rd_write_value = pc + 32'd4;
             next_pc = pc + imm_j;
+        end else if (is_jalr) begin
+            reg_write_en = 1'b1;
+            rd_write_value = pc + 32'd4;
+            next_pc = jalr_target;
         end else if (is_lui) begin
             reg_write_en = 1'b1;
             rd_write_value = imm_u;
+        end else if (is_auipc) begin
+            reg_write_en = 1'b1;
+            rd_write_value = pc + imm_u;
         end else if (is_addi) begin
             reg_write_en = 1'b1;
             rd_write_value = rs1_value + imm_i;
+        end else if (is_slti) begin
+            reg_write_en = 1'b1;
+            rd_write_value = {31'b0, imm_signed_lt};
+        end else if (is_sltiu) begin
+            reg_write_en = 1'b1;
+            rd_write_value = {31'b0, imm_unsigned_lt};
         end else if (is_slli) begin
             reg_write_en = 1'b1;
             rd_write_value = rs1_value << shamt_i;
@@ -135,6 +206,12 @@ module rv32i_cpu (
         end else if (is_sll) begin
             reg_write_en = 1'b1;
             rd_write_value = rs1_value << shamt_r;
+        end else if (is_slt) begin
+            reg_write_en = 1'b1;
+            rd_write_value = {31'b0, rs_signed_lt};
+        end else if (is_sltu) begin
+            reg_write_en = 1'b1;
+            rd_write_value = {31'b0, rs_unsigned_lt};
         end else if (is_sub) begin
             reg_write_en = 1'b1;
             rd_write_value = rs1_value - rs2_value;
@@ -153,11 +230,18 @@ module rv32i_cpu (
         end else if (is_and) begin
             reg_write_en = 1'b1;
             rd_write_value = rs1_value & rs2_value;
-        end else if (is_lw) begin
+        end else if (is_lb | is_lh | is_lw | is_lbu | is_lhu) begin
             reg_write_en = 1'b1;
-            rd_write_value = load_word;
+            rd_write_value = load_value;
+        end else if (is_sb) begin
+            store_en = 1'b1;
+            store_write_value = store_byte_word;
+        end else if (is_sh) begin
+            store_en = 1'b1;
+            store_write_value = store_half_word;
         end else if (is_sw) begin
             store_en = 1'b1;
+            store_write_value = rs2_value;
         end
     end
 
@@ -179,7 +263,7 @@ module rv32i_cpu (
                     regs[rd_idx] <= rd_write_value;
 
                 if (store_en)
-                    dmem[data_word_index] <= rs2_value;
+                    dmem[data_word_index] <= store_write_value;
             end
 
             regs[0] <= 32'b0;

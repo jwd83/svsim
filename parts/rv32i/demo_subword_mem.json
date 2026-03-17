@@ -1,0 +1,78 @@
+{
+  "source": "rv32i_cpu.sv",
+  "sequential": true,
+  "memory_files": {
+    "rom": {
+      "module": "rv32i_cpu",
+      "memory": "imem",
+      "file": "demo_subword_mem.txt"
+    }
+  },
+  "test_cases": [
+    {
+      "name": "Subword loads and stores select the correct byte and halfword lanes",
+      "sequence": [
+        {
+          "inputs": {"clk": 1, "reset": 1, "run": 0},
+          "expected": {"pc": 0, "halted": 0, "x1_out": 0, "x2_out": 0, "x3_out": 0, "x4_out": 0, "x5_out": 0, "mem0_out": 0}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 4}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 8, "x1_out": 2164208452}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 12, "mem0_out": 2164208452}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 16, "x2_out": 4294967168}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 20, "x3_out": 128}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 24, "x4_out": 4294934783}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 28, "x5_out": 33023}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 32, "x2_out": 170}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 36, "mem0_out": 2164238916}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 40, "x3_out": 1656}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 44, "mem0_out": 108571204}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 48, "x4_out": 170}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 52, "x5_out": 1656}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 52, "halted": 1, "x4_out": 170, "x5_out": 1656, "mem0_out": 108571204}
+        }
+      ]
+    }
+  ]
+}

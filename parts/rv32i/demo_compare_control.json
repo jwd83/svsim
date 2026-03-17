@@ -1,0 +1,98 @@
+{
+  "source": "rv32i_cpu.sv",
+  "sequential": true,
+  "memory_files": {
+    "rom": {
+      "module": "rv32i_cpu",
+      "memory": "imem",
+      "file": "demo_compare_control.txt"
+    }
+  },
+  "test_cases": [
+    {
+      "name": "AUIPC, JALR, compare ops, and signed or unsigned branches execute correctly",
+      "sequence": [
+        {
+          "inputs": {"clk": 1, "reset": 1, "run": 0},
+          "expected": {"pc": 0, "halted": 0, "x1_out": 0, "x2_out": 0, "x3_out": 0, "x4_out": 0, "x5_out": 0, "mem2_out": 0}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 4, "x1_out": 0}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 8, "x1_out": 16}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 24, "x2_out": 0, "x3_out": 0, "x4_out": 0, "x5_out": 12}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 28, "x2_out": 4294967292}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 32, "x3_out": 3}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 36, "x4_out": 1}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 40, "x1_out": 0}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 44, "x4_out": 1}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 48, "x1_out": 1}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 56}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 60}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 64, "x1_out": 2}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 72}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 80}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 84}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 88, "x4_out": 2}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 96}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 100, "mem2_out": 12}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 100, "halted": 1, "x1_out": 2, "x2_out": 4294967292, "x3_out": 3, "x4_out": 2, "x5_out": 12, "mem2_out": 12}
+        }
+      ]
+    }
+  ]
+}

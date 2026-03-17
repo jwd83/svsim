@@ -53,7 +53,14 @@ pub(crate) fn expr_width(expr: &Expr, module: &ModuleSummary) -> Result<usize> {
             let left_width = expr_width(left, module)?;
             let right_width = expr_width(right, module)?;
             Ok(match op {
-                BinaryOp::LogicalAnd | BinaryOp::LogicalOr | BinaryOp::Eq | BinaryOp::NotEq => 1,
+                BinaryOp::LogicalAnd
+                | BinaryOp::LogicalOr
+                | BinaryOp::Eq
+                | BinaryOp::NotEq
+                | BinaryOp::Lt
+                | BinaryOp::LtEq
+                | BinaryOp::Gt
+                | BinaryOp::GtEq => 1,
                 BinaryOp::ShiftLeft | BinaryOp::ShiftRight => left_width,
                 BinaryOp::BitAnd
                 | BinaryOp::BitOr

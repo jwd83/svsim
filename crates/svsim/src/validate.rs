@@ -381,9 +381,14 @@ fn validate_expr(expr: &Expr, module: &ModuleSummary) -> Result<usize> {
             let right_width = validate_expr(right, module)?;
             ensure_runtime_width(
                 match op {
-                    BinaryOp::LogicalAnd | BinaryOp::LogicalOr | BinaryOp::Eq | BinaryOp::NotEq => {
-                        1
-                    }
+                    BinaryOp::LogicalAnd
+                    | BinaryOp::LogicalOr
+                    | BinaryOp::Eq
+                    | BinaryOp::NotEq
+                    | BinaryOp::Lt
+                    | BinaryOp::LtEq
+                    | BinaryOp::Gt
+                    | BinaryOp::GtEq => 1,
                     BinaryOp::ShiftLeft | BinaryOp::ShiftRight => left_width,
                     BinaryOp::BitAnd
                     | BinaryOp::BitOr
@@ -627,6 +632,16 @@ fn const_eval_expr(expr: &Expr) -> Option<ConstValue> {
                 ),
                 BinaryOp::NotEq => (
                     (left.normalized_bits() != right.normalized_bits()) as u64,
+                    1,
+                ),
+                BinaryOp::Lt => ((left.normalized_bits() < right.normalized_bits()) as u64, 1),
+                BinaryOp::LtEq => (
+                    (left.normalized_bits() <= right.normalized_bits()) as u64,
+                    1,
+                ),
+                BinaryOp::Gt => ((left.normalized_bits() > right.normalized_bits()) as u64, 1),
+                BinaryOp::GtEq => (
+                    (left.normalized_bits() >= right.normalized_bits()) as u64,
                     1,
                 ),
                 BinaryOp::Add => (

@@ -712,6 +712,17 @@ mod tests {
     }
 
     #[test]
+    fn run_json_test_dir_passes_rv32i_corpus() {
+        let repo = repo_root();
+        let report = Compiler::new()
+            .run_json_test_dir(repo.join("parts/rv32i"))
+            .expect("run rv32i json tests");
+
+        assert!(report.all_passed());
+        assert_eq!(report.passed, report.total);
+    }
+
+    #[test]
     fn run_json_file_reports_output_mismatch() {
         let temp_dir = unique_temp_dir("json-test-mismatch");
         let design = Compiler::new()

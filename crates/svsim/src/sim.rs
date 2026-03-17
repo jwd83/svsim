@@ -1150,6 +1150,16 @@ fn eval_expr(
                 BinaryOp::LogicalOr => ((left.truthy() || right.truthy()) as u64, 1),
                 BinaryOp::Eq => (values_equal(left, right) as u64, 1),
                 BinaryOp::NotEq => ((!values_equal(left, right)) as u64, 1),
+                BinaryOp::Lt => ((left.normalized_bits() < right.normalized_bits()) as u64, 1),
+                BinaryOp::LtEq => (
+                    (left.normalized_bits() <= right.normalized_bits()) as u64,
+                    1,
+                ),
+                BinaryOp::Gt => ((left.normalized_bits() > right.normalized_bits()) as u64, 1),
+                BinaryOp::GtEq => (
+                    (left.normalized_bits() >= right.normalized_bits()) as u64,
+                    1,
+                ),
                 BinaryOp::Add => (
                     left.normalized_bits().wrapping_add(right.normalized_bits()),
                     left.width.max(right.width),
@@ -1866,6 +1876,48 @@ endmodule
             .expect("eval");
 
         assert_eq!(outputs.get("out"), Some(&1));
+    }
+
+    #[test]
+    fn eval_once_runs_always_comb_with_relational_operators() {
+        let temp_dir = unique_temp_dir("always-comb-relational");
+        let source = r#"
+module relational_ops (
+    input  logic [7:0] a,
+    input  logic [7:0] b,
+    output logic lt,
+    output logic le,
+    output logic gt,
+    output logic ge
+);
+    assign lt = a < b;
+    assign le = a <= b;
+    assign gt = a > b;
+    assign ge = a >= b;
+endmodule
+"#;
+        fs::write(temp_dir.join("relational_ops.sv"), source).expect("write relational_ops");
+
+        let design = Compiler::new()
+            .compile_file(temp_dir.join("relational_ops.sv"))
+            .expect("compile relational_ops");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let outputs = sim
+            .eval_once(BTreeMap::from([("a".into(), 3), ("b".into(), 5)]))
+            .expect("eval lt");
+        assert_eq!(outputs.get("lt"), Some(&1));
+        assert_eq!(outputs.get("le"), Some(&1));
+        assert_eq!(outputs.get("gt"), Some(&0));
+        assert_eq!(outputs.get("ge"), Some(&0));
+
+        let outputs = sim
+            .eval_once(BTreeMap::from([("a".into(), 5), ("b".into(), 5)]))
+            .expect("eval eq");
+        assert_eq!(outputs.get("lt"), Some(&0));
+        assert_eq!(outputs.get("le"), Some(&1));
+        assert_eq!(outputs.get("gt"), Some(&0));
+        assert_eq!(outputs.get("ge"), Some(&1));
     }
 
     #[test]

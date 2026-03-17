@@ -111,6 +111,10 @@ pub enum BinaryOp {
     LogicalOr,
     Eq,
     NotEq,
+    Lt,
+    LtEq,
+    Gt,
+    GtEq,
     Add,
     Sub,
 }
