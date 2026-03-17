@@ -1,0 +1,78 @@
+{
+  "source": "rv32i_cpu.sv",
+  "sequential": true,
+  "memory_files": {
+    "rom": {
+      "module": "rv32i_cpu",
+      "memory": "imem",
+      "file": "demo_shift_ops.txt"
+    }
+  },
+  "test_cases": [
+    {
+      "name": "Shift instructions update registers and memory with RV32I shamt semantics",
+      "sequence": [
+        {
+          "inputs": {"clk": 1, "reset": 1, "run": 0},
+          "expected": {"pc": 0, "halted": 0, "x1_out": 0, "x2_out": 0, "x3_out": 0, "x4_out": 0, "x5_out": 0, "mem0_out": 0, "mem1_out": 0, "mem2_out": 0}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 4, "x1_out": 3}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 8, "x2_out": 48}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 12, "x3_out": 33}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 16, "x4_out": 6}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 20, "x2_out": 24}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 24, "x4_out": 12}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 28, "x5_out": 4294967280}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 32, "x3_out": 4294967292}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 36, "x1_out": 35}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 40, "x5_out": 4294967294}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 44, "mem0_out": 24}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 48, "mem1_out": 12}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 52, "mem2_out": 4294967292}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 52, "halted": 1, "x1_out": 35, "x2_out": 24, "x3_out": 4294967292, "x4_out": 12, "x5_out": 4294967294}
+        }
+      ]
+    }
+  ]
+}

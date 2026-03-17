@@ -384,6 +384,7 @@ fn validate_expr(expr: &Expr, module: &ModuleSummary) -> Result<usize> {
                     BinaryOp::LogicalAnd | BinaryOp::LogicalOr | BinaryOp::Eq | BinaryOp::NotEq => {
                         1
                     }
+                    BinaryOp::ShiftLeft | BinaryOp::ShiftRight => left_width,
                     BinaryOp::BitAnd
                     | BinaryOp::BitOr
                     | BinaryOp::BitXor
@@ -610,6 +611,14 @@ fn const_eval_expr(expr: &Expr) -> Option<ConstValue> {
                     left.normalized_bits() ^ right.normalized_bits(),
                     left.width.max(right.width),
                 ),
+                BinaryOp::ShiftLeft => (
+                    shift_left_bits(left.normalized_bits(), right.normalized_bits(), left.width),
+                    left.width,
+                ),
+                BinaryOp::ShiftRight => (
+                    shift_right_bits(left.normalized_bits(), right.normalized_bits(), left.width),
+                    left.width,
+                ),
                 BinaryOp::LogicalAnd => ((left.truthy() && right.truthy()) as u64, 1),
                 BinaryOp::LogicalOr => ((left.truthy() || right.truthy()) as u64, 1),
                 BinaryOp::Eq => (
@@ -669,6 +678,34 @@ fn concat_const_values(parts: &[ConstValue]) -> Option<ConstValue> {
     }
 
     Some(ConstValue::new(bits, total_width))
+}
+
+fn shift_left_bits(bits: u64, amount_bits: u64, width: usize) -> u64 {
+    shift_bits(bits, amount_bits, width, ShiftDirection::Left)
+}
+
+fn shift_right_bits(bits: u64, amount_bits: u64, width: usize) -> u64 {
+    shift_bits(bits, amount_bits, width, ShiftDirection::Right)
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ShiftDirection {
+    Left,
+    Right,
+}
+
+fn shift_bits(bits: u64, amount_bits: u64, width: usize, direction: ShiftDirection) -> u64 {
+    let normalized = bits & mask(width);
+    let Ok(amount) = u32::try_from(amount_bits) else {
+        return 0;
+    };
+    if amount as usize >= width {
+        return 0;
+    }
+    match direction {
+        ShiftDirection::Left => normalized.checked_shl(amount).unwrap_or(0) & mask(width),
+        ShiftDirection::Right => normalized.checked_shr(amount).unwrap_or(0),
+    }
 }
 
 fn mask(width: usize) -> u64 {

@@ -18,7 +18,7 @@ module rv32i_cpu (
     // Minimal RV32I demo core:
     // - Byte-addressed 32-bit PC
     // - Word-aligned LW/SW into an internal RAM
-    // - Real RV32I encodings for ADDI/ADD/SUB/AND/OR/XOR/LUI/LW/SW/BEQ/BNE/JAL
+    // - Real RV32I encodings for ADDI/SLLI/SRLI/SRAI/ADD/SUB/SLL/SRL/SRA/AND/OR/XOR/LUI/LW/SW/BEQ/BNE/JAL
     // - Treats `jal x0, 0` as a demo halt instruction
 
     reg [31:0] regs [31:0];
@@ -42,6 +42,8 @@ module rv32i_cpu (
 
     wire [31:0] rs1_value = regs[rs1_idx];
     wire [31:0] rs2_value = regs[rs2_idx];
+    wire [4:0] shamt_i = instr[24:20];
+    wire [4:0] shamt_r = rs2_value[4:0];
 
     wire [31:0] imm_i = {{20{instr[31]}}, instr[31:20]};
     wire [31:0] imm_s = {{20{instr[31]}}, instr[31:25], instr[11:7]};
@@ -58,13 +60,19 @@ module rv32i_cpu (
     wire is_jal    = opcode == 7'b1101111;
 
     wire is_addi = is_op_imm & (funct3 == 3'b000);
+    wire is_slli = is_op_imm & (funct3 == 3'b001) & (funct7 == 7'b0000000);
     wire is_xori = is_op_imm & (funct3 == 3'b100);
+    wire is_srli = is_op_imm & (funct3 == 3'b101) & (funct7 == 7'b0000000);
+    wire is_srai = is_op_imm & (funct3 == 3'b101) & (funct7 == 7'b0100000);
     wire is_ori  = is_op_imm & (funct3 == 3'b110);
     wire is_andi = is_op_imm & (funct3 == 3'b111);
 
     wire is_add = is_op & (funct3 == 3'b000) & (funct7 == 7'b0000000);
+    wire is_sll = is_op & (funct3 == 3'b001) & (funct7 == 7'b0000000);
     wire is_sub = is_op & (funct3 == 3'b000) & (funct7 == 7'b0100000);
     wire is_xor = is_op & (funct3 == 3'b100) & (funct7 == 7'b0000000);
+    wire is_srl = is_op & (funct3 == 3'b101) & (funct7 == 7'b0000000);
+    wire is_sra = is_op & (funct3 == 3'b101) & (funct7 == 7'b0100000);
     wire is_or  = is_op & (funct3 == 3'b110) & (funct7 == 7'b0000000);
     wire is_and = is_op & (funct3 == 3'b111) & (funct7 == 7'b0000000);
 
@@ -76,6 +84,8 @@ module rv32i_cpu (
     wire [31:0] data_addr = rs1_value + (is_sw ? imm_s : imm_i);
     wire [5:0] data_word_index = data_addr[7:2];
     wire [31:0] load_word = dmem[data_word_index];
+    wire [31:0] srai_fill = rs1_value[31] ? ~(32'hffffffff >> shamt_i) : 32'b0;
+    wire [31:0] sra_fill = rs1_value[31] ? ~(32'hffffffff >> shamt_r) : 32'b0;
 
     wire rs_equal = rs1_value == rs2_value;
     wire branch_taken = (is_beq & rs_equal) | (is_bne & (rs_equal == 1'b0));
@@ -101,9 +111,18 @@ module rv32i_cpu (
         end else if (is_addi) begin
             reg_write_en = 1'b1;
             rd_write_value = rs1_value + imm_i;
+        end else if (is_slli) begin
+            reg_write_en = 1'b1;
+            rd_write_value = rs1_value << shamt_i;
         end else if (is_xori) begin
             reg_write_en = 1'b1;
             rd_write_value = rs1_value ^ imm_i;
+        end else if (is_srli) begin
+            reg_write_en = 1'b1;
+            rd_write_value = rs1_value >> shamt_i;
+        end else if (is_srai) begin
+            reg_write_en = 1'b1;
+            rd_write_value = (rs1_value >> shamt_i) | srai_fill;
         end else if (is_ori) begin
             reg_write_en = 1'b1;
             rd_write_value = rs1_value | imm_i;
@@ -113,12 +132,21 @@ module rv32i_cpu (
         end else if (is_add) begin
             reg_write_en = 1'b1;
             rd_write_value = rs1_value + rs2_value;
+        end else if (is_sll) begin
+            reg_write_en = 1'b1;
+            rd_write_value = rs1_value << shamt_r;
         end else if (is_sub) begin
             reg_write_en = 1'b1;
             rd_write_value = rs1_value - rs2_value;
         end else if (is_xor) begin
             reg_write_en = 1'b1;
             rd_write_value = rs1_value ^ rs2_value;
+        end else if (is_srl) begin
+            reg_write_en = 1'b1;
+            rd_write_value = rs1_value >> shamt_r;
+        end else if (is_sra) begin
+            reg_write_en = 1'b1;
+            rd_write_value = (rs1_value >> shamt_r) | sra_fill;
         end else if (is_or) begin
             reg_write_en = 1'b1;
             rd_write_value = rs1_value | rs2_value;

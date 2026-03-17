@@ -1138,6 +1138,14 @@ fn eval_expr(
                     left.normalized_bits() ^ right.normalized_bits(),
                     left.width.max(right.width),
                 ),
+                BinaryOp::ShiftLeft => (
+                    shift_left_bits(left.normalized_bits(), right.normalized_bits(), left.width),
+                    left.width,
+                ),
+                BinaryOp::ShiftRight => (
+                    shift_right_bits(left.normalized_bits(), right.normalized_bits(), left.width),
+                    left.width,
+                ),
                 BinaryOp::LogicalAnd => ((left.truthy() && right.truthy()) as u64, 1),
                 BinaryOp::LogicalOr => ((left.truthy() || right.truthy()) as u64, 1),
                 BinaryOp::Eq => (values_equal(left, right) as u64, 1),
@@ -1199,6 +1207,34 @@ fn concat_values(parts: &[Value]) -> Result<Value> {
 
 fn values_equal(left: Value, right: Value) -> bool {
     left.normalized_bits() == right.normalized_bits()
+}
+
+fn shift_left_bits(bits: u64, amount_bits: u64, width: usize) -> u64 {
+    shift_bits(bits, amount_bits, width, ShiftDirection::Left)
+}
+
+fn shift_right_bits(bits: u64, amount_bits: u64, width: usize) -> u64 {
+    shift_bits(bits, amount_bits, width, ShiftDirection::Right)
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ShiftDirection {
+    Left,
+    Right,
+}
+
+fn shift_bits(bits: u64, amount_bits: u64, width: usize, direction: ShiftDirection) -> u64 {
+    let normalized = bits & mask(width);
+    let Ok(amount) = u32::try_from(amount_bits) else {
+        return 0;
+    };
+    if amount as usize >= width {
+        return 0;
+    }
+    match direction {
+        ShiftDirection::Left => normalized.checked_shl(amount).unwrap_or(0) & mask(width),
+        ShiftDirection::Right => normalized.checked_shr(amount).unwrap_or(0),
+    }
 }
 
 fn expr_to_lvalue(expr: &Expr) -> Option<LValue> {
@@ -1678,6 +1714,43 @@ mod tests {
         assert_eq!(outputs.get("child_input_narrowed"), Some(&0));
         assert_eq!(outputs.get("child_output_widened"), Some(&0b000001));
         assert_eq!(outputs.get("child_output_narrowed"), Some(&0b101));
+    }
+
+    #[test]
+    fn eval_once_runs_shift_operators_with_left_operand_width() {
+        let design = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module top(",
+                    "input logic [7:0] in, ",
+                    "input logic [3:0] shamt, ",
+                    "output logic [7:0] left_shifted, ",
+                    "output logic [7:0] right_shifted, ",
+                    "output logic [7:0] right_past_width",
+                    "); ",
+                    "assign left_shifted = in << shamt; ",
+                    "assign right_shifted = in >> shamt; ",
+                    "assign right_past_width = in >> 4'd8; ",
+                    "endmodule\n"
+                ),
+            )
+            .expect("compile virtual design");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let outputs = sim
+            .eval_once(BTreeMap::from([("in".into(), 0x81), ("shamt".into(), 2)]))
+            .expect("eval truncating shift case");
+        assert_eq!(outputs.get("left_shifted"), Some(&0x04));
+        assert_eq!(outputs.get("right_shifted"), Some(&0x20));
+        assert_eq!(outputs.get("right_past_width"), Some(&0x00));
+
+        let outputs = sim
+            .eval_once(BTreeMap::from([("in".into(), 0x03), ("shamt".into(), 6)]))
+            .expect("eval large variable shift case");
+        assert_eq!(outputs.get("left_shifted"), Some(&0xc0));
+        assert_eq!(outputs.get("right_shifted"), Some(&0x00));
+        assert_eq!(outputs.get("right_past_width"), Some(&0x00));
     }
 
     #[test]

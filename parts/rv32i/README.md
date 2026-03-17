@@ -9,7 +9,7 @@ This directory adds a small RV32I-flavored corpus that fits the current executab
   - 32 × 32-bit register file
   - 64-word instruction memory (`imem`)
   - 64-word data memory (`dmem`)
-  - real RV32I encodings for `ADDI`, `ADD`, `SUB`, `AND`, `OR`, `XOR`, `LUI`, `LW`, `SW`, `BEQ`, `BNE`, and `JAL`
+  - real RV32I encodings for `ADDI`, `SLLI`, `SRLI`, `SRAI`, `ADD`, `SUB`, `SLL`, `SRL`, `SRA`, `AND`, `OR`, `XOR`, `LUI`, `LW`, `SW`, `BEQ`, `BNE`, and `JAL`
 
 ## Demo Convention
 
@@ -22,6 +22,7 @@ This directory adds a small RV32I-flavored corpus that fits the current executab
 - `demo_add_store.json`: arithmetic, store, load, halt
 - `demo_sum_loop.json`: counted loop using `bne`
 - `demo_branch_jal.json`: taken `beq` plus `jal` link-register behavior
+- `demo_shift_ops.json`: logical and arithmetic shifts, including register-form `shamt[4:0]` masking
 
 ## Run
 

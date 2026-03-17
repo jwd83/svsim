@@ -1126,6 +1126,31 @@ mod tests {
     }
 
     #[test]
+    fn compile_str_constant_shift_expression_can_drive_memory_index_validation() {
+        let error = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module top(output logic [7:0] y); ",
+                    "logic [7:0] rom [0:1]; ",
+                    "assign y = rom[2'b01 << 1]; ",
+                    "endmodule\n"
+                ),
+            )
+            .expect_err("shift-based constant memory reads should fail validation");
+
+        match error {
+            Error::Resolve(message) => {
+                assert!(
+                    message.contains("memory index [2] is out of range for 'rom' in 'top'"),
+                    "unexpected message: {message}"
+                );
+            }
+            other => panic!("unexpected error: {other}"),
+        }
+    }
+
+    #[test]
     fn compile_str_errors_on_duplicate_instance_name() {
         let error = Compiler::new()
             .compile_str(

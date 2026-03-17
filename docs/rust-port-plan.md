@@ -35,7 +35,7 @@ Current implementation status as of March 17, 2026:
 - runtime width handling now includes a shared lowered-expression width helper, fixed-width ternary evaluation, and an explicit coercion path for assignments and instance-port handoff, so self-determined `?:` results and in-range truncation/zero-extension no longer depend on scattered incidental `u64` shaping
 - `SimulationSession::step` now maintains per-instance state and can advance hierarchical designs using `always_ff @(posedge <clock>)` blocks with blocking immediate updates and nonblocking assignment staging
 - current procedural subset: blocking assignments in combinational blocks and `always_ff`, nonblocking assignments in `always_ff`, `if` / `else`, `case` / `default`, and `begin` / `end` statement blocks
-- current expression subset adds concatenation, replication, logical `&&` / `||`, equality `==` / `!=`, arithmetic `+` / `-`, and single-dimension memory reads on top of literals, identifiers, slices, ternary expressions, and bitwise operators
+- current expression subset adds concatenation, replication, logical `&&` / `||`, equality `==` / `!=`, arithmetic `+` / `-`, logical shifts `<<` / `>>`, and single-dimension memory reads on top of literals, identifiers, slices, ternary expressions, and bitwise operators
 - frontend lowering now accepts grouped ANSI port declarations such as `input [4:0] a, b, c` and lowers net declaration initializers like `wire [24:0] v = expr;` into signal declarations plus continuous assignments
 - `compile_str` can seed a design from an in-memory top module while still resolving instantiated dependencies from the virtual path's directory and configured search paths
 - current sequential limits: only `posedge` event controls are lowered, `always_ff` clock expressions must be local identifiers, and cross-block race semantics are not modeled beyond deterministic source order
@@ -44,6 +44,8 @@ Current implementation status as of March 17, 2026:
 - measured verification: `cargo test` passes; the compile-only multi-directory corpus reports `parts/basic` at `44/44`, `parts/testing` at `41/41`, `parts/overture` at `41/41`, and the full `parts/basic` + `parts/testing` + `parts/overture` compile surface at `126/126` in about `1.6s`; the JSON regression corpus remains green at `128/128` in about `18.6s`
 - measured batch status: the compile-only multi-directory runner completes `parts/basic` in about `0.8s`, `parts/testing` in about `0.1s`, and `parts/overture` in about `0.7s`; the JSON multi-directory runner completes them in about `8.1s`, `0.2s`, and `10.3s`
 - `parts/testing/020-WidthCoercion.sv` and `parts/testing/020-WidthCoercion.json` now pin widened and narrowed assignment/instance-port coercion behavior in the green corpus
+- `parts/testing/021-ShiftOps.sv` and `parts/testing/021-ShiftOps.json` now pin logical shift semantics, including left-operand result width and zeroing when the shift amount reaches the operand width
+- `parts/rv32i/demo_shift_ops.json` now exercises the RV32I demo core's `SLLI`, `SRLI`, `SRAI`, `SLL`, `SRL`, and `SRA` execution path, including register-form `shamt[4:0]` masking
 - `parts/testing/019-Vector5.json` now matches the standard SystemVerilog bit ordering for multi-expression replication (`{5{a, b, c, d, e}}`), retiring the old Python reference divergence from the checked-in corpus
 
 ## Compatibility Target
@@ -369,6 +371,7 @@ Current progress:
 - `always_comb` convergence now uses each block's final assigned state, which fixes Overture-style blocks that seed an output before overriding it inside `case` or `if` logic
 - child instance outputs are now memoized within each `settle_module` convergence pass when their inputs are unchanged, which removes the worst repeated subtree work from deep hierarchical combinational designs
 - self-determined ternary expressions now preserve their fixed width at runtime via a shared lowered-expression width helper, which keeps concatenation and replication behavior aligned with validation
+- logical shift operators `<<` / `>>` now lower, validate, constant-fold, and execute with the left operand's width, which unlocks a cleaner RV32I shift datapath in the demo corpus
 - assignment and instance-port coercion now flow through an explicit shared runtime path, and child-instance cache keys now use the coerced child-visible input value rather than the raw parent expression bits
 - grouped ANSI port declarations and initialized net declarations from the vector corpus are now lowered
 - in-memory top-level compilation via `compile_str` is implemented, with dependency lookup anchored at the virtual path plus explicit search paths

@@ -1689,6 +1689,8 @@ fn lower_binary_operator(
         "&" => Ok(BinaryOp::BitAnd),
         "|" => Ok(BinaryOp::BitOr),
         "^" => Ok(BinaryOp::BitXor),
+        "<<" => Ok(BinaryOp::ShiftLeft),
+        ">>" => Ok(BinaryOp::ShiftRight),
         "&&" => Ok(BinaryOp::LogicalAnd),
         "||" => Ok(BinaryOp::LogicalOr),
         "==" => Ok(BinaryOp::Eq),

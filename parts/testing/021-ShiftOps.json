@@ -1,0 +1,29 @@
+[
+    {
+        "in": 129,
+        "shamt": 2,
+        "expect": {
+            "left_shifted": 4,
+            "right_shifted": 32,
+            "right_past_width": 0
+        }
+    },
+    {
+        "in": 3,
+        "shamt": 6,
+        "expect": {
+            "left_shifted": 192,
+            "right_shifted": 0,
+            "right_past_width": 0
+        }
+    },
+    {
+        "in": 255,
+        "shamt": 0,
+        "expect": {
+            "left_shifted": 255,
+            "right_shifted": 255,
+            "right_past_width": 0
+        }
+    }
+]
