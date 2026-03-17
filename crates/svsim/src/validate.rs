@@ -558,12 +558,19 @@ fn minimum_width(bits: u64) -> usize {
 }
 
 fn ensure_runtime_width(width: usize, context: impl Into<String>) -> Result<usize> {
+    let context = context.into();
+
+    if width == 0 {
+        return Err(Error::Unsupported(format!(
+            "{} has width 0 outside the supported 1..={} bit runtime subset",
+            context, MAX_RUNTIME_WIDTH
+        )));
+    }
+
     if width > MAX_RUNTIME_WIDTH {
         return Err(Error::Unsupported(format!(
             "{} has width {} exceeding the current {}-bit runtime limit",
-            context.into(),
-            width,
-            MAX_RUNTIME_WIDTH
+            context, width, MAX_RUNTIME_WIDTH
         )));
     }
 

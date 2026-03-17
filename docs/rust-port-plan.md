@@ -18,13 +18,13 @@ These product decisions are fixed for the first Rust pass:
 
 ## Current Status
 
-Current implementation status as of March 16, 2026:
+Current implementation status as of March 17, 2026:
 
 - Cargo workspace created with `svsim`, `svsim-cli`, and `svsim-render`
 - `sv-parser` integrated for file-based parsing and in-memory source parsing via virtual paths
 - owned HIR covers source files, module summaries, continuous assignments, instantiations, `always_comb`, a first `always_ff @(posedge ...)` subset, concatenation/replication expressions, and concatenated assignment targets
 - library API now exposes `Compiler`, `CompiledDesign`, and `SimulationSession`, including `compile_file` and `compile_str`
-- compilation now rejects duplicate module definitions during source registration and includes a semantic validation pass over lowered HIR, catching duplicate declarations, duplicate instance names, undeclared identifiers/memories, lowered select bounds, unsupported `inout` / `ref` ports, invalid named-port instance bindings including missing child input bindings, attempts to drive input ports, malformed legacy `rom_*` wrappers, missing legacy ROM backing files, and declarations or value-shape constructs that exceed the current 64-bit runtime limit before simulation
+- compilation now rejects duplicate module definitions during source registration and includes a semantic validation pass over lowered HIR, catching duplicate declarations, duplicate instance names, undeclared identifiers/memories, lowered select bounds, unsupported `inout` / `ref` ports, invalid named-port instance bindings including missing child input bindings, attempts to drive input ports, malformed legacy `rom_*` wrappers, missing legacy ROM backing files, and declarations or lowered value-shape constructs that fall outside the current supported `1..=64` bit runtime subset before simulation
 - `CompiledDesign::hierarchy()` now exposes an owned top-down instance tree so embedding callers can discover valid instance paths before using per-instance memory APIs
 - compile-only corpus reporting is now available through `Compiler::run_compile_dir` / `Compiler::run_compile_dirs`, and compile-only runs fail cleanly when source compilation errors or unsupported-feature diagnostics are present
 - library-side JSON regression execution is now available through `CompiledDesign::run_json_file` / `svsim::JsonTestSuite` for combinational arrays, sequential `test_cases`, and relative memory-file preload
@@ -40,8 +40,8 @@ Current implementation status as of March 16, 2026:
 - current sequential limits: only `posedge` event controls are lowered, `always_ff` clock expressions must be local identifiers, and cross-block race semantics are not modeled beyond deterministic source order
 - current memory subset supports fixed-size unpacked `reg` / `logic` arrays with zero-initialized reads, explicit programmatic preload/read access by instance path, text-file ROM/RAM loading, procedural single-element writes, and JSON-driven regression preload; explicit elaboration, broader event controls, and render integration are still pending
 - regression compatibility now covers the legacy corpus conventions that still matter in `parts/`: compile-time validation now enforces the supported interface-only `rom_*` wrapper shape and backing text-file lookup, and `pgm_*` JSON suites auto-bind `overture_fetch.rom` from a sibling program text file when no explicit memory bindings are present
-- measured verification: `cargo test` passes; the compile-only multi-directory corpus reports `parts/basic` at `44/44`, `parts/testing` at `40/40`, `parts/overture` at `41/41`, and the full `parts/basic` + `parts/testing` + `parts/overture` compile surface at `125/125` in about `2.4s`; the JSON regression corpus remains green at `127/127` in about `19.1s`
-- measured batch status: the compile-only multi-directory runner completes `parts/basic` in about `1.1s`, `parts/testing` in about `0.2s`, and `parts/overture` in about `1.1s`; the JSON multi-directory runner completes them in about `8.8s`, `0.2s`, and `10.1s`
+- measured verification: `cargo test` passes; the compile-only multi-directory corpus reports `parts/basic` at `44/44`, `parts/testing` at `40/40`, `parts/overture` at `41/41`, and the full `parts/basic` + `parts/testing` + `parts/overture` compile surface at `125/125` in about `1.1s`; the JSON regression corpus remains green at `127/127` in about `17.2s`
+- measured batch status: the compile-only multi-directory runner completes `parts/basic` in about `0.4s`, `parts/testing` in about `0.1s`, and `parts/overture` in about `0.5s`; the JSON multi-directory runner completes them in about `6.6s`, `0.2s`, and `10.3s`
 - `parts/testing/019-Vector5.json` now matches the standard SystemVerilog bit ordering for multi-expression replication (`{5{a, b, c, d, e}}`), retiring the old Python reference divergence from the checked-in corpus
 
 ## Compatibility Target
@@ -188,8 +188,8 @@ Make resolution and memory binding explicit through the library API rather than 
 Current status:
 
 - the first slice of elaboration is now present as source-registration checks plus a compile-time validation pass over lowered HIR
-- duplicate module definitions, duplicate declarations, duplicate instance names, identifier/memory resolution, lowered select bounds, unsupported `inout` / `ref` ports, input-port drive attempts, the most obvious invalid named-port bindings including missing child input connections, malformed legacy `rom_*` wrappers, missing legacy ROM backing files, and the current 64-bit runtime width limit for declarations, literals, concatenations, replications, and concatenated lvalues are now rejected before simulation
-- width normalization inside the supported `1..=64` bit subset and moving the remaining in-range value-shape checks into a single elaboration stage are still future work
+- duplicate module definitions, duplicate declarations, duplicate instance names, identifier/memory resolution, lowered select bounds, unsupported `inout` / `ref` ports, input-port drive attempts, the most obvious invalid named-port bindings including missing child input connections, malformed legacy `rom_*` wrappers, missing legacy ROM backing files, and lowered width checks for declarations plus zero-width or overwide literals/concatenations/replications/concatenated lvalues are now rejected before simulation
+- width normalization for assignment and port coercions inside the supported `1..=64` bit subset, plus moving the remaining in-range value-shape checks into a single elaboration stage, are still future work
 
 ### 4. Compiled IR
 
@@ -234,6 +234,8 @@ Recommended value model:
 - fast path: inline `u64`
 - width mask stored with the value
 - optional wide fallback later if widths above 64 become necessary
+
+The current `64`-bit ceiling comes from this representation choice. Supporting wider designs requires widening `Value`, not merely increasing a validator constant.
 
 Avoid binding the whole engine to `u128` or arbitrary precision on day one. The current corpus does not need it, and it will slow the hot path.
 

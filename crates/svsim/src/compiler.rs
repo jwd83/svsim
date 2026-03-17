@@ -1180,6 +1180,54 @@ mod tests {
     }
 
     #[test]
+    fn compile_str_errors_on_zero_width_single_expression_replication() {
+        let error = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module top(input logic a, output logic y); ",
+                    "assign y = {0{a}}; ",
+                    "endmodule\n"
+                ),
+            )
+            .expect_err("zero-width replications should fail validation");
+
+        match error {
+            Error::Unsupported(message) => {
+                assert!(
+                    message.contains("replication expression has width 0"),
+                    "unexpected message: {message}"
+                );
+            }
+            other => panic!("unexpected error: {other}"),
+        }
+    }
+
+    #[test]
+    fn compile_str_errors_on_zero_width_multi_expression_replication() {
+        let error = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module top(input logic a, input logic b, output logic y); ",
+                    "assign y = {0{a, b}}; ",
+                    "endmodule\n"
+                ),
+            )
+            .expect_err("zero-width replications should fail validation");
+
+        match error {
+            Error::Unsupported(message) => {
+                assert!(
+                    message.contains("replication expression has width 0"),
+                    "unexpected message: {message}"
+                );
+            }
+            other => panic!("unexpected error: {other}"),
+        }
+    }
+
+    #[test]
     fn compile_str_errors_on_concatenation_expression_exceeding_runtime_limit() {
         let error = Compiler::new()
             .compile_str(
