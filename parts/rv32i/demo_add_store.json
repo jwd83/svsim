@@ -1,0 +1,50 @@
+{
+  "source": "rv32i_cpu.sv",
+  "sequential": true,
+  "memory_files": {
+    "rom": {
+      "module": "rv32i_cpu",
+      "memory": "imem",
+      "file": "demo_add_store.txt"
+    }
+  },
+  "test_cases": [
+    {
+      "name": "Add, store, load, halt",
+      "sequence": [
+        {
+          "inputs": {"clk": 1, "reset": 1, "run": 0},
+          "expected": {"pc": 0, "halted": 0, "x1_out": 0, "x2_out": 0, "x3_out": 0, "x4_out": 0, "mem0_out": 0}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 4, "instr_debug": 5243027, "x1_out": 5}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 8, "instr_debug": 7340307, "x2_out": 7}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 12, "instr_debug": 2130355, "x3_out": 12}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 16, "instr_debug": 3153955, "mem0_out": 12}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 20, "instr_debug": 8707, "x4_out": 12}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 20, "instr_debug": 111, "halted": 1}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 20, "halted": 1, "x4_out": 12, "mem0_out": 12}
+        }
+      ]
+    }
+  ]
+}

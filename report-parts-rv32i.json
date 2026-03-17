@@ -1,0 +1,76 @@
+{
+  "directory": "parts/rv32i",
+  "report": {
+    "duration_ms": 63,
+    "passed": 3,
+    "total": 3,
+    "suites": [
+      {
+        "source_path": "parts/rv32i/rv32i_cpu.sv",
+        "json_path": "parts/rv32i/demo_add_store.json",
+        "top_module": "rv32i_cpu",
+        "duration_ms": 62,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Add, store, load, halt",
+              "description": null,
+              "steps": 8,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/rv32i/rv32i_cpu.sv",
+        "json_path": "parts/rv32i/demo_branch_jal.json",
+        "top_module": "rv32i_cpu",
+        "duration_ms": 62,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Taken beq skips work and jal writes the link register",
+              "description": null,
+              "steps": 10,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/rv32i/rv32i_cpu.sv",
+        "json_path": "parts/rv32i/demo_sum_loop.json",
+        "top_module": "rv32i_cpu",
+        "duration_ms": 62,
+        "passed": true,
+        "report": {
+          "duration_ms": 1,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Loop with bne accumulates 1 through 5",
+              "description": null,
+              "steps": 21,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      }
+    ]
+  }
+}
