@@ -944,6 +944,33 @@ mod tests {
     }
 
     #[test]
+    fn compile_str_errors_on_duplicate_instance_name() {
+        let error = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module child(input logic a, output logic y); assign y = a; endmodule\n",
+                    "module top(input logic a, input logic b, output logic y); ",
+                    "logic y0; ",
+                    "child u_child (.a(a), .y(y0)); ",
+                    "child u_child (.a(b), .y(y)); ",
+                    "endmodule\n"
+                ),
+            )
+            .expect_err("duplicate instance names should fail validation");
+
+        match error {
+            Error::Resolve(message) => {
+                assert!(
+                    message.contains("declares instance 'u_child' more than once"),
+                    "unexpected message: {message}"
+                );
+            }
+            other => panic!("unexpected error: {other}"),
+        }
+    }
+
+    #[test]
     fn compile_str_errors_on_output_port_connected_to_input_port() {
         let error = Compiler::new()
             .compile_str(

@@ -62,6 +62,7 @@ fn validate_module_recursive(
 fn validate_module(module: &ModuleSummary) -> Result<()> {
     validate_supported_port_directions(module)?;
     validate_unique_declarations(module)?;
+    validate_unique_instance_names(module)?;
 
     for assign in &module.continuous_assignments {
         validate_expr(&assign.expr, module)?;
@@ -114,6 +115,21 @@ fn validate_unique_declarations(module: &ModuleSummary) -> Result<()> {
             return Err(Error::Resolve(format!(
                 "module '{}' declares '{}' more than once",
                 module.name, memory.name
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_unique_instance_names(module: &ModuleSummary) -> Result<()> {
+    let mut names = HashSet::new();
+
+    for instance in &module.instantiations {
+        if !names.insert(instance.instance_name.as_str()) {
+            return Err(Error::Resolve(format!(
+                "module '{}' declares instance '{}' more than once",
+                module.name, instance.instance_name
             )));
         }
     }
