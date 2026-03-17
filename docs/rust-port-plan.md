@@ -48,6 +48,7 @@ Current implementation status as of March 17, 2026:
 - `parts/rv32i` now provides a 16-suite RV32I demo corpus covering arithmetic, compare, branch, jump, instruction-address misalignment traps, instruction/load/store access faults, subword memory, fence/system instructions, breakpoint and illegal-instruction traps, and misaligned load/store traps
 - `parts/rv32i/demo_shift_ops.json` now exercises the RV32I demo core's `SLLI`, `SRLI`, `SRAI`, `SLL`, `SRL`, and `SRA` execution path, including register-form `shamt[4:0]` masking
 - `parts/testing/019-Vector5.json` now matches the standard SystemVerilog bit ordering for multi-expression replication (`{5{a, b, c, d, e}}`), retiring the old Python reference divergence from the checked-in corpus
+- shared helper functions that were duplicated between `sim.rs` and `validate.rs` have been consolidated: `mask`, `shift_bits`, `shift_left_bits`, `shift_right_bits`, and `ShiftDirection` now live in `width.rs`; `expr_to_lvalue` now lives in `hir.rs`; `resolve_legacy_rom_data_path` is `pub(crate)` in `validate.rs` and imported by `sim.rs`
 
 ## Compatibility Target
 
@@ -109,10 +110,11 @@ svsim::compiler  # file/string compilation plus compile-only and JSON batch entr
 svsim::design    # compiled design handle plus hierarchy inspection
 svsim::diag      # diagnostics and unsupported-feature errors
 svsim::frontend  # sv-parser integration and lowering
-svsim::hir       # owned executable subset
+svsim::hir       # owned executable subset plus shared HIR-level helpers (expr_to_lvalue)
 svsim::sim       # combinational + sequential engine
 svsim::test      # JSON test execution and report types
-svsim::validate  # internal semantic validation of lowered HIR
+svsim::validate  # internal semantic validation of lowered HIR plus shared design-file resolution
+svsim::width     # expression width inference, bit-manipulation primitives (mask, shifts)
 ```
 
 This keeps the public API simple for embedding while still separating concerns internally. A separate elaboration/value/compiled-IR split is still future work, not a current module boundary in the tree.
@@ -413,7 +415,8 @@ Current progress:
 - library and CLI batch entry points now exist for both compile-only `*.sv` discovery and JSON regression discovery, runs stay sorted by source path, and JSON suites can explicitly reuse a shared source file through a `source` field
 - legacy corpus compatibility for `rom_*` wrappers and `pgm_*` program harnesses now exists without reintroducing those naming conventions into the main library memory API, and malformed `rom_*` wrappers now fail at compile time instead of degrading into empty modules or late runtime errors
 - measured Overture status now includes `41/41` clean compile-only source files and `43/43` passing JSON suites, including the two explicit-source `overture_cpu` program variants; the full multi-directory corpus snapshot is `126/126` compile-only in about `1.6s` and `128/128` JSON regressions in about `18.6s`
-- remaining work is folding more in-range resolution and connection-shape checks into a single elaboration/validation layer now that the runtime coercion slices and constant memory-bounds checks are explicit, and tightening unsupported-construct diagnostics where wider coverage finds gaps
+- shared helper functions (`mask`, shift primitives, `expr_to_lvalue`, `resolve_legacy_rom_data_path`) have been deduplicated between `sim.rs` and `validate.rs` and consolidated into `width.rs`, `hir.rs`, and `validate.rs` respectively, removing ~70 lines of cross-module duplication
+- remaining work is folding more in-range resolution and connection-shape checks into a single elaboration/validation layer now that the runtime coercion slices, constant memory-bounds checks, and shared helpers are explicit, and tightening unsupported-construct diagnostics where wider coverage finds gaps
 
 Exit criterion:
 - parity for `parts/overture/` tests
@@ -473,6 +476,6 @@ The first concrete implementation target should be:
 5. add explicit memory binding configuration
 6. broaden Rust CLI regression coverage across Overture and add scalable batch execution
 
-That library milestone, the compile-only and JSON corpus runners, the first compile-time semantic validation pass, the initial runtime width-normalization slices for self-determined ternary expressions plus assignment/instance-port coercion, and the current fixpoint engine are now in place. The next pragmatic target is to keep pulling in-range resolution checks into a single elaboration layer, then continue the runtime shift away from iterative hot paths toward a more explicit compiled evaluation model.
+That library milestone, the compile-only and JSON corpus runners, the first compile-time semantic validation pass, the initial runtime width-normalization slices for self-determined ternary expressions plus assignment/instance-port coercion, and the current fixpoint engine are now in place. Shared helper functions between the simulator and validator are now consolidated. The next pragmatic target is to trust the validation pass for checks that the simulator currently re-verifies at runtime, then continue the runtime shift away from iterative hot paths toward a more explicit compiled evaluation model.
 
 At that point the project has replaced the Python simulator for core use, even before image rendering exists.

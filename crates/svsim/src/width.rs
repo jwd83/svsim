@@ -89,3 +89,44 @@ pub(crate) fn minimum_width(bits: u64) -> usize {
         (u64::BITS - bits.leading_zeros()) as usize
     }
 }
+
+pub(crate) fn mask(width: usize) -> u64 {
+    if width >= u64::BITS as usize {
+        u64::MAX
+    } else {
+        (1u64 << width) - 1
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum ShiftDirection {
+    Left,
+    Right,
+}
+
+pub(crate) fn shift_bits(
+    bits: u64,
+    amount_bits: u64,
+    width: usize,
+    direction: ShiftDirection,
+) -> u64 {
+    let normalized = bits & mask(width);
+    let Ok(amount) = u32::try_from(amount_bits) else {
+        return 0;
+    };
+    if amount as usize >= width {
+        return 0;
+    }
+    match direction {
+        ShiftDirection::Left => normalized.checked_shl(amount).unwrap_or(0) & mask(width),
+        ShiftDirection::Right => normalized.checked_shr(amount).unwrap_or(0),
+    }
+}
+
+pub(crate) fn shift_left_bits(bits: u64, amount_bits: u64, width: usize) -> u64 {
+    shift_bits(bits, amount_bits, width, ShiftDirection::Left)
+}
+
+pub(crate) fn shift_right_bits(bits: u64, amount_bits: u64, width: usize) -> u64 {
+    shift_bits(bits, amount_bits, width, ShiftDirection::Right)
+}

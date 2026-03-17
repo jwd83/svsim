@@ -5,9 +5,9 @@ use crate::diag::{Error, Result};
 use crate::hir::{
     AssignmentKind, BinaryOp, CaseStmtItem, Expr, HirDesign, LValue, MemoryDecl,
     ModuleInstanceSummary, ModuleSummary, NumericLiteral, PortDirection, ProcBlockKind, Stmt,
-    UnaryOp,
+    UnaryOp, expr_to_lvalue,
 };
-use crate::width::minimum_width;
+use crate::width::{mask, minimum_width, shift_left_bits, shift_right_bits};
 
 const MAX_RUNTIME_WIDTH: usize = u64::BITS as usize;
 
@@ -695,79 +695,6 @@ fn concat_const_values(parts: &[ConstValue]) -> Option<ConstValue> {
     Some(ConstValue::new(bits, total_width))
 }
 
-fn shift_left_bits(bits: u64, amount_bits: u64, width: usize) -> u64 {
-    shift_bits(bits, amount_bits, width, ShiftDirection::Left)
-}
-
-fn shift_right_bits(bits: u64, amount_bits: u64, width: usize) -> u64 {
-    shift_bits(bits, amount_bits, width, ShiftDirection::Right)
-}
-
-#[derive(Debug, Clone, Copy)]
-enum ShiftDirection {
-    Left,
-    Right,
-}
-
-fn shift_bits(bits: u64, amount_bits: u64, width: usize, direction: ShiftDirection) -> u64 {
-    let normalized = bits & mask(width);
-    let Ok(amount) = u32::try_from(amount_bits) else {
-        return 0;
-    };
-    if amount as usize >= width {
-        return 0;
-    }
-    match direction {
-        ShiftDirection::Left => normalized.checked_shl(amount).unwrap_or(0) & mask(width),
-        ShiftDirection::Right => normalized.checked_shr(amount).unwrap_or(0),
-    }
-}
-
-fn mask(width: usize) -> u64 {
-    if width >= u64::BITS as usize {
-        u64::MAX
-    } else {
-        (1u64 << width) - 1
-    }
-}
-
-fn expr_to_lvalue(expr: &Expr) -> Option<LValue> {
-    match expr {
-        Expr::Ident(name) => Some(LValue::Signal(name.clone())),
-        Expr::Concat(exprs) => {
-            let mut items = Vec::with_capacity(exprs.len());
-            for expr in exprs {
-                items.push(expr_to_lvalue(expr)?);
-            }
-            Some(LValue::Concat(items))
-        }
-        Expr::BitSelect { expr, index } => match expr.as_ref() {
-            Expr::Ident(signal) => Some(LValue::BitSelect {
-                signal: signal.clone(),
-                index: *index,
-            }),
-            _ => None,
-        },
-        Expr::PartSelect { expr, msb, lsb } => match expr.as_ref() {
-            Expr::Ident(signal) => Some(LValue::PartSelect {
-                signal: signal.clone(),
-                msb: *msb,
-                lsb: *lsb,
-            }),
-            _ => None,
-        },
-        Expr::MemoryRead { memory, index } => Some(LValue::MemoryElement {
-            memory: memory.clone(),
-            index: index.clone(),
-        }),
-        Expr::Literal(_)
-        | Expr::Repeat { .. }
-        | Expr::Unary { .. }
-        | Expr::Binary { .. }
-        | Expr::Ternary { .. } => None,
-    }
-}
-
 fn ensure_runtime_width(width: usize, context: impl Into<String>) -> Result<usize> {
     let context = context.into();
 
@@ -856,7 +783,10 @@ fn validate_legacy_rom_primitive(hir: &HirDesign, module: &ModuleSummary) -> Res
     Ok(())
 }
 
-fn resolve_legacy_rom_data_path(source_path: &Path, rom_name: &str) -> Option<std::path::PathBuf> {
+pub(crate) fn resolve_legacy_rom_data_path(
+    source_path: &Path,
+    rom_name: &str,
+) -> Option<std::path::PathBuf> {
     let file_name = format!("{rom_name}.txt");
     let mut candidates = Vec::new();
     if let Some(source_dir) = source_path.parent() {

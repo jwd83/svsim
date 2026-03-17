@@ -6,9 +6,10 @@ use crate::design::CompiledDesign;
 use crate::diag::{Error, Result};
 use crate::hir::{
     AssignmentKind, BinaryOp, Expr, HirDesign, LValue, ModuleInstanceSummary, ModuleSummary,
-    NumericLiteral, PackedRange, PortDirection, ProcBlockKind, Stmt, UnaryOp,
+    NumericLiteral, PackedRange, PortDirection, ProcBlockKind, Stmt, UnaryOp, expr_to_lvalue,
 };
-use crate::width::{expr_width, minimum_width};
+use crate::validate::resolve_legacy_rom_data_path;
+use crate::width::{expr_width, mask, minimum_width, shift_left_bits, shift_right_bits};
 
 #[derive(Debug, Clone)]
 pub struct SimulationSession {
@@ -819,20 +820,6 @@ fn build_legacy_rom_state(
     }))
 }
 
-fn resolve_legacy_rom_data_path(source_path: &Path, rom_name: &str) -> Option<std::path::PathBuf> {
-    let file_name = format!("{rom_name}.txt");
-    let mut candidates = Vec::new();
-    if let Some(source_dir) = source_path.parent() {
-        candidates.push(source_dir.join(&file_name));
-        candidates.push(source_dir.join("roms").join(&file_name));
-    }
-    if let Ok(current_dir) = std::env::current_dir() {
-        candidates.push(current_dir.join("roms").join(&file_name));
-    }
-
-    candidates.into_iter().find(|candidate| candidate.is_file())
-}
-
 fn apply_legacy_rom_outputs(
     module: &ModuleSummary,
     values: &mut HashMap<String, Value>,
@@ -1219,63 +1206,6 @@ fn values_equal(left: Value, right: Value) -> bool {
     left.normalized_bits() == right.normalized_bits()
 }
 
-fn shift_left_bits(bits: u64, amount_bits: u64, width: usize) -> u64 {
-    shift_bits(bits, amount_bits, width, ShiftDirection::Left)
-}
-
-fn shift_right_bits(bits: u64, amount_bits: u64, width: usize) -> u64 {
-    shift_bits(bits, amount_bits, width, ShiftDirection::Right)
-}
-
-#[derive(Debug, Clone, Copy)]
-enum ShiftDirection {
-    Left,
-    Right,
-}
-
-fn shift_bits(bits: u64, amount_bits: u64, width: usize, direction: ShiftDirection) -> u64 {
-    let normalized = bits & mask(width);
-    let Ok(amount) = u32::try_from(amount_bits) else {
-        return 0;
-    };
-    if amount as usize >= width {
-        return 0;
-    }
-    match direction {
-        ShiftDirection::Left => normalized.checked_shl(amount).unwrap_or(0) & mask(width),
-        ShiftDirection::Right => normalized.checked_shr(amount).unwrap_or(0),
-    }
-}
-
-fn expr_to_lvalue(expr: &Expr) -> Option<LValue> {
-    match expr {
-        Expr::Ident(name) => Some(LValue::Signal(name.clone())),
-        Expr::Concat(exprs) => {
-            let mut items = Vec::with_capacity(exprs.len());
-            for expr in exprs {
-                items.push(expr_to_lvalue(expr)?);
-            }
-            Some(LValue::Concat(items))
-        }
-        Expr::BitSelect { expr, index } => match expr.as_ref() {
-            Expr::Ident(name) => Some(LValue::BitSelect {
-                signal: name.clone(),
-                index: *index,
-            }),
-            _ => None,
-        },
-        Expr::PartSelect { expr, msb, lsb } => match expr.as_ref() {
-            Expr::Ident(name) => Some(LValue::PartSelect {
-                signal: name.clone(),
-                msb: *msb,
-                lsb: *lsb,
-            }),
-            _ => None,
-        },
-        _ => None,
-    }
-}
-
 fn resolve_lvalue(
     lvalue: &LValue,
     module: &ModuleSummary,
@@ -1522,14 +1452,6 @@ fn resolve_instance_path_mut<'a>(
             ))
         })?;
     resolve_instance_path_mut(hir, state.children[child_index].state.as_mut(), rest)
-}
-
-fn mask(width: usize) -> u64 {
-    if width >= u64::BITS as usize {
-        u64::MAX
-    } else {
-        (1u64 << width) - 1
-    }
 }
 
 #[cfg(test)]

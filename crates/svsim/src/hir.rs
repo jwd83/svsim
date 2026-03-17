@@ -284,6 +284,43 @@ impl ModuleSummary {
     }
 }
 
+pub(crate) fn expr_to_lvalue(expr: &Expr) -> Option<LValue> {
+    match expr {
+        Expr::Ident(name) => Some(LValue::Signal(name.clone())),
+        Expr::Concat(exprs) => {
+            let mut items = Vec::with_capacity(exprs.len());
+            for expr in exprs {
+                items.push(expr_to_lvalue(expr)?);
+            }
+            Some(LValue::Concat(items))
+        }
+        Expr::BitSelect { expr, index } => match expr.as_ref() {
+            Expr::Ident(signal) => Some(LValue::BitSelect {
+                signal: signal.clone(),
+                index: *index,
+            }),
+            _ => None,
+        },
+        Expr::PartSelect { expr, msb, lsb } => match expr.as_ref() {
+            Expr::Ident(signal) => Some(LValue::PartSelect {
+                signal: signal.clone(),
+                msb: *msb,
+                lsb: *lsb,
+            }),
+            _ => None,
+        },
+        Expr::MemoryRead { memory, index } => Some(LValue::MemoryElement {
+            memory: memory.clone(),
+            index: index.clone(),
+        }),
+        Expr::Literal(_)
+        | Expr::Repeat { .. }
+        | Expr::Unary { .. }
+        | Expr::Binary { .. }
+        | Expr::Ternary { .. } => None,
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct SourceFile {
     pub path: PathBuf,
