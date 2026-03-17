@@ -6,6 +6,7 @@ pub mod hir;
 pub mod sim;
 pub mod test;
 mod validate;
+mod width;
 
 pub use compiler::{
     CompileCorpusReport, CompileDirectoryReport, CompileDirectoryRunReport, CompileFileReport,

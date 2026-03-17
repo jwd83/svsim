@@ -6,6 +6,7 @@ use crate::hir::{
     AssignmentKind, BinaryOp, CaseStmtItem, Expr, HirDesign, LValue, ModuleInstanceSummary,
     ModuleSummary, PortDirection, ProcBlockKind, Stmt,
 };
+use crate::width::minimum_width;
 
 const MAX_RUNTIME_WIDTH: usize = u64::BITS as usize;
 
@@ -546,14 +547,6 @@ fn expr_to_lvalue(expr: &Expr) -> Option<LValue> {
         | Expr::Unary { .. }
         | Expr::Binary { .. }
         | Expr::Ternary { .. } => None,
-    }
-}
-
-fn minimum_width(bits: u64) -> usize {
-    if bits == 0 {
-        1
-    } else {
-        (u64::BITS - bits.leading_zeros()) as usize
     }
 }
 

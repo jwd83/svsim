@@ -8,6 +8,7 @@ use crate::hir::{
     AssignmentKind, BinaryOp, Expr, HirDesign, LValue, ModuleInstanceSummary, ModuleSummary,
     NumericLiteral, PackedRange, PortDirection, ProcBlockKind, Stmt, UnaryOp,
 };
+use crate::width::{expr_width, minimum_width};
 
 #[derive(Debug, Clone)]
 pub struct SimulationSession {
@@ -420,7 +421,7 @@ fn settle_module(
         let mut changed = false;
 
         for assign in &module.continuous_assignments {
-            let value = eval_expr(&assign.expr, &values, &state.memories)?;
+            let value = eval_expr(&assign.expr, module, &values, &state.memories)?;
             let target = resolve_lvalue(&assign.target, module, &values, &state.memories)?;
             if resolved_lvalue_contains_memory(&target) {
                 return Err(Error::Unsupported(
@@ -488,7 +489,8 @@ fn step_module(
 
     for (instance, child_state) in module.instantiations.iter().zip(state.children.iter_mut()) {
         let child = resolve_supported_module(hir, &instance.module_name)?;
-        let child_inputs = build_child_inputs(child, instance, &pre_values, &state.memories)?;
+        let child_inputs =
+            build_child_inputs(module, child, instance, &pre_values, &state.memories)?;
         step_module(hir, child_state.state.as_mut(), &child_inputs, stack)?;
     }
 
@@ -560,7 +562,7 @@ fn execute_comb_stmt(
         }
         Stmt::Assign { kind, target, expr } => match kind {
             AssignmentKind::Blocking => {
-                let value = eval_expr(expr, values, memories)?;
+                let value = eval_expr(expr, module, values, memories)?;
                 let target = resolve_lvalue(target, module, values, memories)?;
                 if resolved_lvalue_contains_memory(&target) {
                     return Err(Error::Unsupported(
@@ -581,7 +583,7 @@ fn execute_comb_stmt(
             then_branch,
             else_branch,
         } => {
-            if eval_expr(cond, values, memories)?.truthy() {
+            if eval_expr(cond, module, values, memories)?.truthy() {
                 execute_comb_stmt(then_branch, module, values, memories)
             } else if let Some(else_branch) = else_branch {
                 execute_comb_stmt(else_branch, module, values, memories)
@@ -594,10 +596,10 @@ fn execute_comb_stmt(
             items,
             default,
         } => {
-            let value = eval_expr(expr, values, memories)?;
+            let value = eval_expr(expr, module, values, memories)?;
             for item in items {
                 for pattern in &item.patterns {
-                    if values_equal(value, eval_expr(pattern, values, memories)?) {
+                    if values_equal(value, eval_expr(pattern, module, values, memories)?) {
                         return execute_comb_stmt(&item.body, module, values, memories);
                     }
                 }
@@ -636,13 +638,13 @@ fn execute_sequential_stmt(
         }
         Stmt::Assign { kind, target, expr } => match kind {
             AssignmentKind::Nonblocking => {
-                let value = eval_expr(expr, current_values, memories)?;
+                let value = eval_expr(expr, module, current_values, memories)?;
                 let target = resolve_lvalue(target, module, current_values, memories)?;
                 apply_resolved_lvalue(&target, value, module, staged_values, staged_memories)?;
                 Ok(())
             }
             AssignmentKind::Blocking => {
-                let value = eval_expr(expr, current_values, memories)?;
+                let value = eval_expr(expr, module, current_values, memories)?;
                 let target = resolve_lvalue(target, module, current_values, memories)?;
                 apply_resolved_lvalue(&target, value, module, current_values, memories)?;
                 Ok(())
@@ -653,7 +655,7 @@ fn execute_sequential_stmt(
             then_branch,
             else_branch,
         } => {
-            if eval_expr(cond, current_values, memories)?.truthy() {
+            if eval_expr(cond, module, current_values, memories)?.truthy() {
                 execute_sequential_stmt(
                     then_branch,
                     module,
@@ -680,10 +682,10 @@ fn execute_sequential_stmt(
             items,
             default,
         } => {
-            let value = eval_expr(expr, current_values, memories)?;
+            let value = eval_expr(expr, module, current_values, memories)?;
             for item in items {
                 for pattern in &item.patterns {
-                    if values_equal(value, eval_expr(pattern, current_values, memories)?) {
+                    if values_equal(value, eval_expr(pattern, module, current_values, memories)?) {
                         return execute_sequential_stmt(
                             &item.body,
                             module,
@@ -894,6 +896,7 @@ fn build_signal_table(
 }
 
 fn build_child_inputs(
+    parent: &ModuleSummary,
     child: &ModuleSummary,
     instance: &ModuleInstanceSummary,
     parent_values: &HashMap<String, Value>,
@@ -909,7 +912,7 @@ fn build_child_inputs(
         let Some(connection) = find_connection(instance, &port.name) else {
             continue;
         };
-        let value = eval_expr(&connection.expr, parent_values, parent_memories)?;
+        let value = eval_expr(&connection.expr, parent, parent_values, parent_memories)?;
         child_inputs.insert(port.name.clone(), value.normalized_bits());
     }
 
@@ -933,7 +936,7 @@ fn evaluate_instance(
         ))
     })?;
 
-    let child_inputs = build_child_inputs(child, instance, values, memories)?;
+    let child_inputs = build_child_inputs(parent, child, instance, values, memories)?;
     let needs_refresh = cache
         .as_ref()
         .is_none_or(|cached| cached.inputs != child_inputs);
@@ -1050,6 +1053,7 @@ fn find_connection<'a>(
 
 fn eval_expr(
     expr: &Expr,
+    module: &ModuleSummary,
     values: &HashMap<String, Value>,
     memories: &HashMap<String, MemoryState>,
 ) -> Result<Value> {
@@ -1062,24 +1066,24 @@ fn eval_expr(
         Expr::Concat(exprs) => {
             let mut values_out = Vec::with_capacity(exprs.len());
             for expr in exprs {
-                values_out.push(eval_expr(expr, values, memories)?);
+                values_out.push(eval_expr(expr, module, values, memories)?);
             }
             concat_values(&values_out)
         }
         Expr::Repeat { count, expr } => {
-            let value = eval_expr(expr, values, memories)?;
+            let value = eval_expr(expr, module, values, memories)?;
             let values_out = vec![value; *count];
             concat_values(&values_out)
         }
         Expr::MemoryRead { memory, index } => {
-            let index = eval_expr(index, values, memories)?.normalized_bits() as usize;
+            let index = eval_expr(index, module, values, memories)?.normalized_bits() as usize;
             let memory_state = memories
                 .get(memory)
                 .ok_or_else(|| Error::Resolve(format!("memory '{}' is not declared", memory)))?;
             memory_state.read(index, memory)
         }
         Expr::BitSelect { expr, index } => {
-            let value = eval_expr(expr, values, memories)?;
+            let value = eval_expr(expr, module, values, memories)?;
             if *index >= value.width {
                 return Err(Error::Resolve(format!(
                     "bit select [{}] is out of range for width {}",
@@ -1089,7 +1093,7 @@ fn eval_expr(
             Ok(Value::new((value.normalized_bits() >> index) & 1, 1))
         }
         Expr::PartSelect { expr, msb, lsb } => {
-            let value = eval_expr(expr, values, memories)?;
+            let value = eval_expr(expr, module, values, memories)?;
             let low = (*msb).min(*lsb);
             let high = (*msb).max(*lsb);
             if high >= value.width {
@@ -1105,14 +1109,14 @@ fn eval_expr(
             ))
         }
         Expr::Unary { op, expr } => {
-            let value = eval_expr(expr, values, memories)?;
+            let value = eval_expr(expr, module, values, memories)?;
             match op {
                 UnaryOp::BitNot => Ok(Value::new(!value.normalized_bits(), value.width)),
             }
         }
         Expr::Binary { left, op, right } => {
-            let left = eval_expr(left, values, memories)?;
-            let right = eval_expr(right, values, memories)?;
+            let left = eval_expr(left, module, values, memories)?;
+            let right = eval_expr(right, module, values, memories)?;
             let (bits, width) = match op {
                 BinaryOp::BitAnd => (
                     left.normalized_bits() & right.normalized_bits(),
@@ -1146,10 +1150,17 @@ fn eval_expr(
             when_true,
             when_false,
         } => {
-            if eval_expr(cond, values, memories)?.truthy() {
-                eval_expr(when_true, values, memories)
+            let result_width = expr_width(when_true, module)?.max(expr_width(when_false, module)?);
+            if eval_expr(cond, module, values, memories)?.truthy() {
+                Ok(Value::new(
+                    eval_expr(when_true, module, values, memories)?.normalized_bits(),
+                    result_width,
+                ))
             } else {
-                eval_expr(when_false, values, memories)
+                Ok(Value::new(
+                    eval_expr(when_false, module, values, memories)?.normalized_bits(),
+                    result_width,
+                ))
             }
         }
     }
@@ -1245,7 +1256,7 @@ fn resolve_lvalue(
         }),
         LValue::MemoryElement { memory, index } => Ok(ResolvedLValue::MemoryElement {
             memory: memory.clone(),
-            index: eval_expr(index, values, memories)?.normalized_bits() as usize,
+            index: eval_expr(index, module, values, memories)?.normalized_bits() as usize,
         }),
     }
 }
@@ -1459,14 +1470,6 @@ fn resolve_instance_path_mut<'a>(
     resolve_instance_path_mut(hir, state.children[child_index].state.as_mut(), rest)
 }
 
-fn minimum_width(bits: u64) -> usize {
-    if bits == 0 {
-        1
-    } else {
-        (u64::BITS - bits.leading_zeros()) as usize
-    }
-}
-
 fn mask(width: usize) -> u64 {
     if width >= u64::BITS as usize {
         u64::MAX
@@ -1540,6 +1543,62 @@ mod tests {
             .expect("eval");
 
         assert_eq!(outputs.get("out"), Some(&0x12));
+    }
+
+    #[test]
+    fn eval_once_normalizes_ternary_width_before_concatenation() {
+        let design = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module top(",
+                    "input logic sel, ",
+                    "output logic [3:0] out",
+                    "); ",
+                    "assign out = {2'b10, (sel ? 2'b11 : 1'b1)}; ",
+                    "endmodule\n"
+                ),
+            )
+            .expect("compile virtual design");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let outputs = sim
+            .eval_once(BTreeMap::from([("sel".into(), 0)]))
+            .expect("eval false branch");
+        assert_eq!(outputs.get("out"), Some(&0b1001));
+
+        let outputs = sim
+            .eval_once(BTreeMap::from([("sel".into(), 1)]))
+            .expect("eval true branch");
+        assert_eq!(outputs.get("out"), Some(&0b1011));
+    }
+
+    #[test]
+    fn eval_once_normalizes_ternary_width_before_replication() {
+        let design = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module top(",
+                    "input logic sel, ",
+                    "output logic [3:0] out",
+                    "); ",
+                    "assign out = {2{sel ? 2'b10 : 1'b1}}; ",
+                    "endmodule\n"
+                ),
+            )
+            .expect("compile virtual design");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let outputs = sim
+            .eval_once(BTreeMap::from([("sel".into(), 0)]))
+            .expect("eval false branch");
+        assert_eq!(outputs.get("out"), Some(&0b0101));
+
+        let outputs = sim
+            .eval_once(BTreeMap::from([("sel".into(), 1)]))
+            .expect("eval true branch");
+        assert_eq!(outputs.get("out"), Some(&0b1010));
     }
 
     #[test]
