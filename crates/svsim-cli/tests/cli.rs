@@ -314,10 +314,10 @@ fn cli_reports_expected_failures_for_failing_corpus() {
 
     let json: Value = serde_json::from_slice(&output.stdout).expect("parse stdout json");
     assert_eq!(json["report"]["passed"], 0);
-    assert_eq!(json["report"]["total"], 5);
+    assert_eq!(json["report"]["total"], 6);
 
     let suites = json["report"]["suites"].as_array().expect("suite array");
-    assert_eq!(suites.len(), 5);
+    assert_eq!(suites.len(), 6);
 
     let constant_one_mismatch = suites
         .iter()
@@ -349,6 +349,24 @@ fn cli_reports_expected_failures_for_failing_corpus() {
         duplicate_instance_names["error"]
             .as_str()
             .is_some_and(|message| message.contains("more than once"))
+    );
+
+    let constant_memory_index_oob = suites
+        .iter()
+        .find(|suite| {
+            suite["source_path"]
+                == repo
+                    .join("parts/failing/constant_memory_index_oob.sv")
+                    .display()
+                    .to_string()
+        })
+        .expect("constant_memory_index_oob suite");
+    assert_eq!(constant_memory_index_oob["passed"], false);
+    assert!(constant_memory_index_oob["report"].is_null());
+    assert!(
+        constant_memory_index_oob["error"]
+            .as_str()
+            .is_some_and(|message| message.contains("memory index [2] is out of range"))
     );
 
     let malformed_json = suites

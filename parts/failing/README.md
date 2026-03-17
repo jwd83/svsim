@@ -7,6 +7,7 @@ This directory is a negative corpus for manual regression checks.
 - `syntax_error.sv` + `syntax_error.json`: parser failure from intentionally invalid SystemVerilog syntax.
 - `malformed_json.sv` + `malformed_json.json`: successful compile with an intentionally broken JSON test file.
 - `duplicate_instance_names.sv` + `duplicate_instance_names.json`: compile failure from repeated instance names in the same module.
+- `constant_memory_index_oob.sv` + `constant_memory_index_oob.json`: compile failure from a constant memory access outside the declared array bounds.
 
 Use this directory when you want failure reports on purpose:
 

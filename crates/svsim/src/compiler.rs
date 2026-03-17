@@ -1074,6 +1074,58 @@ mod tests {
     }
 
     #[test]
+    fn compile_str_errors_on_constant_memory_read_index_out_of_range() {
+        let error = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module top(output logic [7:0] y); ",
+                    "logic [7:0] rom [0:1]; ",
+                    "assign y = rom[2]; ",
+                    "endmodule\n"
+                ),
+            )
+            .expect_err("out-of-range constant memory reads should fail validation");
+
+        match error {
+            Error::Resolve(message) => {
+                assert!(
+                    message.contains("memory index [2] is out of range for 'rom' in 'top'"),
+                    "unexpected message: {message}"
+                );
+            }
+            other => panic!("unexpected error: {other}"),
+        }
+    }
+
+    #[test]
+    fn compile_str_errors_on_constant_memory_write_index_out_of_range() {
+        let error = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module top(input logic clk, input logic [7:0] d); ",
+                    "logic [7:0] ram [0:1]; ",
+                    "always_ff @(posedge clk) begin ",
+                    "ram[3] <= d; ",
+                    "end ",
+                    "endmodule\n"
+                ),
+            )
+            .expect_err("out-of-range constant memory writes should fail validation");
+
+        match error {
+            Error::Resolve(message) => {
+                assert!(
+                    message.contains("memory index [3] is out of range for 'ram' in 'top'"),
+                    "unexpected message: {message}"
+                );
+            }
+            other => panic!("unexpected error: {other}"),
+        }
+    }
+
+    #[test]
     fn compile_str_errors_on_duplicate_instance_name() {
         let error = Compiler::new()
             .compile_str(

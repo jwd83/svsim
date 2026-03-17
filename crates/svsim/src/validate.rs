@@ -3,8 +3,9 @@ use std::path::Path;
 
 use crate::diag::{Error, Result};
 use crate::hir::{
-    AssignmentKind, BinaryOp, CaseStmtItem, Expr, HirDesign, LValue, ModuleInstanceSummary,
-    ModuleSummary, PortDirection, ProcBlockKind, Stmt,
+    AssignmentKind, BinaryOp, CaseStmtItem, Expr, HirDesign, LValue, MemoryDecl,
+    ModuleInstanceSummary, ModuleSummary, NumericLiteral, PortDirection, ProcBlockKind, Stmt,
+    UnaryOp,
 };
 use crate::width::minimum_width;
 
@@ -341,21 +342,17 @@ fn validate_expr(expr: &Expr, module: &ModuleSummary) -> Result<usize> {
         ),
         Expr::MemoryRead { memory, index } => {
             validate_expr(index, module)?;
-            module
-                .memory_decl(memory)
-                .map(|memory| memory.element_width())
-                .ok_or_else(|| {
-                    Error::Resolve(format!(
-                        "memory '{}' is not declared in '{}'",
-                        memory, module.name
-                    ))
-                })
-                .and_then(|width| {
-                    ensure_runtime_width(
-                        width,
-                        format!("memory element '{}' in '{}'", memory, module.name),
-                    )
-                })
+            let memory = module.memory_decl(memory).ok_or_else(|| {
+                Error::Resolve(format!(
+                    "memory '{}' is not declared in '{}'",
+                    memory, module.name
+                ))
+            })?;
+            validate_constant_memory_index(index, memory, module)?;
+            ensure_runtime_width(
+                memory.element_width(),
+                format!("memory element '{}' in '{}'", memory.name, module.name),
+            )
         }
         Expr::BitSelect { expr, index } => {
             let width = validate_expr(expr, module)?;
@@ -457,15 +454,14 @@ fn validate_lvalue(lvalue: &LValue, module: &ModuleSummary) -> Result<usize> {
         }
         LValue::MemoryElement { memory, index } => {
             validate_expr(index, module)?;
-            module
-                .memory_decl(memory)
-                .map(|memory| memory.element_width())
-                .ok_or_else(|| {
-                    Error::Resolve(format!(
-                        "memory '{}' is not declared in '{}'",
-                        memory, module.name
-                    ))
-                })
+            let memory = module.memory_decl(memory).ok_or_else(|| {
+                Error::Resolve(format!(
+                    "memory '{}' is not declared in '{}'",
+                    memory, module.name
+                ))
+            })?;
+            validate_constant_memory_index(index, memory, module)?;
+            Ok(memory.element_width())
         }
     }
 }
@@ -510,6 +506,176 @@ fn lvalue_contains_memory(lvalue: &LValue) -> bool {
         LValue::Signal(_) | LValue::BitSelect { .. } | LValue::PartSelect { .. } => false,
         LValue::Concat(items) => items.iter().any(lvalue_contains_memory),
         LValue::MemoryElement { .. } => true,
+    }
+}
+
+fn validate_constant_memory_index(
+    index: &Expr,
+    memory: &MemoryDecl,
+    module: &ModuleSummary,
+) -> Result<()> {
+    let Some(index) = const_eval_expr(index) else {
+        return Ok(());
+    };
+    let raw_index = index.normalized_bits();
+    let index = usize::try_from(raw_index).map_err(|_| {
+        Error::Resolve(format!(
+            "memory index [{}] is out of range for '{}' in '{}'",
+            raw_index, memory.name, module.name
+        ))
+    })?;
+
+    if memory.index_range.contains_index(index) {
+        Ok(())
+    } else {
+        Err(Error::Resolve(format!(
+            "memory index [{}] is out of range for '{}' in '{}'",
+            raw_index, memory.name, module.name
+        )))
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ConstValue {
+    bits: u64,
+    width: usize,
+}
+
+impl ConstValue {
+    fn new(bits: u64, width: usize) -> Self {
+        Self {
+            bits: bits & mask(width),
+            width,
+        }
+    }
+
+    fn normalized_bits(self) -> u64 {
+        self.bits & mask(self.width)
+    }
+
+    fn truthy(self) -> bool {
+        self.normalized_bits() != 0
+    }
+}
+
+fn const_eval_expr(expr: &Expr) -> Option<ConstValue> {
+    match expr {
+        Expr::Ident(_) | Expr::MemoryRead { .. } => None,
+        Expr::Literal(literal) => Some(const_value_from_literal(literal)),
+        Expr::Concat(exprs) => {
+            let mut parts = Vec::with_capacity(exprs.len());
+            for expr in exprs {
+                parts.push(const_eval_expr(expr)?);
+            }
+            concat_const_values(&parts)
+        }
+        Expr::Repeat { count, expr } => {
+            let value = const_eval_expr(expr)?;
+            let values = vec![value; *count];
+            concat_const_values(&values)
+        }
+        Expr::BitSelect { expr, index } => {
+            let value = const_eval_expr(expr)?;
+            Some(ConstValue::new((value.normalized_bits() >> index) & 1, 1))
+        }
+        Expr::PartSelect { expr, msb, lsb } => {
+            let value = const_eval_expr(expr)?;
+            let low = (*msb).min(*lsb);
+            let high = (*msb).max(*lsb);
+            let width = high - low + 1;
+            Some(ConstValue::new(
+                (value.normalized_bits() >> low) & mask(width),
+                width,
+            ))
+        }
+        Expr::Unary { op, expr } => {
+            let value = const_eval_expr(expr)?;
+            match op {
+                UnaryOp::BitNot => Some(ConstValue::new(!value.normalized_bits(), value.width)),
+            }
+        }
+        Expr::Binary { left, op, right } => {
+            let left = const_eval_expr(left)?;
+            let right = const_eval_expr(right)?;
+            let (bits, width) = match op {
+                BinaryOp::BitAnd => (
+                    left.normalized_bits() & right.normalized_bits(),
+                    left.width.max(right.width),
+                ),
+                BinaryOp::BitOr => (
+                    left.normalized_bits() | right.normalized_bits(),
+                    left.width.max(right.width),
+                ),
+                BinaryOp::BitXor => (
+                    left.normalized_bits() ^ right.normalized_bits(),
+                    left.width.max(right.width),
+                ),
+                BinaryOp::LogicalAnd => ((left.truthy() && right.truthy()) as u64, 1),
+                BinaryOp::LogicalOr => ((left.truthy() || right.truthy()) as u64, 1),
+                BinaryOp::Eq => (
+                    (left.normalized_bits() == right.normalized_bits()) as u64,
+                    1,
+                ),
+                BinaryOp::NotEq => (
+                    (left.normalized_bits() != right.normalized_bits()) as u64,
+                    1,
+                ),
+                BinaryOp::Add => (
+                    left.normalized_bits().wrapping_add(right.normalized_bits()),
+                    left.width.max(right.width),
+                ),
+                BinaryOp::Sub => (
+                    left.normalized_bits().wrapping_sub(right.normalized_bits()),
+                    left.width.max(right.width),
+                ),
+            };
+            Some(ConstValue::new(bits, width))
+        }
+        Expr::Ternary {
+            cond,
+            when_true,
+            when_false,
+        } => {
+            let cond = const_eval_expr(cond)?;
+            let when_true = const_eval_expr(when_true)?;
+            let when_false = const_eval_expr(when_false)?;
+            let result_width = when_true.width.max(when_false.width);
+            let value = if cond.truthy() {
+                when_true.normalized_bits()
+            } else {
+                when_false.normalized_bits()
+            };
+            Some(ConstValue::new(value, result_width))
+        }
+    }
+}
+
+fn const_value_from_literal(literal: &NumericLiteral) -> ConstValue {
+    let width = literal.width.unwrap_or_else(|| minimum_width(literal.bits));
+    ConstValue::new(literal.bits, width)
+}
+
+fn concat_const_values(parts: &[ConstValue]) -> Option<ConstValue> {
+    let total_width: usize = parts.iter().map(|value| value.width).sum();
+    if total_width == 0 || total_width > MAX_RUNTIME_WIDTH {
+        return None;
+    }
+
+    let mut bits = 0u64;
+    let mut shift = total_width;
+    for part in parts {
+        shift -= part.width;
+        bits |= (part.normalized_bits() & mask(part.width)) << shift;
+    }
+
+    Some(ConstValue::new(bits, total_width))
+}
+
+fn mask(width: usize) -> u64 {
+    if width >= u64::BITS as usize {
+        u64::MAX
+    } else {
+        (1u64 << width) - 1
     }
 }
 
