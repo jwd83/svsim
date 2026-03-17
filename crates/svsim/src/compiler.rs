@@ -919,6 +919,31 @@ mod tests {
     }
 
     #[test]
+    fn compile_str_errors_on_missing_instance_input_connection() {
+        let error = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module child(input logic a, output logic y); assign y = a; endmodule\n",
+                    "module top(input logic a, output logic y); ",
+                    "child u_child (.y(y)); ",
+                    "endmodule\n"
+                ),
+            )
+            .expect_err("missing input connection should fail validation");
+
+        match error {
+            Error::Resolve(message) => {
+                assert!(
+                    message.contains("missing a connection for input port 'a'"),
+                    "unexpected message: {message}"
+                );
+            }
+            other => panic!("unexpected error: {other}"),
+        }
+    }
+
+    #[test]
     fn compile_str_errors_on_output_port_connected_to_input_port() {
         let error = Compiler::new()
             .compile_str(

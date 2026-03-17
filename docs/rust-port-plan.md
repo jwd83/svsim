@@ -24,7 +24,7 @@ Current implementation status as of March 16, 2026:
 - `sv-parser` integrated for file-based parsing and in-memory source parsing via virtual paths
 - owned HIR covers source files, module summaries, continuous assignments, instantiations, `always_comb`, a first `always_ff @(posedge ...)` subset, concatenation/replication expressions, and concatenated assignment targets
 - library API now exposes `Compiler`, `CompiledDesign`, and `SimulationSession`, including `compile_file` and `compile_str`
-- compilation now includes a first semantic validation pass over lowered HIR, catching duplicate declarations, undeclared identifiers/memories, lowered select bounds, unsupported `inout` / `ref` ports, invalid named-port instance bindings, and attempts to drive input ports before simulation
+- compilation now includes a first semantic validation pass over lowered HIR, catching duplicate declarations, undeclared identifiers/memories, lowered select bounds, unsupported `inout` / `ref` ports, invalid named-port instance bindings including missing child input bindings, and attempts to drive input ports before simulation
 - `CompiledDesign::hierarchy()` now exposes an owned top-down instance tree so embedding callers can discover valid instance paths before using per-instance memory APIs
 - compile-only corpus reporting is now available through `Compiler::run_compile_dir` / `Compiler::run_compile_dirs`, and compile-only runs fail cleanly when source compilation errors or unsupported-feature diagnostics are present
 - library-side JSON regression execution is now available through `CompiledDesign::run_json_file` / `svsim::JsonTestSuite` for combinational arrays, sequential `test_cases`, and relative memory-file preload
@@ -40,8 +40,8 @@ Current implementation status as of March 16, 2026:
 - current sequential limits: only `posedge` event controls are lowered, `always_ff` clock expressions must be local identifiers, and cross-block race semantics are not modeled beyond deterministic source order
 - current memory subset supports fixed-size unpacked `reg` / `logic` arrays with zero-initialized reads, explicit programmatic preload/read access by instance path, text-file ROM/RAM loading, procedural single-element writes, and JSON-driven regression preload; explicit elaboration, broader event controls, and render integration are still pending
 - regression compatibility now covers the legacy corpus conventions that still matter in `parts/`: interface-only `rom_*` wrappers auto-load sibling ROM text files at runtime, and `pgm_*` JSON suites auto-bind `overture_fetch.rom` from a sibling program text file when no explicit memory bindings are present
-- measured verification: `cargo test` passes; the compile-only multi-directory corpus reports `parts/basic` at `44/44`, `parts/testing` at `40/40`, `parts/overture` at `41/41`, and the full `parts/basic` + `parts/testing` + `parts/overture` compile surface at `125/125` in about `1.0s`; the JSON regression corpus remains green at `127/127` in about `17.1s`
-- measured batch status: the compile-only multi-directory runner completes `parts/basic` in about `0.4s`, `parts/testing` in about `0.1s`, and `parts/overture` in about `0.5s`; the JSON multi-directory runner completes them in about `6.8s`, `0.2s`, and `10.2s`
+- measured verification: `cargo test` passes; the compile-only multi-directory corpus reports `parts/basic` at `44/44`, `parts/testing` at `40/40`, `parts/overture` at `41/41`, and the full `parts/basic` + `parts/testing` + `parts/overture` compile surface at `125/125` in about `1.4s`; the JSON regression corpus remains green at `127/127` in about `19.9s`
+- measured batch status: the compile-only multi-directory runner completes `parts/basic` in about `0.5s`, `parts/testing` in about `0.2s`, and `parts/overture` in about `0.7s`; the JSON multi-directory runner completes them in about `7.7s`, `0.2s`, and `12.1s`
 - `parts/testing/019-Vector5.json` now matches the standard SystemVerilog bit ordering for multi-expression replication (`{5{a, b, c, d, e}}`), retiring the old Python reference divergence from the checked-in corpus
 
 ## Compatibility Target
@@ -188,8 +188,8 @@ Make resolution and memory binding explicit through the library API rather than 
 Current status:
 
 - the first slice of elaboration is now present as a compile-time validation pass over lowered HIR
-- duplicate declarations, identifier/memory resolution, lowered select bounds, unsupported `inout` / `ref` ports, input-port drive attempts, and the most obvious invalid named-port bindings are now rejected before simulation
-- width normalization, connection completeness, and moving more runtime-only checks into a single elaboration stage are still future work
+- duplicate declarations, identifier/memory resolution, lowered select bounds, unsupported `inout` / `ref` ports, input-port drive attempts, and the most obvious invalid named-port bindings, including missing child input connections, are now rejected before simulation
+- width normalization and moving more runtime-only checks into a single elaboration stage are still future work
 
 ### 4. Compiled IR
 
@@ -366,7 +366,7 @@ Current progress:
 - child instance outputs are now memoized within each `settle_module` convergence pass when their inputs are unchanged, which removes the worst repeated subtree work from deep hierarchical combinational designs
 - grouped ANSI port declarations and initialized net declarations from the vector corpus are now lowered
 - in-memory top-level compilation via `compile_str` is implemented, with dependency lookup anchored at the virtual path plus explicit search paths
-- compilation now rejects several design-shape errors before simulation, including undeclared identifiers, duplicate declarations, unsupported `inout` / `ref` ports, input-port drive attempts, unknown named ports, duplicate named-port bindings, and non-lvalue output bindings
+- compilation now rejects several design-shape errors before simulation, including undeclared identifiers, duplicate declarations, unsupported `inout` / `ref` ports, input-port drive attempts, unknown named ports, duplicate named-port bindings, missing child input bindings, and non-lvalue output bindings
 - callers can now inspect the compiled instance tree directly instead of reverse-engineering valid instance paths from raw HIR module summaries
 - library-side JSON-backed combinational regression execution is implemented
 - compile-only corpus coverage is now available for `*.sv` discovery even when runtime suites are not involved
@@ -402,8 +402,8 @@ Exit criterion:
 Current progress:
 - library and CLI batch entry points now exist for both compile-only `*.sv` discovery and JSON regression discovery, runs stay sorted by source path, and JSON suites can explicitly reuse a shared source file through a `source` field
 - legacy corpus compatibility for `rom_*` wrappers and `pgm_*` program harnesses now exists without reintroducing those naming conventions into the main library memory API
-- measured Overture status now includes `41/41` clean compile-only source files and `43/43` passing JSON suites, including the two explicit-source `overture_cpu` program variants; the full multi-directory corpus snapshot is `125/125` compile-only in about `1.0s` and `127/127` JSON regressions in about `17.1s`
-- remaining work is folding more simulation-time resolution checks into a single elaboration/validation layer and tightening unsupported-construct diagnostics where wider coverage finds gaps
+- measured Overture status now includes `41/41` clean compile-only source files and `43/43` passing JSON suites, including the two explicit-source `overture_cpu` program variants; the full multi-directory corpus snapshot is `125/125` compile-only in about `1.4s` and `127/127` JSON regressions in about `19.9s`
+- remaining work is folding more simulation-time resolution checks into a single elaboration/validation layer, especially width normalization, and tightening unsupported-construct diagnostics where wider coverage finds gaps
 
 Exit criterion:
 - parity for `parts/overture/` tests
@@ -463,6 +463,6 @@ The first concrete implementation target should be:
 5. add explicit memory binding configuration
 6. broaden Rust CLI regression coverage across Overture and add scalable batch execution
 
-That library milestone, the compile-only and JSON corpus runners, the first compile-time semantic validation pass, and the current fixpoint engine are now in place. The next pragmatic target is to keep pulling runtime-only resolution checks into a single elaboration layer, with connection completeness and width normalization now the clearest remaining slices, then continue the runtime shift away from iterative hot paths toward a more explicit compiled evaluation model.
+That library milestone, the compile-only and JSON corpus runners, the first compile-time semantic validation pass, and the current fixpoint engine are now in place. The next pragmatic target is to keep pulling runtime-only resolution checks into a single elaboration layer, with width normalization now the clearest remaining slice, then continue the runtime shift away from iterative hot paths toward a more explicit compiled evaluation model.
 
 At that point the project has replaced the Python simulator for core use, even before image rendering exists.

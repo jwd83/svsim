@@ -183,6 +183,19 @@ fn validate_instance(
         }
     }
 
+    for port in child
+        .ports
+        .iter()
+        .filter(|port| matches!(port.direction, PortDirection::Input))
+    {
+        if !connected_ports.contains(port.name.as_str()) {
+            return Err(Error::Resolve(format!(
+                "instance '{}' is missing a connection for input port '{}' on module '{}'",
+                instance.instance_name, port.name, child.name
+            )));
+        }
+    }
+
     Ok(())
 }
 
