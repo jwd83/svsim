@@ -6,6 +6,8 @@ use crate::hir::{
     ModuleSummary, PortDirection, ProcBlockKind, Stmt,
 };
 
+const MAX_RUNTIME_WIDTH: usize = u64::BITS as usize;
+
 pub(crate) fn validate_design(hir: &HirDesign) -> Result<()> {
     let mut validated = HashSet::new();
     let mut stack = Vec::new();
@@ -63,6 +65,7 @@ fn validate_module(module: &ModuleSummary) -> Result<()> {
     validate_supported_port_directions(module)?;
     validate_unique_declarations(module)?;
     validate_unique_instance_names(module)?;
+    validate_runtime_widths(module)?;
 
     for assign in &module.continuous_assignments {
         validate_expr(&assign.expr, module)?;
@@ -84,6 +87,31 @@ fn validate_module(module: &ModuleSummary) -> Result<()> {
             }
         }
         validate_stmt(&block.body, module, &block.kind)?;
+    }
+
+    Ok(())
+}
+
+fn validate_runtime_widths(module: &ModuleSummary) -> Result<()> {
+    for port in &module.ports {
+        ensure_runtime_width(
+            port.width(),
+            format!("port '{}' in '{}'", port.name, module.name),
+        )?;
+    }
+
+    for signal in &module.signals {
+        ensure_runtime_width(
+            signal.width(),
+            format!("signal '{}' in '{}'", signal.name, module.name),
+        )?;
+    }
+
+    for memory in &module.memories {
+        ensure_runtime_width(
+            memory.element_width(),
+            format!("memory element '{}' in '{}'", memory.name, module.name),
+        )?;
     }
 
     Ok(())
@@ -293,15 +321,21 @@ fn validate_expr(expr: &Expr, module: &ModuleSummary) -> Result<usize> {
                 name, module.name
             ))
         }),
-        Expr::Literal(literal) => Ok(literal.width.unwrap_or_else(|| minimum_width(literal.bits))),
+        Expr::Literal(literal) => ensure_runtime_width(
+            literal.width.unwrap_or_else(|| minimum_width(literal.bits)),
+            "literal",
+        ),
         Expr::Concat(exprs) => {
             let mut width = 0usize;
             for expr in exprs {
                 width = width.saturating_add(validate_expr(expr, module)?);
             }
-            Ok(width)
+            ensure_runtime_width(width, "concatenation expression")
         }
-        Expr::Repeat { count, expr } => Ok(validate_expr(expr, module)?.saturating_mul(*count)),
+        Expr::Repeat { count, expr } => ensure_runtime_width(
+            validate_expr(expr, module)?.saturating_mul(*count),
+            "replication expression",
+        ),
         Expr::MemoryRead { memory, index } => {
             validate_expr(index, module)?;
             module
@@ -313,6 +347,12 @@ fn validate_expr(expr: &Expr, module: &ModuleSummary) -> Result<usize> {
                         memory, module.name
                     ))
                 })
+                .and_then(|width| {
+                    ensure_runtime_width(
+                        width,
+                        format!("memory element '{}' in '{}'", memory, module.name),
+                    )
+                })
         }
         Expr::BitSelect { expr, index } => {
             let width = validate_expr(expr, module)?;
@@ -322,7 +362,7 @@ fn validate_expr(expr: &Expr, module: &ModuleSummary) -> Result<usize> {
                     index, width
                 )));
             }
-            Ok(1)
+            ensure_runtime_width(1, "bit-select expression")
         }
         Expr::PartSelect { expr, msb, lsb } => {
             let width = validate_expr(expr, module)?;
@@ -333,20 +373,25 @@ fn validate_expr(expr: &Expr, module: &ModuleSummary) -> Result<usize> {
                     msb, lsb, width
                 )));
             }
-            Ok(high - (*msb).min(*lsb) + 1)
+            ensure_runtime_width(high - (*msb).min(*lsb) + 1, "part-select expression")
         }
         Expr::Unary { expr, .. } => validate_expr(expr, module),
         Expr::Binary { left, op, right } => {
             let left_width = validate_expr(left, module)?;
             let right_width = validate_expr(right, module)?;
-            Ok(match op {
-                BinaryOp::LogicalAnd | BinaryOp::LogicalOr | BinaryOp::Eq | BinaryOp::NotEq => 1,
-                BinaryOp::BitAnd
-                | BinaryOp::BitOr
-                | BinaryOp::BitXor
-                | BinaryOp::Add
-                | BinaryOp::Sub => left_width.max(right_width),
-            })
+            ensure_runtime_width(
+                match op {
+                    BinaryOp::LogicalAnd | BinaryOp::LogicalOr | BinaryOp::Eq | BinaryOp::NotEq => {
+                        1
+                    }
+                    BinaryOp::BitAnd
+                    | BinaryOp::BitOr
+                    | BinaryOp::BitXor
+                    | BinaryOp::Add
+                    | BinaryOp::Sub => left_width.max(right_width),
+                },
+                "binary expression",
+            )
         }
         Expr::Ternary {
             cond,
@@ -356,7 +401,7 @@ fn validate_expr(expr: &Expr, module: &ModuleSummary) -> Result<usize> {
             validate_expr(cond, module)?;
             let when_true_width = validate_expr(when_true, module)?;
             let when_false_width = validate_expr(when_false, module)?;
-            Ok(when_true_width.max(when_false_width))
+            ensure_runtime_width(when_true_width.max(when_false_width), "ternary expression")
         }
     }
 }
@@ -374,7 +419,7 @@ fn validate_lvalue(lvalue: &LValue, module: &ModuleSummary) -> Result<usize> {
             for item in items {
                 width = width.saturating_add(validate_lvalue(item, module)?);
             }
-            Ok(width)
+            ensure_runtime_width(width, "concatenated assignment target")
         }
         LValue::BitSelect { signal, index } => {
             let width = module.signal_width(signal).ok_or_else(|| {
@@ -508,4 +553,17 @@ fn minimum_width(bits: u64) -> usize {
     } else {
         (u64::BITS - bits.leading_zeros()) as usize
     }
+}
+
+fn ensure_runtime_width(width: usize, context: impl Into<String>) -> Result<usize> {
+    if width > MAX_RUNTIME_WIDTH {
+        return Err(Error::Unsupported(format!(
+            "{} has width {} exceeding the current {}-bit runtime limit",
+            context.into(),
+            width,
+            MAX_RUNTIME_WIDTH
+        )));
+    }
+
+    Ok(width)
 }

@@ -1093,6 +1093,89 @@ mod tests {
     }
 
     #[test]
+    fn compile_str_errors_on_port_width_exceeding_runtime_limit() {
+        let error = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module top(",
+                    "input logic [64:0] inA, ",
+                    "output logic outY",
+                    "); ",
+                    "assign outY = inA[0]; ",
+                    "endmodule\n"
+                ),
+            )
+            .expect_err("ports wider than 64 bits should fail validation");
+
+        match error {
+            Error::Unsupported(message) => {
+                assert!(
+                    message.contains("port 'inA' in 'top' has width 65"),
+                    "unexpected message: {message}"
+                );
+            }
+            other => panic!("unexpected error: {other}"),
+        }
+    }
+
+    #[test]
+    fn compile_str_errors_on_concatenation_expression_exceeding_runtime_limit() {
+        let error = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module top(",
+                    "input logic [39:0] inA, ",
+                    "input logic [39:0] inB, ",
+                    "output logic [39:0] outY",
+                    "); ",
+                    "assign outY = {inA, inB}; ",
+                    "endmodule\n"
+                ),
+            )
+            .expect_err("wide concatenations should fail validation");
+
+        match error {
+            Error::Unsupported(message) => {
+                assert!(
+                    message.contains("concatenation expression has width 80"),
+                    "unexpected message: {message}"
+                );
+            }
+            other => panic!("unexpected error: {other}"),
+        }
+    }
+
+    #[test]
+    fn compile_str_errors_on_concatenated_lvalue_exceeding_runtime_limit() {
+        let error = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module top(",
+                    "input logic [39:0] inA, ",
+                    "output logic [39:0] high, ",
+                    "output logic [39:0] low",
+                    "); ",
+                    "assign {high, low} = inA; ",
+                    "endmodule\n"
+                ),
+            )
+            .expect_err("wide concatenated targets should fail validation");
+
+        match error {
+            Error::Unsupported(message) => {
+                assert!(
+                    message.contains("concatenated assignment target has width 80"),
+                    "unexpected message: {message}"
+                );
+            }
+            other => panic!("unexpected error: {other}"),
+        }
+    }
+
+    #[test]
     fn run_compile_dir_reports_supported_and_unsupported_files() {
         let temp_dir = unique_temp_dir("compile-dir");
         let nested_dir = temp_dir.join("nested");
