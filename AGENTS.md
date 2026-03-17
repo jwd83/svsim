@@ -7,7 +7,8 @@ This repository is a Rust rewrite of the SystemVerilog simulator in `ref/`.
 - `crates/svsim/`: core library crate. Keep compiler, frontend, HIR, diagnostics, and simulation logic here.
 - `crates/svsim-cli/`: thin CLI wrapper over `svsim`.
 - `crates/svsim-render/`: deferred rendering crate for truth-table and waveform output.
-- `parts/basic/`, `parts/overture/`, `parts/testing/`: SystemVerilog corpus and JSON expectations used as the compatibility suite.
+- `parts/basic/`, `parts/overture/`, `parts/testing/`: SystemVerilog corpus and JSON expectations used as the all-green compatibility suite.
+- `parts/failing/`: intentionally failing negative corpus for manual compile/test failure checks.
 - `ref/`: Python reference implementation and historical planning notes.
 - `docs/`: architecture and rewrite plans.
 - `results/`: generated output artifacts from the reference flow.
@@ -23,6 +24,7 @@ Prefer adding new simulator code under `crates/svsim/src/` before splitting into
 - `cargo run -p svsim-cli -- --json-test parts/basic/full_adder.json parts/basic/full_adder.sv`: run a JSON regression suite through the Rust CLI and emit a structured report.
 
 When adding support for new language features, verify them against files under `parts/` instead of isolated toy inputs only.
+Keep `parts/failing/` out of "green" corpus expectations unless you are explicitly checking failure reporting.
 
 ## Coding Style & Naming Conventions
 
@@ -36,7 +38,7 @@ Keep public APIs small and explicit. `sv-parser` types should stay inside the fr
 
 ## Testing Guidelines
 
-Use Rust unit tests alongside the code they cover. Name tests after behavior, for example `parse_file_collects_module_name`. Treat `parts/` as the golden corpus: add or update regression tests whenever you expand supported syntax or fix a simulator bug.
+Use Rust unit tests alongside the code they cover. Name tests after behavior, for example `parse_file_collects_module_name`. Treat `parts/basic`, `parts/testing`, and `parts/overture` as the golden green corpus, and use `parts/failing` for intentional negative coverage when you need to exercise failure paths.
 
 ## Commit & Pull Request Guidelines
 

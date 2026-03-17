@@ -14,11 +14,11 @@ Use `uv` to manage dependencies and run Python:
 # Test a single module
 uv run pysvsim.py parts/basic/and_gate.sv
 
-# Test entire directory tree (parallel execution, recursive)
-uv run pysvsim.py parts/
+# Test directory trees (parallel execution, recursive)
 uv run pysvsim.py parts/basic/
 uv run pysvsim.py parts/overture/
 uv run pysvsim.py parts/testing/
+uv run pysvsim.py parts/failing/   # negative corpus, failures expected
 
 # Generate truth table / run simulation
 uv run pysvsim.py --file parts/basic/full_adder.sv
@@ -133,6 +133,7 @@ Test files share the same base name as their SystemVerilog file:
   - **parts/basic/**: Core building blocks (gates, adders, muxes, registers, counters, ROMs) — 44 modules
   - **parts/overture/**: Overture CPU and program harnesses (cpu, alu, decoder, fetch, pgm_* wrappers) — 41 modules
   - **parts/testing/**: HDLBits coursework modules and extra test modules — 40 modules
+  - **parts/failing/**: Intentionally failing compile/test fixtures for negative-path validation
   - **parts/roms/**: ROM data files (blank templates)
 - **goals/**: Project milestone documents (8-bit CPU, RV32I plans)
   - **goals/research/**: ISA research reports

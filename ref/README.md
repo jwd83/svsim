@@ -34,10 +34,13 @@ uv run pysvsim.py --file parts/basic/full_adder.sv --test parts/basic/full_adder
 # Test a single file
 uv run pysvsim.py parts/basic/and_gate.sv
 
-# Test a subdirectory or entire tree (parallel)
+# Test a green corpus subdirectory (parallel)
 uv run pysvsim.py parts/basic/
 uv run pysvsim.py parts/overture/
-uv run pysvsim.py parts/          # all subdirectories
+uv run pysvsim.py parts/testing/
+
+# Run the negative corpus manually; failures are expected
+uv run pysvsim.py parts/failing/
 ```
 
 ## Features
@@ -83,6 +86,10 @@ pysvsim/
 │   │   ├── 001-GettingStarted.sv
 │   │   ├── ...
 │   │   └── memory_cpu_stub.sv
+│   ├── failing/            # intentionally failing negative corpus
+│   │   ├── missing_child_module.sv
+│   │   ├── missing_child_module.json
+│   │   └── ...
 │   └── roms/               # Blank ROM templates
 ├── goals/                   # Milestone documents
 │   ├── goal-1-overture_cpu_isa_reference.md

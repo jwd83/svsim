@@ -296,6 +296,116 @@ fn cli_runs_json_regression_directory_with_explicit_source_suite() {
     );
 }
 
+#[test]
+fn cli_reports_expected_failures_for_failing_corpus() {
+    let repo = repo_root();
+    let output = Command::new(svsim_bin())
+        .arg("--json-test-dir")
+        .arg(repo.join("parts/failing"))
+        .output()
+        .expect("run svsim");
+
+    assert!(
+        !output.status.success(),
+        "expected failing corpus to return failure, stdout: {}, stderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let json: Value = serde_json::from_slice(&output.stdout).expect("parse stdout json");
+    assert_eq!(json["report"]["passed"], 0);
+    assert_eq!(json["report"]["total"], 5);
+
+    let suites = json["report"]["suites"].as_array().expect("suite array");
+    assert_eq!(suites.len(), 5);
+
+    let constant_one_mismatch = suites
+        .iter()
+        .find(|suite| {
+            suite["source_path"]
+                == repo
+                    .join("parts/failing/constant_one_mismatch.sv")
+                    .display()
+                    .to_string()
+        })
+        .expect("constant_one_mismatch suite");
+    assert_eq!(constant_one_mismatch["passed"], false);
+    assert_eq!(constant_one_mismatch["report"]["passed"], 0);
+    assert_eq!(constant_one_mismatch["report"]["total"], 1);
+
+    let duplicate_instance_names = suites
+        .iter()
+        .find(|suite| {
+            suite["source_path"]
+                == repo
+                    .join("parts/failing/duplicate_instance_names.sv")
+                    .display()
+                    .to_string()
+        })
+        .expect("duplicate_instance_names suite");
+    assert_eq!(duplicate_instance_names["passed"], false);
+    assert!(duplicate_instance_names["report"].is_null());
+    assert!(
+        duplicate_instance_names["error"]
+            .as_str()
+            .is_some_and(|message| message.contains("more than once"))
+    );
+
+    let malformed_json = suites
+        .iter()
+        .find(|suite| {
+            suite["source_path"]
+                == repo
+                    .join("parts/failing/malformed_json.sv")
+                    .display()
+                    .to_string()
+        })
+        .expect("malformed_json suite");
+    assert_eq!(malformed_json["passed"], false);
+    assert!(malformed_json["report"].is_null());
+    assert!(
+        malformed_json["error"]
+            .as_str()
+            .is_some_and(|message| message.contains("failed to parse JSON test file"))
+    );
+
+    let missing_child_module = suites
+        .iter()
+        .find(|suite| {
+            suite["source_path"]
+                == repo
+                    .join("parts/failing/missing_child_module.sv")
+                    .display()
+                    .to_string()
+        })
+        .expect("missing_child_module suite");
+    assert_eq!(missing_child_module["passed"], false);
+    assert!(missing_child_module["report"].is_null());
+    assert!(
+        missing_child_module["error"]
+            .as_str()
+            .is_some_and(|message| message.contains("missing_dependency"))
+    );
+
+    let syntax_error = suites
+        .iter()
+        .find(|suite| {
+            suite["source_path"]
+                == repo
+                    .join("parts/failing/syntax_error.sv")
+                    .display()
+                    .to_string()
+        })
+        .expect("syntax_error suite");
+    assert_eq!(syntax_error["passed"], false);
+    assert!(syntax_error["report"].is_null());
+    assert!(
+        syntax_error["error"]
+            .as_str()
+            .is_some_and(|message| message.contains("parse"))
+    );
+}
+
 fn unique_temp_dir(name: &str) -> PathBuf {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
