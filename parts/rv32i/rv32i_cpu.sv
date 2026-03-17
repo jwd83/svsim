@@ -19,8 +19,9 @@ module rv32i_cpu (
 
     // Minimal RV32I demo core:
     // - Byte-addressed 32-bit PC
-    // - 32-bit internal RAM with byte and halfword lane selection inside each word
+    // - 64-word instruction and data memories with byte and halfword lane selection inside each data word
     // - Misaligned taken branch/jump targets and misaligned halfword/word data accesses raise simple traps
+    // - Aligned fetch/load/store addresses outside the 64-word demo memories raise access-fault traps
     // - Real RV32I encodings for arithmetic, logical, compare, branch, jump, load/store, fence, and basic system ops
     // - Treats `jal x0, 0` as a demo halt instruction
     // - Surfaces `ecall`, `ebreak`, and unrecognized instructions as simple traps
@@ -35,8 +36,9 @@ module rv32i_cpu (
     reg [31:0] rd_write_value;
     reg [31:0] store_write_value;
 
+    wire is_instr_access_fault = pc[31:8] != 24'b0;
     wire [31:0] instr;
-    assign instr = imem[pc[7:2]];
+    assign instr = is_instr_access_fault ? 32'b0 : imem[pc[7:2]];
 
     wire [6:0] opcode = instr[6:0];
     wire [2:0] funct3 = instr[14:12];
@@ -111,8 +113,9 @@ module rv32i_cpu (
     wire [31:0] data_addr = rs1_value + (is_store ? imm_s : imm_i);
     wire [5:0] data_word_index = data_addr[7:2];
     wire [1:0] data_byte_offset = data_addr[1:0];
-    wire [31:0] load_word = dmem[data_word_index];
-    wire [31:0] store_word = dmem[data_word_index];
+    wire is_data_access_fault = data_addr[31:8] != 24'b0;
+    wire [31:0] load_word = is_data_access_fault ? 32'b0 : dmem[data_word_index];
+    wire [31:0] store_word = is_data_access_fault ? 32'b0 : dmem[data_word_index];
     wire [7:0] load_byte =
         (data_byte_offset == 2'b00) ? load_word[7:0] :
         (data_byte_offset == 2'b01) ? load_word[15:8] :
@@ -151,6 +154,12 @@ module rv32i_cpu (
     wire is_store_misaligned =
         (is_sw & (data_byte_offset != 2'b00)) |
         (is_sh & data_byte_offset[0]);
+    wire is_load_access_fault =
+        (is_lb | is_lh | is_lw | is_lbu | is_lhu) &
+        is_data_access_fault;
+    wire is_store_access_fault =
+        (is_sb | is_sh | is_sw) &
+        is_data_access_fault;
 
     wire rs_equal = rs1_value == rs2_value;
     wire rs_signed_lt = (rs1_value[31] == rs2_value[31]) ? rs_sub[31] : rs1_value[31];
@@ -180,17 +189,23 @@ module rv32i_cpu (
     wire is_illegal = is_supported == 1'b0;
     wire trap_en =
         is_instr_misaligned |
+        is_instr_access_fault |
         is_ecall |
         is_ebreak |
         is_load_misaligned |
+        is_load_access_fault |
         is_store_misaligned |
+        is_store_access_fault |
         is_illegal;
     wire [31:0] trap_cause_next =
         is_instr_misaligned ? 32'd0 :
+        is_instr_access_fault ? 32'd1 :
         is_ecall ? 32'd11 :
         is_ebreak ? 32'd3 :
         is_load_misaligned ? 32'd4 :
+        is_load_access_fault ? 32'd5 :
         is_store_misaligned ? 32'd6 :
+        is_store_access_fault ? 32'd7 :
         32'd2;
 
     always_comb begin

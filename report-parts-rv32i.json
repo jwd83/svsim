@@ -1,18 +1,18 @@
 {
   "directory": "parts/rv32i",
   "report": {
-    "duration_ms": 270,
-    "passed": 13,
-    "total": 13,
+    "duration_ms": 1543,
+    "passed": 16,
+    "total": 16,
     "suites": [
       {
         "source_path": "parts/rv32i/rv32i_cpu.sv",
         "json_path": "parts/rv32i/demo_add_store.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 159,
+        "duration_ms": 805,
         "passed": true,
         "report": {
-          "duration_ms": 1,
+          "duration_ms": 24,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -31,10 +31,10 @@
         "source_path": "parts/rv32i/rv32i_cpu.sv",
         "json_path": "parts/rv32i/demo_branch_jal.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 173,
+        "duration_ms": 723,
         "passed": true,
         "report": {
-          "duration_ms": 1,
+          "duration_ms": 21,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -53,10 +53,10 @@
         "source_path": "parts/rv32i/rv32i_cpu.sv",
         "json_path": "parts/rv32i/demo_breakpoint.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 106,
+        "duration_ms": 776,
         "passed": true,
         "report": {
-          "duration_ms": 0,
+          "duration_ms": 6,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -75,10 +75,10 @@
         "source_path": "parts/rv32i/rv32i_cpu.sv",
         "json_path": "parts/rv32i/demo_compare_control.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 166,
+        "duration_ms": 800,
         "passed": true,
         "report": {
-          "duration_ms": 3,
+          "duration_ms": 58,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -95,12 +95,34 @@
       },
       {
         "source_path": "parts/rv32i/rv32i_cpu.sv",
-        "json_path": "parts/rv32i/demo_illegal_instr.json",
+        "json_path": "parts/rv32i/demo_fetch_access_fault.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 114,
+        "duration_ms": 789,
         "passed": true,
         "report": {
-          "duration_ms": 0,
+          "duration_ms": 12,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Aligned jumps beyond imem raise an instruction access fault",
+              "description": null,
+              "steps": 3,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/rv32i/rv32i_cpu.sv",
+        "json_path": "parts/rv32i/demo_illegal_instr.json",
+        "top_module": "rv32i_cpu",
+        "duration_ms": 714,
+        "passed": true,
+        "report": {
+          "duration_ms": 8,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -119,10 +141,10 @@
         "source_path": "parts/rv32i/rv32i_cpu.sv",
         "json_path": "parts/rv32i/demo_instr_misaligned_branch.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 97,
+        "duration_ms": 755,
         "passed": true,
         "report": {
-          "duration_ms": 1,
+          "duration_ms": 7,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -141,10 +163,10 @@
         "source_path": "parts/rv32i/rv32i_cpu.sv",
         "json_path": "parts/rv32i/demo_instr_misaligned_jalr.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 167,
+        "duration_ms": 723,
         "passed": true,
         "report": {
-          "duration_ms": 0,
+          "duration_ms": 7,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -161,12 +183,34 @@
       },
       {
         "source_path": "parts/rv32i/rv32i_cpu.sv",
-        "json_path": "parts/rv32i/demo_misaligned_load.json",
+        "json_path": "parts/rv32i/demo_load_access_fault.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 156,
+        "duration_ms": 709,
         "passed": true,
         "report": {
-          "duration_ms": 0,
+          "duration_ms": 21,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Aligned loads beyond dmem raise a load access fault",
+              "description": null,
+              "steps": 3,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/rv32i/rv32i_cpu.sv",
+        "json_path": "parts/rv32i/demo_misaligned_load.json",
+        "top_module": "rv32i_cpu",
+        "duration_ms": 733,
+        "passed": true,
+        "report": {
+          "duration_ms": 7,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -185,10 +229,10 @@
         "source_path": "parts/rv32i/rv32i_cpu.sv",
         "json_path": "parts/rv32i/demo_misaligned_store.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 142,
+        "duration_ms": 771,
         "passed": true,
         "report": {
-          "duration_ms": 1,
+          "duration_ms": 9,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -207,10 +251,10 @@
         "source_path": "parts/rv32i/rv32i_cpu.sv",
         "json_path": "parts/rv32i/demo_shift_ops.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 158,
+        "duration_ms": 738,
         "passed": true,
         "report": {
-          "duration_ms": 2,
+          "duration_ms": 31,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -227,12 +271,34 @@
       },
       {
         "source_path": "parts/rv32i/rv32i_cpu.sv",
-        "json_path": "parts/rv32i/demo_subword_mem.json",
+        "json_path": "parts/rv32i/demo_store_access_fault.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 106,
+        "duration_ms": 792,
         "passed": true,
         "report": {
-          "duration_ms": 2,
+          "duration_ms": 8,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Aligned stores beyond dmem raise a store access fault without mutating memory",
+              "description": null,
+              "steps": 4,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/rv32i/rv32i_cpu.sv",
+        "json_path": "parts/rv32i/demo_subword_mem.json",
+        "top_module": "rv32i_cpu",
+        "duration_ms": 724,
+        "passed": true,
+        "report": {
+          "duration_ms": 35,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -251,10 +317,10 @@
         "source_path": "parts/rv32i/rv32i_cpu.sv",
         "json_path": "parts/rv32i/demo_sum_loop.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 155,
+        "duration_ms": 762,
         "passed": true,
         "report": {
-          "duration_ms": 3,
+          "duration_ms": 59,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -273,10 +339,10 @@
         "source_path": "parts/rv32i/rv32i_cpu.sv",
         "json_path": "parts/rv32i/demo_system_misc.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 109,
+        "duration_ms": 719,
         "passed": true,
         "report": {
-          "duration_ms": 1,
+          "duration_ms": 12,
           "passed": 1,
           "total": 1,
           "cases": [
