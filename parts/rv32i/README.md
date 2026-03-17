@@ -9,7 +9,7 @@ This directory adds a small RV32I-flavored corpus that fits the current executab
   - 32 × 32-bit register file
   - 64-word instruction memory (`imem`)
   - 64-word data memory (`dmem`)
-  - trap outputs for `ecall`, `ebreak`, and illegal instructions
+  - trap outputs for `ecall`, `ebreak`, illegal instructions, and misaligned halfword or word data accesses
   - real RV32I encodings for `LUI`, `AUIPC`, `JAL`, `JALR`
   - arithmetic and logical ops: `ADDI`, `SLTI`, `SLTIU`, `XORI`, `ORI`, `ANDI`, `SLLI`, `SRLI`, `SRAI`, `ADD`, `SUB`, `SLL`, `SLT`, `SLTU`, `XOR`, `SRL`, `SRA`, `OR`, `AND`
   - control-flow ops: `BEQ`, `BNE`, `BLT`, `BGE`, `BLTU`, `BGEU`
@@ -20,9 +20,10 @@ This directory adds a small RV32I-flavored corpus that fits the current executab
 
 - Each JSON suite uses `"source": "rv32i_cpu.sv"` and binds a different `.txt` image into `imem`.
 - `jal x0, 0` is treated as a demo halt instruction so tests can assert a stable stopped state.
-- `trap=1` with `trap_cause=11`, `3`, or `2` models `ecall`, `ebreak`, or an illegal instruction respectively.
+- `trap=1` with `trap_cause=11`, `3`, `2`, `4`, or `6` models `ecall`, `ebreak`, an illegal instruction, a misaligned load, or a misaligned store respectively.
 - `dmem` is still word-backed; byte and halfword accesses select lanes within `dmem[addr[7:2]]`.
-- The demo suites keep `LH`/`LHU`/`SH` within one 32-bit word and do not model misaligned traps.
+- `LH`/`LHU` and `SH` still operate only within a single 32-bit word, but misaligned halfword and word data accesses now trap instead of silently aliasing lanes.
+- Instruction memory is still word-backed, so instruction-address misalignment is not modeled in this demo core.
 
 ## Demo Programs
 
@@ -35,6 +36,8 @@ This directory adds a small RV32I-flavored corpus that fits the current executab
 - `demo_system_misc.json`: `FENCE`, `FENCE.I`, and `ECALL`
 - `demo_breakpoint.json`: `EBREAK`
 - `demo_illegal_instr.json`: illegal-instruction trapping
+- `demo_misaligned_load.json`: misaligned `LW` trapping with cause `4`
+- `demo_misaligned_store.json`: misaligned `SW` trapping with cause `6`
 
 
 ## Run

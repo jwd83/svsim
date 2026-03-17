@@ -17,4 +17,4 @@ cargo run -q -p svsim-cli -- --json-test-dir parts/failing
 uv run ref/pysvsim.py parts/failing/
 ```
 
-For the all-green compatibility corpus, keep using `parts/basic`, `parts/testing`, and `parts/overture`.
+For the all-green compatibility corpus, keep using `parts/basic`, `parts/testing`, `parts/overture`, and `parts/rv32i`.

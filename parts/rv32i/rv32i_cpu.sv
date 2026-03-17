@@ -20,6 +20,7 @@ module rv32i_cpu (
     // Minimal RV32I demo core:
     // - Byte-addressed 32-bit PC
     // - 32-bit internal RAM with byte and halfword lane selection inside each word
+    // - Misaligned halfword/word data accesses raise simple load/store traps
     // - Real RV32I encodings for arithmetic, logical, compare, branch, jump, load/store, fence, and basic system ops
     // - Treats `jal x0, 0` as a demo halt instruction
     // - Surfaces `ecall`, `ebreak`, and unrecognized instructions as simple traps
@@ -142,6 +143,12 @@ module rv32i_cpu (
     wire [31:0] jalr_target = (rs1_value + imm_i) & 32'hfffffffe;
     wire [31:0] rs_sub = rs1_value - rs2_value;
     wire [31:0] imm_sub = rs1_value - imm_i;
+    wire is_load_misaligned =
+        (is_lw & (data_byte_offset != 2'b00)) |
+        ((is_lh | is_lhu) & data_byte_offset[0]);
+    wire is_store_misaligned =
+        (is_sw & (data_byte_offset != 2'b00)) |
+        (is_sh & data_byte_offset[0]);
 
     wire rs_equal = rs1_value == rs2_value;
     wire rs_signed_lt = (rs1_value[31] == rs2_value[31]) ? rs_sub[31] : rs1_value[31];
@@ -165,10 +172,12 @@ module rv32i_cpu (
         is_fence | is_fence_i |
         is_ecall | is_ebreak;
     wire is_illegal = is_supported == 1'b0;
-    wire trap_en = is_ecall | is_ebreak | is_illegal;
+    wire trap_en = is_ecall | is_ebreak | is_load_misaligned | is_store_misaligned | is_illegal;
     wire [31:0] trap_cause_next =
         is_ecall ? 32'd11 :
         is_ebreak ? 32'd3 :
+        is_load_misaligned ? 32'd4 :
+        is_store_misaligned ? 32'd6 :
         32'd2;
 
     always_comb begin

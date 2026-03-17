@@ -41,10 +41,11 @@ Current implementation status as of March 17, 2026:
 - current sequential limits: only `posedge` event controls are lowered, `always_ff` clock expressions must be local identifiers, and cross-block race semantics are not modeled beyond deterministic source order
 - current memory subset supports fixed-size unpacked `reg` / `logic` arrays with zero-initialized reads, explicit programmatic preload/read access by instance path, text-file ROM/RAM loading, procedural single-element writes, and JSON-driven regression preload; explicit elaboration, broader event controls, and render integration are still pending
 - regression compatibility now covers the legacy corpus conventions that still matter in `parts/`: compile-time validation now enforces the supported interface-only `rom_*` wrapper shape and backing text-file lookup, and `pgm_*` JSON suites auto-bind `overture_fetch.rom` from a sibling program text file when no explicit memory bindings are present
-- measured verification: `cargo test` passes; the compile-only multi-directory corpus reports `parts/basic` at `44/44`, `parts/testing` at `41/41`, `parts/overture` at `41/41`, and the full `parts/basic` + `parts/testing` + `parts/overture` compile surface at `126/126` in about `1.6s`; the JSON regression corpus remains green at `128/128` in about `18.6s`
-- measured batch status: the compile-only multi-directory runner completes `parts/basic` in about `0.8s`, `parts/testing` in about `0.1s`, and `parts/overture` in about `0.7s`; the JSON multi-directory runner completes them in about `8.1s`, `0.2s`, and `10.3s`
+- measured verification: `cargo test` passes; the compile-only multi-directory corpus reports `parts/basic` at `44/44`, `parts/testing` at `42/42`, `parts/overture` at `41/41`, `parts/rv32i` at `1/1`, and the full `parts/basic` + `parts/testing` + `parts/overture` + `parts/rv32i` compile surface at `128/128` in about `2.4s`; the JSON regression corpus remains green at `140/140` in about `19.9s`
+- measured batch status: the compile-only multi-directory runner completes `parts/basic` in about `0.9s`, `parts/testing` in about `0.2s`, `parts/overture` in about `0.8s`, and `parts/rv32i` in about `0.4s`; the JSON multi-directory runner completes them in about `8.0s`, `0.2s`, `10.4s`, and `1.3s`
 - `parts/testing/020-WidthCoercion.sv` and `parts/testing/020-WidthCoercion.json` now pin widened and narrowed assignment/instance-port coercion behavior in the green corpus
 - `parts/testing/021-ShiftOps.sv` and `parts/testing/021-ShiftOps.json` now pin logical shift semantics, including left-operand result width and zeroing when the shift amount reaches the operand width
+- `parts/rv32i` now provides an 11-suite RV32I demo corpus covering arithmetic, compare, branch, jump, subword memory, fence/system instructions, breakpoint and illegal-instruction traps, and misaligned load/store traps
 - `parts/rv32i/demo_shift_ops.json` now exercises the RV32I demo core's `SLLI`, `SRLI`, `SRAI`, `SLL`, `SRL`, and `SRA` execution path, including register-form `shamt[4:0]` masking
 - `parts/testing/019-Vector5.json` now matches the standard SystemVerilog bit ordering for multi-expression replication (`{5{a, b, c, d, e}}`), retiring the old Python reference divergence from the checked-in corpus
 
@@ -52,7 +53,7 @@ Current implementation status as of March 17, 2026:
 
 The first meaningful milestone is feature parity with the subset exercised by the current repository:
 
-- `126` SystemVerilog files under `parts/`
+- `128` compile-green SystemVerilog files across `parts/basic`, `parts/testing`, `parts/overture`, and `parts/rv32i`
 - hierarchical modules built from gates up through the Overture CPU
 - combinational logic with buses, slices, concatenation, replication, arithmetic, comparisons, and ternary expressions
 - `always_comb`
