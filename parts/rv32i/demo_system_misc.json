@@ -1,0 +1,42 @@
+{
+  "source": "rv32i_cpu.sv",
+  "sequential": true,
+  "memory_files": {
+    "rom": {
+      "module": "rv32i_cpu",
+      "memory": "imem",
+      "file": "demo_system_misc.txt"
+    }
+  },
+  "test_cases": [
+    {
+      "name": "Fence instructions act as no-ops and ecall raises a trap",
+      "sequence": [
+        {
+          "inputs": {"clk": 1, "reset": 1, "run": 0},
+          "expected": {"pc": 0, "halted": 0, "trap": 0, "trap_cause": 0, "x1_out": 0, "x2_out": 0}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 4, "trap": 0, "x1_out": 5}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 8, "trap": 0, "x1_out": 5, "instr_debug": 267386895}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 12, "trap": 0, "x1_out": 5, "instr_debug": 4111}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 16, "trap": 0, "x2_out": 8}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 16, "halted": 1, "trap": 1, "trap_cause": 11, "instr_debug": 115, "x1_out": 5, "x2_out": 8}
+        }
+      ]
+    }
+  ]
+}

@@ -1,18 +1,18 @@
 {
   "directory": "parts/rv32i",
   "report": {
-    "duration_ms": 63,
-    "passed": 3,
-    "total": 3,
+    "duration_ms": 206,
+    "passed": 9,
+    "total": 9,
     "suites": [
       {
         "source_path": "parts/rv32i/rv32i_cpu.sv",
         "json_path": "parts/rv32i/demo_add_store.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 62,
+        "duration_ms": 136,
         "passed": true,
         "report": {
-          "duration_ms": 0,
+          "duration_ms": 1,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -31,10 +31,10 @@
         "source_path": "parts/rv32i/rv32i_cpu.sv",
         "json_path": "parts/rv32i/demo_branch_jal.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 62,
+        "duration_ms": 152,
         "passed": true,
         "report": {
-          "duration_ms": 0,
+          "duration_ms": 1,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -51,12 +51,122 @@
       },
       {
         "source_path": "parts/rv32i/rv32i_cpu.sv",
-        "json_path": "parts/rv32i/demo_sum_loop.json",
+        "json_path": "parts/rv32i/demo_breakpoint.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 62,
+        "duration_ms": 150,
         "passed": true,
         "report": {
-          "duration_ms": 1,
+          "duration_ms": 0,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Ebreak stops execution and reports breakpoint trap cause",
+              "description": null,
+              "steps": 3,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/rv32i/rv32i_cpu.sv",
+        "json_path": "parts/rv32i/demo_compare_control.json",
+        "top_module": "rv32i_cpu",
+        "duration_ms": 162,
+        "passed": true,
+        "report": {
+          "duration_ms": 3,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "AUIPC, JALR, compare ops, and signed or unsigned branches execute correctly",
+              "description": null,
+              "steps": 20,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/rv32i/rv32i_cpu.sv",
+        "json_path": "parts/rv32i/demo_illegal_instr.json",
+        "top_module": "rv32i_cpu",
+        "duration_ms": 155,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Unknown instructions trap instead of advancing silently",
+              "description": null,
+              "steps": 4,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/rv32i/rv32i_cpu.sv",
+        "json_path": "parts/rv32i/demo_shift_ops.json",
+        "top_module": "rv32i_cpu",
+        "duration_ms": 154,
+        "passed": true,
+        "report": {
+          "duration_ms": 2,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Shift instructions update registers and memory with RV32I shamt semantics",
+              "description": null,
+              "steps": 15,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/rv32i/rv32i_cpu.sv",
+        "json_path": "parts/rv32i/demo_subword_mem.json",
+        "top_module": "rv32i_cpu",
+        "duration_ms": 148,
+        "passed": true,
+        "report": {
+          "duration_ms": 2,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Subword loads and stores select the correct byte and halfword lanes",
+              "description": null,
+              "steps": 15,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/rv32i/rv32i_cpu.sv",
+        "json_path": "parts/rv32i/demo_sum_loop.json",
+        "top_module": "rv32i_cpu",
+        "duration_ms": 152,
+        "passed": true,
+        "report": {
+          "duration_ms": 3,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -64,6 +174,28 @@
               "name": "Loop with bne accumulates 1 through 5",
               "description": null,
               "steps": 21,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/rv32i/rv32i_cpu.sv",
+        "json_path": "parts/rv32i/demo_system_misc.json",
+        "top_module": "rv32i_cpu",
+        "duration_ms": 69,
+        "passed": true,
+        "report": {
+          "duration_ms": 1,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Fence instructions act as no-ops and ecall raises a trap",
+              "description": null,
+              "steps": 6,
               "passed": true,
               "failures": []
             }

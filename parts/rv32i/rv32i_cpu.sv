@@ -5,6 +5,8 @@ module rv32i_cpu (
     output [31:0] pc,
     output [31:0] instr_debug,
     output        halted,
+    output        trap,
+    output [31:0] trap_cause,
     output [31:0] x1_out,
     output [31:0] x2_out,
     output [31:0] x3_out,
@@ -18,8 +20,9 @@ module rv32i_cpu (
     // Minimal RV32I demo core:
     // - Byte-addressed 32-bit PC
     // - 32-bit internal RAM with byte and halfword lane selection inside each word
-    // - Real RV32I encodings for arithmetic, logical, compare, branch, jump, and simple load/store ops
+    // - Real RV32I encodings for arithmetic, logical, compare, branch, jump, load/store, fence, and basic system ops
     // - Treats `jal x0, 0` as a demo halt instruction
+    // - Surfaces `ecall`, `ebreak`, and unrecognized instructions as simple traps
 
     reg [31:0] regs [31:0];
     reg [31:0] imem [63:0];
@@ -61,6 +64,8 @@ module rv32i_cpu (
     wire is_auipc  = opcode == 7'b0010111;
     wire is_jal    = opcode == 7'b1101111;
     wire is_jalr   = opcode == 7'b1100111;
+    wire is_misc_mem = opcode == 7'b0001111;
+    wire is_system = opcode == 7'b1110011;
 
     wire is_addi = is_op_imm & (funct3 == 3'b000);
     wire is_slti = is_op_imm & (funct3 == 3'b010);
@@ -97,6 +102,10 @@ module rv32i_cpu (
     wire is_bge = is_branch & (funct3 == 3'b101);
     wire is_bltu = is_branch & (funct3 == 3'b110);
     wire is_bgeu = is_branch & (funct3 == 3'b111);
+    wire is_fence = is_misc_mem & (funct3 == 3'b000);
+    wire is_fence_i = is_misc_mem & (funct3 == 3'b001);
+    wire is_ecall = is_system & (funct3 == 3'b000) & (instr[31:20] == 12'b000000000000);
+    wire is_ebreak = is_system & (funct3 == 3'b000) & (instr[31:20] == 12'b000000000001);
 
     wire [31:0] data_addr = rs1_value + (is_store ? imm_s : imm_i);
     wire [5:0] data_word_index = data_addr[7:2];
@@ -147,6 +156,20 @@ module rv32i_cpu (
         (is_bltu & rs_unsigned_lt) |
         (is_bgeu & (rs_unsigned_lt == 1'b0));
     wire is_halt = instr == 32'h0000006f;
+    wire is_supported =
+        is_addi | is_slti | is_sltiu | is_slli | is_xori | is_srli | is_srai | is_ori | is_andi |
+        is_add | is_sll | is_slt | is_sltu | is_sub | is_xor | is_srl | is_sra | is_or | is_and |
+        is_lb | is_lh | is_lw | is_lbu | is_lhu | is_sb | is_sh | is_sw |
+        is_beq | is_bne | is_blt | is_bge | is_bltu | is_bgeu |
+        is_lui | is_auipc | is_jal | is_jalr |
+        is_fence | is_fence_i |
+        is_ecall | is_ebreak;
+    wire is_illegal = is_supported == 1'b0;
+    wire trap_en = is_ecall | is_ebreak | is_illegal;
+    wire [31:0] trap_cause_next =
+        is_ecall ? 32'd11 :
+        is_ebreak ? 32'd3 :
+        32'd2;
 
     always_comb begin
         reg_write_en = 1'b0;
@@ -156,6 +179,8 @@ module rv32i_cpu (
         store_write_value = 32'b0;
 
         if (is_halt) begin
+            next_pc = pc;
+        end else if (trap_en) begin
             next_pc = pc;
         end else if (branch_taken) begin
             next_pc = pc + imm_b;
@@ -242,6 +267,8 @@ module rv32i_cpu (
         end else if (is_sw) begin
             store_en = 1'b1;
             store_write_value = rs2_value;
+        end else if (is_fence | is_fence_i) begin
+            next_pc = pc + 32'd4;
         end
     end
 
@@ -250,14 +277,24 @@ module rv32i_cpu (
             pc <= 32'b0;
             instr_debug <= 32'b0;
             halted <= 1'b0;
+            trap <= 1'b0;
+            trap_cause <= 32'b0;
             regs[0] <= 32'b0;
         end else if (run && (halted == 1'b0)) begin
             instr_debug <= instr;
 
             if (is_halt) begin
                 halted <= 1'b1;
+                trap <= 1'b0;
+                trap_cause <= 32'b0;
+            end else if (trap_en) begin
+                halted <= 1'b1;
+                trap <= 1'b1;
+                trap_cause <= trap_cause_next;
             end else begin
                 pc <= next_pc;
+                trap <= 1'b0;
+                trap_cause <= 32'b0;
 
                 if (reg_write_en && (rd_idx != 5'b00000))
                     regs[rd_idx] <= rd_write_value;
