@@ -20,7 +20,7 @@ module rv32i_cpu (
     // Minimal RV32I demo core:
     // - Byte-addressed 32-bit PC
     // - 32-bit internal RAM with byte and halfword lane selection inside each word
-    // - Misaligned halfword/word data accesses raise simple load/store traps
+    // - Misaligned taken branch/jump targets and misaligned halfword/word data accesses raise simple traps
     // - Real RV32I encodings for arithmetic, logical, compare, branch, jump, load/store, fence, and basic system ops
     // - Treats `jal x0, 0` as a demo halt instruction
     // - Surfaces `ecall`, `ebreak`, and unrecognized instructions as simple traps
@@ -140,6 +140,8 @@ module rv32i_cpu (
                               {store_word[31:16], rs2_value[15:0]};
     wire [31:0] srai_fill = rs1_value[31] ? ~(32'hffffffff >> shamt_i) : 32'b0;
     wire [31:0] sra_fill = rs1_value[31] ? ~(32'hffffffff >> shamt_r) : 32'b0;
+    wire [31:0] branch_target = pc + imm_b;
+    wire [31:0] jal_target = pc + imm_j;
     wire [31:0] jalr_target = (rs1_value + imm_i) & 32'hfffffffe;
     wire [31:0] rs_sub = rs1_value - rs2_value;
     wire [31:0] imm_sub = rs1_value - imm_i;
@@ -162,6 +164,10 @@ module rv32i_cpu (
         (is_bge & (rs_signed_lt == 1'b0)) |
         (is_bltu & rs_unsigned_lt) |
         (is_bgeu & (rs_unsigned_lt == 1'b0));
+    wire is_instr_misaligned =
+        (branch_taken & (branch_target[1:0] != 2'b00)) |
+        (is_jal & (jal_target[1:0] != 2'b00)) |
+        (is_jalr & (jalr_target[1:0] != 2'b00));
     wire is_halt = instr == 32'h0000006f;
     wire is_supported =
         is_addi | is_slti | is_sltiu | is_slli | is_xori | is_srli | is_srai | is_ori | is_andi |
@@ -172,8 +178,15 @@ module rv32i_cpu (
         is_fence | is_fence_i |
         is_ecall | is_ebreak;
     wire is_illegal = is_supported == 1'b0;
-    wire trap_en = is_ecall | is_ebreak | is_load_misaligned | is_store_misaligned | is_illegal;
+    wire trap_en =
+        is_instr_misaligned |
+        is_ecall |
+        is_ebreak |
+        is_load_misaligned |
+        is_store_misaligned |
+        is_illegal;
     wire [31:0] trap_cause_next =
+        is_instr_misaligned ? 32'd0 :
         is_ecall ? 32'd11 :
         is_ebreak ? 32'd3 :
         is_load_misaligned ? 32'd4 :
@@ -192,11 +205,11 @@ module rv32i_cpu (
         end else if (trap_en) begin
             next_pc = pc;
         end else if (branch_taken) begin
-            next_pc = pc + imm_b;
+            next_pc = branch_target;
         end else if (is_jal) begin
             reg_write_en = 1'b1;
             rd_write_value = pc + 32'd4;
-            next_pc = pc + imm_j;
+            next_pc = jal_target;
         end else if (is_jalr) begin
             reg_write_en = 1'b1;
             rd_write_value = pc + 32'd4;

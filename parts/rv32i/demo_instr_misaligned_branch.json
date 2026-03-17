@@ -1,0 +1,30 @@
+{
+  "source": "rv32i_cpu.sv",
+  "sequential": true,
+  "memory_files": {
+    "rom": {
+      "module": "rv32i_cpu",
+      "memory": "imem",
+      "file": "demo_instr_misaligned_branch.txt"
+    }
+  },
+  "test_cases": [
+    {
+      "name": "Taken branches trap on misaligned instruction targets",
+      "sequence": [
+        {
+          "inputs": {"clk": 1, "reset": 1, "run": 0},
+          "expected": {"pc": 0, "halted": 0, "trap": 0, "trap_cause": 0, "x1_out": 0, "x2_out": 0}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 4, "trap": 0, "x1_out": 1, "x2_out": 0}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0, "run": 1},
+          "expected": {"pc": 4, "halted": 1, "trap": 1, "trap_cause": 0, "instr_debug": 1081699, "x1_out": 1, "x2_out": 0}
+        }
+      ]
+    }
+  ]
+}
