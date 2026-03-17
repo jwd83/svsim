@@ -60,11 +60,12 @@ fn validate_module_recursive(
 }
 
 fn validate_module(module: &ModuleSummary) -> Result<()> {
+    validate_supported_port_directions(module)?;
     validate_unique_declarations(module)?;
 
     for assign in &module.continuous_assignments {
         validate_expr(&assign.expr, module)?;
-        validate_lvalue(&assign.target, module)?;
+        validate_assignment_target(&assign.target, module)?;
         if lvalue_contains_memory(&assign.target) {
             return Err(Error::Unsupported(
                 "continuous assignments to memory elements are not supported".into(),
@@ -120,6 +121,28 @@ fn validate_unique_declarations(module: &ModuleSummary) -> Result<()> {
     Ok(())
 }
 
+fn validate_supported_port_directions(module: &ModuleSummary) -> Result<()> {
+    for port in &module.ports {
+        match port.direction {
+            PortDirection::Input | PortDirection::Output => {}
+            PortDirection::Inout => {
+                return Err(Error::Unsupported(format!(
+                    "module '{}' uses unsupported `inout` port '{}'",
+                    module.name, port.name
+                )));
+            }
+            PortDirection::Ref => {
+                return Err(Error::Unsupported(format!(
+                    "module '{}' uses unsupported `ref` port '{}'",
+                    module.name, port.name
+                )));
+            }
+        }
+    }
+
+    Ok(())
+}
+
 fn validate_instance(
     parent: &ModuleSummary,
     instance: &ModuleInstanceSummary,
@@ -150,7 +173,7 @@ fn validate_instance(
                     instance.instance_name, port.name
                 ))
             })?;
-            validate_lvalue(&lvalue, parent)?;
+            validate_assignment_target(&lvalue, parent)?;
             if lvalue_contains_memory(&lvalue) {
                 return Err(Error::Unsupported(format!(
                     "instance '{}' connects output port '{}' to a memory element, which is not supported",
@@ -174,7 +197,7 @@ fn validate_stmt(stmt: &Stmt, module: &ModuleSummary, block_kind: &ProcBlockKind
         }
         Stmt::Assign { kind, target, expr } => {
             validate_expr(expr, module)?;
-            validate_lvalue(target, module)?;
+            validate_assignment_target(target, module)?;
 
             if lvalue_contains_memory(target) && matches!(block_kind, ProcBlockKind::AlwaysComb) {
                 return Err(Error::Unsupported(
@@ -368,6 +391,41 @@ fn validate_lvalue(lvalue: &LValue, module: &ModuleSummary) -> Result<usize> {
                 })
         }
     }
+}
+
+fn validate_assignment_target(lvalue: &LValue, module: &ModuleSummary) -> Result<usize> {
+    let width = validate_lvalue(lvalue, module)?;
+    validate_port_drive_targets(lvalue, module)?;
+    Ok(width)
+}
+
+fn validate_port_drive_targets(lvalue: &LValue, module: &ModuleSummary) -> Result<()> {
+    match lvalue {
+        LValue::Signal(name) => validate_driven_signal(name, module),
+        LValue::Concat(items) => {
+            for item in items {
+                validate_port_drive_targets(item, module)?;
+            }
+            Ok(())
+        }
+        LValue::BitSelect { signal, .. } | LValue::PartSelect { signal, .. } => {
+            validate_driven_signal(signal, module)
+        }
+        LValue::MemoryElement { .. } => Ok(()),
+    }
+}
+
+fn validate_driven_signal(signal: &str, module: &ModuleSummary) -> Result<()> {
+    if let Some(port) = module.port(signal) {
+        if matches!(port.direction, PortDirection::Input) {
+            return Err(Error::Resolve(format!(
+                "input port '{}' in '{}' cannot be driven",
+                signal, module.name
+            )));
+        }
+    }
+
+    Ok(())
 }
 
 fn lvalue_contains_memory(lvalue: &LValue) -> bool {

@@ -800,6 +800,78 @@ mod tests {
     }
 
     #[test]
+    fn compile_str_errors_on_unsupported_inout_port_direction() {
+        let error = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                "module top(inout logic io); endmodule\n",
+            )
+            .expect_err("inout ports should fail validation");
+
+        match error {
+            Error::Unsupported(message) => {
+                assert!(
+                    message.contains("unsupported `inout` port 'io'"),
+                    "unexpected message: {message}"
+                );
+            }
+            other => panic!("unexpected error: {other}"),
+        }
+    }
+
+    #[test]
+    fn compile_str_errors_on_continuous_assignment_to_input_port() {
+        let error = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module top(input logic a, output logic y); ",
+                    "assign a = 1'b0; ",
+                    "assign y = a; ",
+                    "endmodule\n"
+                ),
+            )
+            .expect_err("driving an input port should fail validation");
+
+        match error {
+            Error::Resolve(message) => {
+                assert!(
+                    message.contains("input port 'a' in 'top' cannot be driven"),
+                    "unexpected message: {message}"
+                );
+            }
+            other => panic!("unexpected error: {other}"),
+        }
+    }
+
+    #[test]
+    fn compile_str_errors_on_procedural_assignment_to_input_port() {
+        let error = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module top(input logic a, output logic y); ",
+                    "always_comb begin ",
+                    "a = 1'b0; ",
+                    "y = a; ",
+                    "end ",
+                    "endmodule\n"
+                ),
+            )
+            .expect_err("procedurally driving an input port should fail validation");
+
+        match error {
+            Error::Resolve(message) => {
+                assert!(
+                    message.contains("input port 'a' in 'top' cannot be driven"),
+                    "unexpected message: {message}"
+                );
+            }
+            other => panic!("unexpected error: {other}"),
+        }
+    }
+
+    #[test]
     fn compile_str_errors_on_unknown_instance_port() {
         let error = Compiler::new()
             .compile_str(
@@ -841,6 +913,32 @@ mod tests {
         match error {
             Error::Resolve(message) => {
                 assert!(message.contains("connects port 'a' more than once"));
+            }
+            other => panic!("unexpected error: {other}"),
+        }
+    }
+
+    #[test]
+    fn compile_str_errors_on_output_port_connected_to_input_port() {
+        let error = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module child(input logic a, output logic y); assign y = a; endmodule\n",
+                    "module top(input logic a, output logic y); ",
+                    "child u_child (.a(a), .y(a)); ",
+                    "assign y = a; ",
+                    "endmodule\n"
+                ),
+            )
+            .expect_err("driving a parent input through a child output should fail validation");
+
+        match error {
+            Error::Resolve(message) => {
+                assert!(
+                    message.contains("input port 'a' in 'top' cannot be driven"),
+                    "unexpected message: {message}"
+                );
             }
             other => panic!("unexpected error: {other}"),
         }
