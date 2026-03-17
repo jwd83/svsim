@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::path::Path;
 
 use crate::diag::{Error, Result};
 use crate::hir::{
@@ -42,7 +43,7 @@ fn validate_module_recursive(
     let module = hir
         .module(module_name)
         .ok_or_else(|| Error::Resolve(format!("module '{}' was not compiled", module_name)))?;
-    validate_module(module)?;
+    validate_module(hir, module)?;
 
     stack.push(module_name.to_owned());
     for instance in &module.instantiations {
@@ -61,11 +62,12 @@ fn validate_module_recursive(
     Ok(())
 }
 
-fn validate_module(module: &ModuleSummary) -> Result<()> {
+fn validate_module(hir: &HirDesign, module: &ModuleSummary) -> Result<()> {
     validate_supported_port_directions(module)?;
     validate_unique_declarations(module)?;
     validate_unique_instance_names(module)?;
     validate_runtime_widths(module)?;
+    validate_legacy_rom_primitive(hir, module)?;
 
     for assign in &module.continuous_assignments {
         validate_expr(&assign.expr, module)?;
@@ -566,4 +568,86 @@ fn ensure_runtime_width(width: usize, context: impl Into<String>) -> Result<usiz
     }
 
     Ok(width)
+}
+
+fn validate_legacy_rom_primitive(hir: &HirDesign, module: &ModuleSummary) -> Result<()> {
+    if !module.name.starts_with("rom_") {
+        return Ok(());
+    }
+
+    let rom_name = &module.name["rom_".len()..];
+    if rom_name.is_empty() {
+        return Err(Error::Unsupported(
+            "legacy ROM primitive names must include a non-empty file stem after `rom_`".into(),
+        ));
+    }
+
+    if !module.signals.is_empty()
+        || !module.memories.is_empty()
+        || !module.continuous_assignments.is_empty()
+        || !module.proc_blocks.is_empty()
+        || !module.instantiations.is_empty()
+    {
+        return Err(Error::Unsupported(format!(
+            "legacy ROM primitive '{}' must be a port-only wrapper with no internal declarations or logic",
+            module.name
+        )));
+    }
+
+    let input_ports = module
+        .ports
+        .iter()
+        .filter(|port| matches!(port.direction, PortDirection::Input))
+        .collect::<Vec<_>>();
+    let output_ports = module
+        .ports
+        .iter()
+        .filter(|port| matches!(port.direction, PortDirection::Output))
+        .collect::<Vec<_>>();
+    if module.ports.len() != 2 || input_ports.len() != 1 || output_ports.len() != 1 {
+        return Err(Error::Unsupported(format!(
+            "legacy ROM primitive '{}' must declare exactly one input address port and one output data port",
+            module.name
+        )));
+    }
+
+    let source_path = hir.module_source_path(&module.name).ok_or_else(|| {
+        Error::Resolve(format!(
+            "could not determine source file for legacy ROM primitive '{}'",
+            module.name
+        ))
+    })?;
+    resolve_legacy_rom_data_path(source_path, rom_name).ok_or_else(|| {
+        Error::Resolve(format!(
+            "legacy ROM primitive '{}' could not find '{}.txt'",
+            module.name, rom_name
+        ))
+    })?;
+
+    let addr_port = input_ports[0];
+    let _ = 1usize
+        .checked_shl(addr_port.width() as u32)
+        .ok_or_else(|| {
+            Error::Unsupported(format!(
+                "legacy ROM primitive '{}' address width {} exceeds host limits",
+                module.name,
+                addr_port.width()
+            ))
+        })?;
+
+    Ok(())
+}
+
+fn resolve_legacy_rom_data_path(source_path: &Path, rom_name: &str) -> Option<std::path::PathBuf> {
+    let file_name = format!("{rom_name}.txt");
+    let mut candidates = Vec::new();
+    if let Some(source_dir) = source_path.parent() {
+        candidates.push(source_dir.join(&file_name));
+        candidates.push(source_dir.join("roms").join(&file_name));
+    }
+    if let Ok(current_dir) = std::env::current_dir() {
+        candidates.push(current_dir.join("roms").join(&file_name));
+    }
+
+    candidates.into_iter().find(|candidate| candidate.is_file())
 }

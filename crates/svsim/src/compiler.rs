@@ -732,6 +732,66 @@ mod tests {
     }
 
     #[test]
+    fn compile_file_errors_on_malformed_legacy_rom_wrapper() {
+        let temp_dir = unique_temp_dir("legacy-rom-shape");
+        fs::write(temp_dir.join("inline.txt"), "0x2a\n").expect("write inline.txt");
+        fs::write(
+            temp_dir.join("rom_inline.sv"),
+            concat!(
+                "module rom_inline(",
+                "input logic [1:0] addr, output logic [7:0] data",
+                "); ",
+                "logic shadow; ",
+                "endmodule\n"
+            ),
+        )
+        .expect("write rom_inline.sv");
+
+        let error = Compiler::new()
+            .compile_file(temp_dir.join("rom_inline.sv"))
+            .expect_err("legacy rom wrappers with internal logic should fail");
+
+        match error {
+            Error::Unsupported(message) => {
+                assert!(
+                    message.contains("must be a port-only wrapper"),
+                    "unexpected message: {message}"
+                );
+            }
+            other => panic!("unexpected error: {other}"),
+        }
+    }
+
+    #[test]
+    fn compile_file_errors_on_missing_legacy_rom_data_file() {
+        let temp_dir = unique_temp_dir("legacy-rom-missing-data");
+        fs::write(
+            temp_dir.join("rom_missing.sv"),
+            concat!(
+                "module rom_missing(",
+                "input logic [1:0] addr, output logic [7:0] data",
+                "); ",
+                "endmodule\n"
+            ),
+        )
+        .expect("write rom_missing.sv");
+
+        let error = Compiler::new()
+            .compile_file(temp_dir.join("rom_missing.sv"))
+            .expect_err("legacy rom wrappers without a backing data file should fail");
+
+        match error {
+            Error::Resolve(message) => {
+                assert!(
+                    message.contains("could not find 'missing.txt'"),
+                    "unexpected message: {message}"
+                );
+            }
+            other => panic!("unexpected error: {other}"),
+        }
+    }
+
+    #[test]
     fn compile_str_finds_top_module() {
         let design = Compiler::new()
             .compile_str(
