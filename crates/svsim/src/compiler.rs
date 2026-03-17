@@ -350,14 +350,11 @@ impl Compiler {
             if let Some(existing_path) =
                 provided_modules.insert(module.name.clone(), source_path.to_path_buf())
             {
-                if existing_path != source_path {
-                    return Err(Error::Resolve(format!(
-                        "module '{}' is defined in both {} and {}",
-                        module.name,
-                        existing_path.display(),
-                        source_path.display()
-                    )));
-                }
+                return Err(Error::Resolve(duplicate_module_definition_message(
+                    &module.name,
+                    &existing_path,
+                    source_path,
+                )));
             }
         }
 
@@ -375,6 +372,27 @@ impl Compiler {
         }
 
         Ok(())
+    }
+}
+
+fn duplicate_module_definition_message(
+    module_name: &str,
+    existing_path: &Path,
+    duplicate_path: &Path,
+) -> String {
+    if existing_path == duplicate_path {
+        format!(
+            "module '{}' is defined more than once in {}",
+            module_name,
+            existing_path.display()
+        )
+    } else {
+        format!(
+            "module '{}' is defined in both {} and {}",
+            module_name,
+            existing_path.display(),
+            duplicate_path.display()
+        )
     }
 }
 
@@ -670,6 +688,34 @@ mod tests {
     }
 
     #[test]
+    fn compile_file_errors_on_duplicate_module_name_in_same_file() {
+        let temp_dir = unique_temp_dir("duplicate-module-same-file");
+        fs::write(
+            temp_dir.join("top.sv"),
+            concat!(
+                "module child(output logic outY); assign outY = 1'b0; endmodule\n",
+                "module child(output logic outY); assign outY = 1'b1; endmodule\n",
+                "module top(output logic outY); child u_child (.outY(outY)); endmodule\n"
+            ),
+        )
+        .expect("write top");
+
+        let error = Compiler::new()
+            .compile_file(temp_dir.join("top.sv"))
+            .expect_err("duplicate module names in one file should fail");
+
+        match error {
+            Error::Resolve(message) => {
+                assert!(
+                    message.contains("module 'child' is defined more than once"),
+                    "unexpected message: {message}"
+                );
+            }
+            other => panic!("unexpected error: {other}"),
+        }
+    }
+
+    #[test]
     fn compile_file_loads_overture_fetch_without_memory_diagnostics() {
         let repo = repo_root();
         let design = Compiler::new()
@@ -794,6 +840,30 @@ mod tests {
         match error {
             Error::Resolve(message) => {
                 assert!(message.contains("declares 'a' more than once"));
+            }
+            other => panic!("unexpected error: {other}"),
+        }
+    }
+
+    #[test]
+    fn compile_str_errors_on_duplicate_module_name_in_same_source() {
+        let error = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module child(output logic outY); assign outY = 1'b0; endmodule\n",
+                    "module child(output logic outY); assign outY = 1'b1; endmodule\n",
+                    "module top(output logic outY); child u_child (.outY(outY)); endmodule\n"
+                ),
+            )
+            .expect_err("duplicate module names should fail compilation");
+
+        match error {
+            Error::Resolve(message) => {
+                assert!(
+                    message.contains("module 'child' is defined more than once"),
+                    "unexpected message: {message}"
+                );
             }
             other => panic!("unexpected error: {other}"),
         }
