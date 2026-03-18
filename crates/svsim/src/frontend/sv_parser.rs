@@ -201,6 +201,9 @@ fn lower_non_port_module_item(
     module: &mut ModuleSummary,
 ) {
     match item {
+        NonPortModuleItem::GenerateRegion(region) => {
+            lower_generate_region(syntax_tree, region, path, module);
+        }
         NonPortModuleItem::ModuleOrGenerateItem(item) => {
             lower_module_or_generate_item(syntax_tree, item, path, module);
         }
@@ -603,6 +606,9 @@ fn lower_module_or_generate_item(
                     Err(diag) => module.unsupported.push(diag),
                 }
             }
+            sv_parser::ModuleCommonItem::ConditionalGenerateConstruct(construct) => {
+                lower_conditional_generate_construct(syntax_tree, construct, path, module);
+            }
             _ => module.unsupported.push(Diagnostic {
                 message: "module item is outside the current executable subset".into(),
                 span: module.span.clone(),
@@ -612,6 +618,88 @@ fn lower_module_or_generate_item(
             message: "generate item is outside the current executable subset".into(),
             span: module.span.clone(),
         }),
+    }
+}
+
+fn lower_generate_region(
+    syntax_tree: &SyntaxTree,
+    region: &sv_parser::GenerateRegion,
+    path: &Path,
+    module: &mut ModuleSummary,
+) {
+    for item in &region.nodes.1 {
+        lower_generate_item(syntax_tree, item, path, module);
+    }
+}
+
+fn lower_generate_item(
+    syntax_tree: &SyntaxTree,
+    item: &sv_parser::GenerateItem,
+    path: &Path,
+    module: &mut ModuleSummary,
+) {
+    match item {
+        sv_parser::GenerateItem::ModuleOrGenerateItem(item) => {
+            lower_module_or_generate_item(syntax_tree, item, path, module);
+        }
+        _ => module.unsupported.push(Diagnostic {
+            message: "generate item is outside the current executable subset".into(),
+            span: module.span.clone(),
+        }),
+    }
+}
+
+fn lower_generate_block(
+    syntax_tree: &SyntaxTree,
+    block: &sv_parser::GenerateBlock,
+    path: &Path,
+    module: &mut ModuleSummary,
+) {
+    match block {
+        sv_parser::GenerateBlock::GenerateItem(item) => {
+            lower_generate_item(syntax_tree, item, path, module);
+        }
+        sv_parser::GenerateBlock::Multiple(block) => {
+            for item in &block.nodes.3 {
+                lower_generate_item(syntax_tree, item, path, module);
+            }
+        }
+    }
+}
+
+fn lower_conditional_generate_construct(
+    syntax_tree: &SyntaxTree,
+    construct: &sv_parser::ConditionalGenerateConstruct,
+    path: &Path,
+    module: &mut ModuleSummary,
+) {
+    match construct {
+        sv_parser::ConditionalGenerateConstruct::If(construct) => {
+            let cond = lower_constant_expression_to_expr(
+                syntax_tree,
+                &construct.nodes.1.nodes.1,
+                module,
+                path,
+            )
+            .and_then(|expr| const_eval_param_value(&expr, &module.parameters));
+            match cond {
+                Ok(value) if value != 0 => {
+                    lower_generate_block(syntax_tree, &construct.nodes.2, path, module);
+                }
+                Ok(_) => {
+                    if let Some((_, else_block)) = &construct.nodes.3 {
+                        lower_generate_block(syntax_tree, else_block, path, module);
+                    }
+                }
+                Err(diag) => module.unsupported.push(diag),
+            }
+        }
+        sv_parser::ConditionalGenerateConstruct::Case(_) => {
+            module.unsupported.push(Diagnostic {
+                message: "generate case constructs are not supported yet".into(),
+                span: module.span.clone(),
+            });
+        }
     }
 }
 
@@ -657,7 +745,10 @@ fn lower_module_declaration_item(
                     module,
                 );
             }
-            PackageOrGenerateItemDeclaration::TaskDeclaration(_) => {
+            PackageOrGenerateItemDeclaration::TaskDeclaration(decl) => {
+                if is_inert_task_declaration(syntax_tree, decl.as_ref()) {
+                    return;
+                }
                 module.unsupported.push(Diagnostic {
                     message: "task declarations are not supported yet".into(),
                     span: module.span.clone(),
@@ -1233,12 +1324,6 @@ fn lower_always_ff_statement(
             None,
         ));
     }
-    if !statement.nodes.1.is_empty() {
-        return Err(unsupported(
-            "statement attributes are not supported yet",
-            None,
-        ));
-    }
 
     let StatementItem::ProceduralTimingControlStatement(statement) = &statement.nodes.2 else {
         return Err(unsupported(
@@ -1326,12 +1411,6 @@ fn lower_statement(
             None,
         ));
     }
-    if !statement.nodes.1.is_empty() {
-        return Err(unsupported(
-            "statement attributes are not supported yet",
-            None,
-        ));
-    }
 
     match &statement.nodes.2 {
         StatementItem::BlockingAssignment(assignment) => {
@@ -1346,6 +1425,9 @@ fn lower_statement(
         }
         StatementItem::CaseStatement(statement) => {
             lower_case_statement(syntax_tree, statement, module, path)
+        }
+        StatementItem::SubroutineCallStatement(statement) => {
+            lower_subroutine_call_statement(syntax_tree, statement)
         }
         _ => Err(unsupported(
             "statement is outside the current executable subset",
@@ -1364,9 +1446,101 @@ fn lower_statement_or_null(
         StatementOrNull::Statement(statement) => {
             lower_statement(syntax_tree, statement, module, path)
         }
-        StatementOrNull::Attribute(_) => {
-            Err(unsupported("null statements are not supported yet", None))
+        StatementOrNull::Attribute(_) => Ok(Stmt::Empty),
+    }
+}
+
+fn lower_subroutine_call_statement(
+    syntax_tree: &SyntaxTree,
+    statement: &sv_parser::SubroutineCallStatement,
+) -> LowerResult<Stmt> {
+    match statement {
+        sv_parser::SubroutineCallStatement::SubroutineCall(call) => {
+            if is_inert_subroutine_call(syntax_tree, &call.0) {
+                Ok(Stmt::Empty)
+            } else {
+                Err(unsupported(
+                    "subroutine call statements are not supported yet",
+                    None,
+                ))
+            }
         }
+        sv_parser::SubroutineCallStatement::Function(_) => Err(unsupported(
+            "subroutine call statements are not supported yet",
+            None,
+        )),
+    }
+}
+
+fn is_inert_subroutine_call(
+    syntax_tree: &SyntaxTree,
+    call: &sv_parser::SubroutineCall,
+) -> bool {
+    match call {
+        sv_parser::SubroutineCall::TfCall(call) => {
+            inert_task_name(syntax_tree, &call.nodes.0).as_deref() == Some("empty_statement")
+        }
+        sv_parser::SubroutineCall::SystemTfCall(call) => {
+            inert_system_tf_name(syntax_tree, call).as_deref() == Some("$display")
+        }
+        _ => false,
+    }
+}
+
+fn inert_task_name(
+    syntax_tree: &SyntaxTree,
+    identifier: &sv_parser::PsOrHierarchicalTfIdentifier,
+) -> Option<String> {
+    match identifier {
+        sv_parser::PsOrHierarchicalTfIdentifier::PackageScope(identifier) => {
+            identifier_name_from_node(syntax_tree, RefNode::from(&identifier.nodes.1.nodes.0))
+                .map(|(name, _)| name)
+        }
+        sv_parser::PsOrHierarchicalTfIdentifier::HierarchicalTfIdentifier(identifier) => {
+            lower_hierarchical_identifier(syntax_tree, &identifier.nodes.0, "task calls")
+                .ok()
+                .map(|(name, _)| name)
+        }
+    }
+}
+
+fn inert_system_tf_name(
+    syntax_tree: &SyntaxTree,
+    call: &sv_parser::SystemTfCall,
+) -> Option<String> {
+    let identifier = match call {
+        sv_parser::SystemTfCall::ArgOptionl(call) => &call.nodes.0,
+        sv_parser::SystemTfCall::ArgDataType(call) => &call.nodes.0,
+        sv_parser::SystemTfCall::ArgExpression(call) => &call.nodes.0,
+    };
+    syntax_tree.get_str(&identifier.nodes.0).map(str::to_owned)
+}
+
+fn is_inert_task_declaration(
+    _syntax_tree: &SyntaxTree,
+    decl: &sv_parser::TaskDeclaration,
+) -> bool {
+    match &decl.nodes.2 {
+        sv_parser::TaskBodyDeclaration::WithoutPort(body) => {
+            body.nodes.0.is_none()
+                && body.nodes.3.is_empty()
+                && body.nodes.4.len() == 1
+                && matches!(
+                    &body.nodes.4[0],
+                    StatementOrNull::Statement(statement)
+                        if statement.nodes.0.is_none()
+                            && statement.nodes.1.is_empty()
+                            && matches!(
+                                &statement.nodes.2,
+                                StatementItem::SeqBlock(block)
+                                    if block.nodes.1.is_none()
+                                        && block.nodes.2.is_empty()
+                                        && block.nodes.3.is_empty()
+                                        && block.nodes.5.is_none()
+                            )
+                )
+        }
+        sv_parser::TaskBodyDeclaration::WithPort(_) => false,
     }
 }
 
@@ -1503,6 +1677,9 @@ fn lower_block_item_declaration_stmt(
 
     let (name, _) = identifier_name_from_node(syntax_tree, RefNode::from(&assignment.nodes.0))
         .ok_or_else(|| unsupported("failed to determine procedural declaration name", None))?;
+    if name == "empty_statement" && assignment.nodes.2.is_none() {
+        return Ok(Stmt::Empty);
+    }
     if module.signal_width(&name).is_none() {
         return Err(unsupported(
             "procedural blocks with local declarations are not supported yet",
@@ -2785,6 +2962,87 @@ mod tests {
                 assert!(matches!(expr.as_ref(), Expr::Concat(items) if items.len() == 5));
             }
             other => panic!("unexpected multiple concatenation: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_str_prunes_constant_generate_else_if_chain() {
+        let frontend = SvParserFrontend::default();
+        let source = frontend
+            .parse_str(
+                PathBuf::from("/virtual/design/generate_top.sv"),
+                r#"
+module leaf_a(output logic y);
+    assign y = 1'b1;
+endmodule
+
+module leaf_b(output logic y);
+    assign y = 1'b0;
+endmodule
+
+module top #(parameter A = 0, parameter B = 1) (output logic y);
+    generate if (A) begin : gen_a
+        leaf_a u_leaf(.y(y));
+    end else if (B) begin : gen_b
+        leaf_b u_leaf(.y(y));
+    end else begin : gen_c
+        assign y = 1'b1;
+    end endgenerate
+endmodule
+"#,
+            )
+            .expect("parse generated module");
+
+        let module = source
+            .modules
+            .iter()
+            .find(|module| module.name == "top")
+            .expect("top module");
+        assert!(module.unsupported.is_empty());
+        assert_eq!(module.instantiations.len(), 1);
+        assert_eq!(module.instantiations[0].module_name, "leaf_b");
+        assert_eq!(module.instantiations[0].instance_name, "u_leaf");
+        assert!(module.continuous_assignments.is_empty());
+    }
+
+    #[test]
+    fn parse_str_treats_inert_debug_constructs_as_empty_statements() {
+        let frontend = SvParserFrontend::default();
+        let source = frontend
+            .parse_str(
+                PathBuf::from("/virtual/design/inert_debug.sv"),
+                r#"
+module top(input logic a, output logic y);
+    task empty_statement;
+        begin end
+    endtask
+
+    always @* begin
+        y = 1'b0;
+        empty_statement;
+        $display("debug");
+        (* parallel_case *)
+        case (1'b1)
+            a: y = 1'b1;
+            default: y = 1'b0;
+        endcase
+    end
+endmodule
+"#,
+            )
+            .expect("parse inert debug module");
+
+        let module = &source.modules[0];
+        assert!(module.unsupported.is_empty());
+        assert_eq!(module.proc_blocks.len(), 1);
+        match &module.proc_blocks[0].body {
+            Stmt::Block(statements) => {
+                assert!(matches!(statements[0], Stmt::Assign { .. }));
+                assert!(matches!(statements[1], Stmt::Empty));
+                assert!(matches!(statements[2], Stmt::Empty));
+                assert!(matches!(statements[3], Stmt::Case { .. }));
+            }
+            other => panic!("unexpected always body: {other:?}"),
         }
     }
 }

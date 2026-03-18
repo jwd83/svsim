@@ -732,6 +732,55 @@ mod tests {
     }
 
     #[test]
+    fn compile_file_prunes_picorv32_default_generate_blocks() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .compile_file(repo.join("parts/picorv32/picorv32.v"))
+            .expect("compile picorv32");
+
+        let picorv32 = design.hir().module("picorv32").expect("picorv32 module");
+        assert!(picorv32.instantiations.is_empty());
+        assert!(
+            !picorv32
+                .unsupported
+                .iter()
+                .any(|diag| diag.message == "task declarations are not supported yet")
+        );
+        assert!(
+            !picorv32
+                .unsupported
+                .iter()
+                .any(|diag| diag.message == "statement attributes are not supported yet")
+        );
+    }
+
+    #[test]
+    fn compile_file_loads_picorv32_smoke_harness() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .add_search_path(repo.join("parts/picorv32"))
+            .compile_file(repo.join("parts/picorv32/picorv32_smoke.sv"))
+            .expect("compile picorv32 smoke harness");
+
+        assert_eq!(design.top_module(), Some("picorv32_smoke"));
+        let smoke = design
+            .hir()
+            .module("picorv32_smoke")
+            .expect("picorv32_smoke module");
+        assert!(smoke.unsupported.is_empty());
+        assert_eq!(
+            smoke
+                .instantiations
+                .iter()
+                .map(|instance| instance.module_name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["picorv32"]
+        );
+        assert_eq!(smoke.memories.len(), 1);
+        assert_eq!(smoke.memories[0].name, "rom");
+    }
+
+    #[test]
     fn compile_file_errors_on_malformed_legacy_rom_wrapper() {
         let temp_dir = unique_temp_dir("legacy-rom-shape");
         fs::write(temp_dir.join("inline.txt"), "0x2a\n").expect("write inline.txt");
