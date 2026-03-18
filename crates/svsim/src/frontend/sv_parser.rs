@@ -16,6 +16,7 @@ use sv_parser::{
     parse_sv_str, unwrap_node,
 };
 
+use crate::bit_value::BitValue;
 use crate::diag::{Diagnostic, Error, Result, SourceSpan};
 use crate::hir::{
     AssignmentKind, BinaryOp, CaseStmtItem, ContinuousAssign as HirContinuousAssign, Expr, LValue,
@@ -1343,7 +1344,7 @@ fn lower_number(
     match &**number {
         sv_parser::IntegralNumber::DecimalNumber(number) => match &**number {
             sv_parser::DecimalNumber::UnsignedNumber(number) => {
-                let bits = locate_usize(syntax_tree, &number.nodes.0)? as u64;
+                let bits = locate_usize(syntax_tree, &number.nodes.0)? as BitValue;
                 Ok(NumericLiteral { bits, width: None })
             }
             sv_parser::DecimalNumber::BaseUnsigned(number) => Ok(NumericLiteral {
@@ -1812,7 +1813,7 @@ fn lower_usize_constant_mintypmax_expression(
     }
 }
 
-fn parse_based_value(syntax_tree: &SyntaxTree, locate: &Locate, radix: u32) -> LowerResult<u64> {
+fn parse_based_value(syntax_tree: &SyntaxTree, locate: &Locate, radix: u32) -> LowerResult<BitValue> {
     let text = syntax_tree
         .get_str(locate)
         .ok_or_else(|| unsupported("failed to read numeric literal text", None))?;
@@ -1823,7 +1824,7 @@ fn parse_based_value(syntax_tree: &SyntaxTree, locate: &Locate, radix: u32) -> L
             None,
         ));
     }
-    u64::from_str_radix(&cleaned, radix)
+    BitValue::from_str_radix(&cleaned, radix)
         .map_err(|_| unsupported("failed to parse numeric literal", None))
 }
 

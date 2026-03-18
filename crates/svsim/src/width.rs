@@ -1,3 +1,4 @@
+use crate::bit_value::{BitValue, BIT_VALUE_BITS};
 use crate::diag::{Error, Result};
 use crate::hir::{BinaryOp, Expr, ModuleSummary};
 
@@ -82,19 +83,19 @@ pub(crate) fn expr_width(expr: &Expr, module: &ModuleSummary) -> Result<usize> {
     }
 }
 
-pub(crate) fn minimum_width(bits: u64) -> usize {
+pub(crate) fn minimum_width(bits: BitValue) -> usize {
     if bits == 0 {
         1
     } else {
-        (u64::BITS - bits.leading_zeros()) as usize
+        (BIT_VALUE_BITS as u32 - bits.leading_zeros()) as usize
     }
 }
 
-pub(crate) fn mask(width: usize) -> u64 {
-    if width >= u64::BITS as usize {
-        u64::MAX
+pub(crate) fn mask(width: usize) -> BitValue {
+    if width >= BIT_VALUE_BITS {
+        BitValue::MAX
     } else {
-        (1u64 << width) - 1
+        (1 as BitValue).checked_shl(width as u32).unwrap_or(0).wrapping_sub(1)
     }
 }
 
@@ -105,11 +106,11 @@ pub(crate) enum ShiftDirection {
 }
 
 pub(crate) fn shift_bits(
-    bits: u64,
-    amount_bits: u64,
+    bits: BitValue,
+    amount_bits: BitValue,
     width: usize,
     direction: ShiftDirection,
-) -> u64 {
+) -> BitValue {
     let normalized = bits & mask(width);
     let Ok(amount) = u32::try_from(amount_bits) else {
         return 0;
@@ -123,10 +124,10 @@ pub(crate) fn shift_bits(
     }
 }
 
-pub(crate) fn shift_left_bits(bits: u64, amount_bits: u64, width: usize) -> u64 {
+pub(crate) fn shift_left_bits(bits: BitValue, amount_bits: BitValue, width: usize) -> BitValue {
     shift_bits(bits, amount_bits, width, ShiftDirection::Left)
 }
 
-pub(crate) fn shift_right_bits(bits: u64, amount_bits: u64, width: usize) -> u64 {
+pub(crate) fn shift_right_bits(bits: BitValue, amount_bits: BitValue, width: usize) -> BitValue {
     shift_bits(bits, amount_bits, width, ShiftDirection::Right)
 }

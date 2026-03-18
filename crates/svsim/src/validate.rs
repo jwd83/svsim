@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::path::Path;
 
+use crate::bit_value::{BitValue, BIT_VALUE_BITS};
 use crate::diag::{Error, Result};
 use crate::hir::{
     AssignmentKind, BinaryOp, CaseStmtItem, Expr, HirDesign, LValue, MemoryDecl,
@@ -9,7 +10,7 @@ use crate::hir::{
 };
 use crate::width::{mask, minimum_width, shift_left_bits, shift_right_bits};
 
-const MAX_RUNTIME_WIDTH: usize = u64::BITS as usize;
+const MAX_RUNTIME_WIDTH: usize = BIT_VALUE_BITS;
 
 pub(crate) fn validate_design(hir: &HirDesign) -> Result<()> {
     let mut validated = HashSet::new();
@@ -543,19 +544,19 @@ fn validate_constant_memory_index(
 
 #[derive(Debug, Clone, Copy)]
 struct ConstValue {
-    bits: u64,
+    bits: BitValue,
     width: usize,
 }
 
 impl ConstValue {
-    fn new(bits: u64, width: usize) -> Self {
+    fn new(bits: BitValue, width: usize) -> Self {
         Self {
             bits: bits & mask(width),
             width,
         }
     }
 
-    fn normalized_bits(self) -> u64 {
+    fn normalized_bits(self) -> BitValue {
         self.bits & mask(self.width)
     }
 
@@ -624,24 +625,24 @@ fn const_eval_expr(expr: &Expr) -> Option<ConstValue> {
                     shift_right_bits(left.normalized_bits(), right.normalized_bits(), left.width),
                     left.width,
                 ),
-                BinaryOp::LogicalAnd => ((left.truthy() && right.truthy()) as u64, 1),
-                BinaryOp::LogicalOr => ((left.truthy() || right.truthy()) as u64, 1),
+                BinaryOp::LogicalAnd => ((left.truthy() && right.truthy()) as BitValue, 1),
+                BinaryOp::LogicalOr => ((left.truthy() || right.truthy()) as BitValue, 1),
                 BinaryOp::Eq => (
-                    (left.normalized_bits() == right.normalized_bits()) as u64,
+                    (left.normalized_bits() == right.normalized_bits()) as BitValue,
                     1,
                 ),
                 BinaryOp::NotEq => (
-                    (left.normalized_bits() != right.normalized_bits()) as u64,
+                    (left.normalized_bits() != right.normalized_bits()) as BitValue,
                     1,
                 ),
-                BinaryOp::Lt => ((left.normalized_bits() < right.normalized_bits()) as u64, 1),
+                BinaryOp::Lt => ((left.normalized_bits() < right.normalized_bits()) as BitValue, 1),
                 BinaryOp::LtEq => (
-                    (left.normalized_bits() <= right.normalized_bits()) as u64,
+                    (left.normalized_bits() <= right.normalized_bits()) as BitValue,
                     1,
                 ),
-                BinaryOp::Gt => ((left.normalized_bits() > right.normalized_bits()) as u64, 1),
+                BinaryOp::Gt => ((left.normalized_bits() > right.normalized_bits()) as BitValue, 1),
                 BinaryOp::GtEq => (
-                    (left.normalized_bits() >= right.normalized_bits()) as u64,
+                    (left.normalized_bits() >= right.normalized_bits()) as BitValue,
                     1,
                 ),
                 BinaryOp::Add => (
@@ -685,7 +686,7 @@ fn concat_const_values(parts: &[ConstValue]) -> Option<ConstValue> {
         return None;
     }
 
-    let mut bits = 0u64;
+    let mut bits: BitValue = 0;
     let mut shift = total_width;
     for part in parts {
         shift -= part.width;

@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::Path;
 
+use crate::bit_value::{BitValue, BIT_VALUE_BITS};
 use crate::design::CompiledDesign;
 use crate::diag::{Error, Result};
 use crate::hir::{
@@ -33,7 +34,7 @@ struct ChildState {
 
 #[derive(Debug, Clone)]
 struct InstanceEvalCache {
-    inputs: BTreeMap<String, u64>,
+    inputs: BTreeMap<String, BitValue>,
     outputs: HashMap<String, Value>,
 }
 
@@ -99,7 +100,7 @@ impl SimulationSession {
         &mut self,
         instance_path: &[&str],
         memory_name: &str,
-        words: &[u64],
+        words: &[BitValue],
     ) -> Result<()> {
         let hir = self.design.hir();
         let module_state = resolve_instance_path_mut(hir, &mut self.state, instance_path)?;
@@ -169,7 +170,7 @@ impl SimulationSession {
         instance_path: &[&str],
         memory_name: &str,
         index: usize,
-    ) -> Result<u64> {
+    ) -> Result<BitValue> {
         let hir = self.design.hir();
         let module_state = resolve_instance_path(hir, &self.state, instance_path)?;
         let module = resolve_supported_module(hir, &module_state.module_name)?;
@@ -188,14 +189,14 @@ impl SimulationSession {
         Ok(memory_state.read(index, memory_name)?.normalized_bits())
     }
 
-    pub fn eval_once(&mut self, inputs: BTreeMap<String, u64>) -> Result<BTreeMap<String, u64>> {
+    pub fn eval_once(&mut self, inputs: BTreeMap<String, BitValue>) -> Result<BTreeMap<String, BitValue>> {
         let module = top_module(self.design.hir(), self.top_module())?;
         let mut stack = Vec::new();
         let values = settle_module(self.design.hir(), module, &self.state, &inputs, &mut stack)?;
         Ok(collect_outputs(module, &values))
     }
 
-    pub fn step(&mut self, inputs: BTreeMap<String, u64>) -> Result<BTreeMap<String, u64>> {
+    pub fn step(&mut self, inputs: BTreeMap<String, BitValue>) -> Result<BTreeMap<String, BitValue>> {
         let module = top_module(self.design.hir(), self.top_module())?;
         let mut stack = Vec::new();
         step_module(self.design.hir(), &mut self.state, &inputs, &mut stack)?;
@@ -212,7 +213,7 @@ impl SimulationSession {
     }
 }
 
-fn parse_memory_file(path: &Path, word_width: usize, depth: usize) -> Result<Vec<(usize, u64)>> {
+fn parse_memory_file(path: &Path, word_width: usize, depth: usize) -> Result<Vec<(usize, BitValue)>> {
     let text = fs::read_to_string(path)?;
     parse_memory_text(&text, path, word_width, depth)
 }
@@ -222,7 +223,7 @@ fn parse_memory_text(
     path: &Path,
     word_width: usize,
     depth: usize,
-) -> Result<Vec<(usize, u64)>> {
+) -> Result<Vec<(usize, BitValue)>> {
     let mut writes = Vec::new();
     let mut current_address = 0usize;
 
@@ -270,7 +271,7 @@ fn strip_memory_comments(line: &str) -> Option<&str> {
 
 fn parse_memory_address(text: &str, path: &Path, line_number: usize) -> Result<usize> {
     let raw = text.trim().replace('_', "");
-    if let Ok(value) = parse_prefixed_u64(&raw) {
+    if let Ok(value) = parse_prefixed_value(&raw) {
         usize::try_from(value).map_err(|_| {
             Error::Parse(format!(
                 "memory file '{}' line {} has an address too large for this host",
@@ -288,10 +289,10 @@ fn parse_memory_address(text: &str, path: &Path, line_number: usize) -> Result<u
     }
 }
 
-fn parse_memory_value(text: &str, path: &Path, line_number: usize) -> Result<u64> {
+fn parse_memory_value(text: &str, path: &Path, line_number: usize) -> Result<BitValue> {
     let raw = text.trim().replace('_', "");
     if raw.chars().all(|ch| matches!(ch, '0' | '1')) {
-        return u64::from_str_radix(&raw, 2).map_err(|_| {
+        return BitValue::from_str_radix(&raw, 2).map_err(|_| {
             Error::Parse(format!(
                 "memory file '{}' line {} has an invalid binary value '{}'",
                 path.display(),
@@ -301,7 +302,7 @@ fn parse_memory_value(text: &str, path: &Path, line_number: usize) -> Result<u64
         });
     }
 
-    parse_prefixed_u64(&raw).map_err(|_| {
+    parse_prefixed_value(&raw).map_err(|_| {
         Error::Parse(format!(
             "memory file '{}' line {} has an invalid value '{}'",
             path.display(),
@@ -311,13 +312,13 @@ fn parse_memory_value(text: &str, path: &Path, line_number: usize) -> Result<u64
     })
 }
 
-fn parse_prefixed_u64(raw: &str) -> std::result::Result<u64, std::num::ParseIntError> {
+fn parse_prefixed_value(raw: &str) -> std::result::Result<BitValue, std::num::ParseIntError> {
     if let Some(rest) = raw.strip_prefix("0x").or_else(|| raw.strip_prefix("0X")) {
-        u64::from_str_radix(rest, 16)
+        BitValue::from_str_radix(rest, 16)
     } else if let Some(rest) = raw.strip_prefix("0b").or_else(|| raw.strip_prefix("0B")) {
-        u64::from_str_radix(rest, 2)
+        BitValue::from_str_radix(rest, 2)
     } else if let Some(rest) = raw.strip_prefix("0o").or_else(|| raw.strip_prefix("0O")) {
-        u64::from_str_radix(rest, 8)
+        BitValue::from_str_radix(rest, 8)
     } else {
         raw.parse()
     }
@@ -325,12 +326,12 @@ fn parse_prefixed_u64(raw: &str) -> std::result::Result<u64, std::num::ParseIntE
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Value {
-    bits: u64,
+    bits: BitValue,
     width: usize,
 }
 
 impl Value {
-    fn new(bits: u64, width: usize) -> Self {
+    fn new(bits: BitValue, width: usize) -> Self {
         let width = width.max(1);
         Self {
             bits: bits & mask(width),
@@ -346,7 +347,7 @@ impl Value {
         Self::new(0, width)
     }
 
-    fn normalized_bits(self) -> u64 {
+    fn normalized_bits(self) -> BitValue {
         self.bits & mask(self.width)
     }
 
@@ -396,7 +397,7 @@ fn settle_module(
     hir: &HirDesign,
     module: &ModuleSummary,
     state: &ModuleState,
-    inputs: &BTreeMap<String, u64>,
+    inputs: &BTreeMap<String, BitValue>,
     stack: &mut Vec<String>,
 ) -> Result<HashMap<String, Value>> {
     if stack.iter().any(|name| name == &state.module_name) {
@@ -486,7 +487,7 @@ fn settle_module(
 fn step_module(
     hir: &HirDesign,
     state: &mut ModuleState,
-    inputs: &BTreeMap<String, u64>,
+    inputs: &BTreeMap<String, BitValue>,
     stack: &mut Vec<String>,
 ) -> Result<()> {
     let module = resolve_supported_module(hir, &state.module_name)?;
@@ -847,7 +848,7 @@ fn apply_legacy_rom_outputs(
 
 fn build_signal_table(
     module: &ModuleSummary,
-    inputs: &BTreeMap<String, u64>,
+    inputs: &BTreeMap<String, BitValue>,
     persisted: &HashMap<String, Value>,
 ) -> Result<HashMap<String, Value>> {
     let mut values = HashMap::new();
@@ -892,7 +893,7 @@ fn build_child_inputs(
     instance: &ModuleInstanceSummary,
     parent_values: &HashMap<String, Value>,
     parent_memories: &HashMap<String, MemoryState>,
-) -> Result<BTreeMap<String, u64>> {
+) -> Result<BTreeMap<String, BitValue>> {
     let mut child_inputs = BTreeMap::new();
 
     for port in child
@@ -995,7 +996,7 @@ enum ResolvedLValue {
 fn collect_outputs(
     module: &ModuleSummary,
     values: &HashMap<String, Value>,
-) -> BTreeMap<String, u64> {
+) -> BTreeMap<String, BitValue> {
     let mut outputs = BTreeMap::new();
 
     for port in module
@@ -1133,18 +1134,18 @@ fn eval_expr(
                     shift_right_bits(left.normalized_bits(), right.normalized_bits(), left.width),
                     left.width,
                 ),
-                BinaryOp::LogicalAnd => ((left.truthy() && right.truthy()) as u64, 1),
-                BinaryOp::LogicalOr => ((left.truthy() || right.truthy()) as u64, 1),
-                BinaryOp::Eq => (values_equal(left, right) as u64, 1),
-                BinaryOp::NotEq => ((!values_equal(left, right)) as u64, 1),
-                BinaryOp::Lt => ((left.normalized_bits() < right.normalized_bits()) as u64, 1),
+                BinaryOp::LogicalAnd => ((left.truthy() && right.truthy()) as BitValue, 1),
+                BinaryOp::LogicalOr => ((left.truthy() || right.truthy()) as BitValue, 1),
+                BinaryOp::Eq => (values_equal(left, right) as BitValue, 1),
+                BinaryOp::NotEq => ((!values_equal(left, right)) as BitValue, 1),
+                BinaryOp::Lt => ((left.normalized_bits() < right.normalized_bits()) as BitValue, 1),
                 BinaryOp::LtEq => (
-                    (left.normalized_bits() <= right.normalized_bits()) as u64,
+                    (left.normalized_bits() <= right.normalized_bits()) as BitValue,
                     1,
                 ),
-                BinaryOp::Gt => ((left.normalized_bits() > right.normalized_bits()) as u64, 1),
+                BinaryOp::Gt => ((left.normalized_bits() > right.normalized_bits()) as BitValue, 1),
                 BinaryOp::GtEq => (
-                    (left.normalized_bits() >= right.normalized_bits()) as u64,
+                    (left.normalized_bits() >= right.normalized_bits()) as BitValue,
                     1,
                 ),
                 BinaryOp::Add => (
@@ -1186,14 +1187,14 @@ fn value_from_literal(literal: &NumericLiteral) -> Value {
 
 fn concat_values(parts: &[Value]) -> Result<Value> {
     let total_width: usize = parts.iter().map(|value| value.width).sum();
-    if total_width > u64::BITS as usize {
+    if total_width > BIT_VALUE_BITS {
         return Err(Error::Unsupported(format!(
-            "concatenation width {} exceeds the current 64-bit runtime limit",
-            total_width
+            "concatenation width {} exceeds the current {}-bit runtime limit",
+            total_width, BIT_VALUE_BITS
         )));
     }
 
-    let mut bits = 0u64;
+    let mut bits: BitValue = 0;
     let mut shift = total_width;
     for part in parts {
         shift -= part.width;
@@ -1364,7 +1365,7 @@ fn apply_resolved_lvalue(
             }
             let bit = value.coerced_to(1).normalized_bits();
             let mut bits = current.normalized_bits();
-            bits &= !(1u64 << index);
+            bits &= !((1 as BitValue) << index);
             bits |= bit << index;
             let next = Value::new(bits, current.width);
             let changed = *current != next;

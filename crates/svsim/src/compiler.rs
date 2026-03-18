@@ -1236,19 +1236,19 @@ mod tests {
                 PathBuf::from("/virtual/top.sv"),
                 concat!(
                     "module top(",
-                    "input logic [64:0] inA, ",
+                    "input logic [128:0] inA, ",
                     "output logic outY",
                     "); ",
                     "assign outY = inA[0]; ",
                     "endmodule\n"
                 ),
             )
-            .expect_err("ports wider than 64 bits should fail validation");
+            .expect_err("ports wider than BitValue bits should fail validation");
 
         match error {
             Error::Unsupported(message) => {
                 assert!(
-                    message.contains("port 'inA' in 'top' has width 65"),
+                    message.contains("port 'inA' in 'top' has width 129"),
                     "unexpected message: {message}"
                 );
             }
@@ -1311,9 +1311,9 @@ mod tests {
                 PathBuf::from("/virtual/top.sv"),
                 concat!(
                     "module top(",
-                    "input logic [39:0] inA, ",
-                    "input logic [39:0] inB, ",
-                    "output logic [39:0] outY",
+                    "input logic [79:0] inA, ",
+                    "input logic [79:0] inB, ",
+                    "output logic [79:0] outY",
                     "); ",
                     "assign outY = {inA, inB}; ",
                     "endmodule\n"
@@ -1324,7 +1324,7 @@ mod tests {
         match error {
             Error::Unsupported(message) => {
                 assert!(
-                    message.contains("concatenation expression has width 80"),
+                    message.contains("concatenation expression has width 160"),
                     "unexpected message: {message}"
                 );
             }
@@ -1339,9 +1339,9 @@ mod tests {
                 PathBuf::from("/virtual/top.sv"),
                 concat!(
                     "module top(",
-                    "input logic [39:0] inA, ",
-                    "output logic [39:0] high, ",
-                    "output logic [39:0] low",
+                    "input logic [79:0] inA, ",
+                    "output logic [79:0] high, ",
+                    "output logic [79:0] low",
                     "); ",
                     "assign {high, low} = inA; ",
                     "endmodule\n"
@@ -1352,7 +1352,7 @@ mod tests {
         match error {
             Error::Unsupported(message) => {
                 assert!(
-                    message.contains("concatenated assignment target has width 80"),
+                    message.contains("concatenated assignment target has width 160"),
                     "unexpected message: {message}"
                 );
             }

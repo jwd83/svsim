@@ -1,3 +1,4 @@
+pub mod bit_value;
 pub mod compiler;
 pub mod design;
 pub mod diag;
@@ -8,6 +9,7 @@ pub mod test;
 mod validate;
 mod width;
 
+pub use bit_value::BitValue;
 pub use compiler::{
     CompileCorpusReport, CompileDirectoryReport, CompileDirectoryRunReport, CompileFileReport,
     Compiler,

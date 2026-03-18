@@ -5,6 +5,7 @@ use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
 
+use crate::bit_value::BitValue;
 use crate::design::{CompiledDesign, DesignHierarchy, InstanceHierarchy};
 use crate::diag::{Error, Result};
 
@@ -84,6 +85,11 @@ pub struct JsonTestFailure {
     pub actual: Option<u64>,
 }
 
+fn to_bitvalue_map(map: BTreeMap<String, u64>) -> BTreeMap<String, BitValue> {
+    map.into_iter().map(|(k, v)| (k, BitValue::from(v))).collect()
+}
+
+
 #[derive(Debug, Clone)]
 pub struct JsonTestSuite {
     kind: JsonTestKind,
@@ -97,8 +103,8 @@ enum JsonTestKind {
 
 #[derive(Debug, Clone)]
 struct CombinationalTestCase {
-    inputs: BTreeMap<String, u64>,
-    expected: BTreeMap<String, u64>,
+    inputs: BTreeMap<String, BitValue>,
+    expected: BTreeMap<String, BitValue>,
 }
 
 #[derive(Debug, Clone)]
@@ -117,8 +123,8 @@ struct SequentialTestCase {
 
 #[derive(Debug, Clone)]
 struct TestStep {
-    inputs: BTreeMap<String, u64>,
-    expected: BTreeMap<String, u64>,
+    inputs: BTreeMap<String, BitValue>,
+    expected: BTreeMap<String, BitValue>,
 }
 
 #[derive(Debug, Clone)]
@@ -163,8 +169,8 @@ impl JsonTestSuite {
                 cases
                     .into_iter()
                     .map(|case| CombinationalTestCase {
-                        inputs: case.inputs,
-                        expected: case.expect,
+                        inputs: to_bitvalue_map(case.inputs),
+                        expected: to_bitvalue_map(case.expect),
                     })
                     .collect(),
             ),
@@ -275,14 +281,14 @@ impl SequentialTestSuite {
                     sequence
                         .into_iter()
                         .map(|step| TestStep {
-                            inputs: step.inputs,
-                            expected: step.expected,
+                            inputs: to_bitvalue_map(step.inputs),
+                            expected: to_bitvalue_map(step.expected),
                         })
                         .collect()
                 } else {
                     vec![TestStep {
-                        inputs: case.inputs.unwrap_or_default(),
-                        expected: case.expected.unwrap_or_default(),
+                        inputs: to_bitvalue_map(case.inputs.unwrap_or_default()),
+                        expected: to_bitvalue_map(case.expected.unwrap_or_default()),
                     }]
                 },
             })
@@ -459,8 +465,8 @@ fn collect_matching_instances(
 }
 
 fn compare_outputs(
-    actual: &BTreeMap<String, u64>,
-    expected: &BTreeMap<String, u64>,
+    actual: &BTreeMap<String, BitValue>,
+    expected: &BTreeMap<String, BitValue>,
     step: Option<usize>,
 ) -> Vec<JsonTestFailure> {
     let mut failures = Vec::new();
@@ -470,8 +476,8 @@ fn compare_outputs(
             failures.push(JsonTestFailure {
                 step,
                 signal: signal.clone(),
-                expected: *expected_value,
-                actual: actual_value,
+                expected: *expected_value as u64,
+                actual: actual_value.map(|v| v as u64),
             });
         }
     }

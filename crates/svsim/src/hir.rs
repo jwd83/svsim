@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use serde::Serialize;
 
+use crate::bit_value::BitValue;
 use crate::diag::{Diagnostic, SourceSpan};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -91,7 +92,7 @@ impl MemoryDecl {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct NumericLiteral {
-    pub bits: u64,
+    pub bits: BitValue,
     pub width: Option<usize>,
 }
 
