@@ -52,7 +52,10 @@ pub(crate) fn expr_width(expr: &Expr, module: &ModuleSummary) -> Result<usize> {
             Ok(high - (*msb).min(*lsb) + 1)
         }
         Expr::Unary { op, expr } => match op {
-            UnaryOp::LogicalNot => Ok(1),
+            UnaryOp::LogicalNot
+            | UnaryOp::ReductionAnd
+            | UnaryOp::ReductionOr
+            | UnaryOp::ReductionXor => Ok(1),
             UnaryOp::BitNot => expr_width(expr, module),
         },
         Expr::Binary { left, op, right } => {

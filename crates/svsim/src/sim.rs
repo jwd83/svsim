@@ -1158,6 +1158,25 @@ fn eval_expr(
                     let is_zero = value.normalized_bits().is_zero();
                     Ok(Value::new(BitValue::from(u64::from(is_zero)), 1))
                 }
+                UnaryOp::ReductionOr => {
+                    let result = !value.normalized_bits().is_zero();
+                    Ok(Value::new(BitValue::from(u64::from(result)), 1))
+                }
+                UnaryOp::ReductionAnd => {
+                    let mask = mask(value.width);
+                    let result = value.normalized_bits().bitand(&mask) == mask;
+                    Ok(Value::new(BitValue::from(u64::from(result)), 1))
+                }
+                UnaryOp::ReductionXor => {
+                    let mut count = 0u32;
+                    let bits = value.normalized_bits();
+                    for i in 0..value.width {
+                        if !bits.slice(i, 1).is_zero() {
+                            count += 1;
+                        }
+                    }
+                    Ok(Value::new(BitValue::from(u64::from(count % 2 != 0)), 1))
+                }
             }
         }
         Expr::Binary { left, op, right } => {

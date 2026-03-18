@@ -2137,6 +2137,9 @@ fn lower_unary_operator(
     match symbol_text(syntax_tree, &operator.nodes.0)?.as_str() {
         "~" => Ok(UnaryOp::BitNot),
         "!" => Ok(UnaryOp::LogicalNot),
+        "&" => Ok(UnaryOp::ReductionAnd),
+        "|" => Ok(UnaryOp::ReductionOr),
+        "^" => Ok(UnaryOp::ReductionXor),
         _ => Err(unsupported("unary operator is not supported yet", None)),
     }
 }

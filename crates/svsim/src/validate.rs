@@ -8,7 +8,7 @@ use crate::hir::{
     ModuleInstanceSummary, ModuleSummary, NumericLiteral, PortDirection, ProcBlockKind, Stmt,
     UnaryOp, expr_to_lvalue,
 };
-use crate::width::{minimum_width, shift_left_bits, shift_right_bits};
+use crate::width::{mask, minimum_width, shift_left_bits, shift_right_bits};
 
 pub(crate) fn validate_design(hir: &HirDesign) -> Result<()> {
     let mut validated = HashSet::new();
@@ -628,6 +628,28 @@ fn const_eval_expr(expr: &Expr) -> Option<ConstValue> {
                 UnaryOp::LogicalNot => {
                     let is_zero = value.normalized_bits().is_zero();
                     Some(ConstValue::new(BitValue::from(u64::from(is_zero)), 1))
+                }
+                UnaryOp::ReductionOr => {
+                    let result = !value.normalized_bits().is_zero();
+                    Some(ConstValue::new(BitValue::from(u64::from(result)), 1))
+                }
+                UnaryOp::ReductionAnd => {
+                    let m = mask(value.width);
+                    let result = value.normalized_bits().bitand(&m) == m;
+                    Some(ConstValue::new(BitValue::from(u64::from(result)), 1))
+                }
+                UnaryOp::ReductionXor => {
+                    let mut count = 0u32;
+                    let bits = value.normalized_bits();
+                    for i in 0..value.width {
+                        if !bits.slice(i, 1).is_zero() {
+                            count += 1;
+                        }
+                    }
+                    Some(ConstValue::new(
+                        BitValue::from(u64::from(count % 2 != 0)),
+                        1,
+                    ))
                 }
             }
         }

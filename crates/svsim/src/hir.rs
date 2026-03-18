@@ -114,6 +114,9 @@ pub struct NumericLiteral {
 pub enum UnaryOp {
     BitNot,
     LogicalNot,
+    ReductionAnd,
+    ReductionOr,
+    ReductionXor,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

@@ -1,0 +1,10 @@
+[
+    {"a": 0,  "expect": {"red_or": 0, "red_and": 0, "red_xor": 0}},
+    {"a": 1,  "expect": {"red_or": 1, "red_and": 0, "red_xor": 1}},
+    {"a": 15, "expect": {"red_or": 1, "red_and": 1, "red_xor": 0}},
+    {"a": 5,  "expect": {"red_or": 1, "red_and": 0, "red_xor": 0}},
+    {"a": 7,  "expect": {"red_or": 1, "red_and": 0, "red_xor": 1}},
+    {"a": 8,  "expect": {"red_or": 1, "red_and": 0, "red_xor": 1}},
+    {"a": 3,  "expect": {"red_or": 1, "red_and": 0, "red_xor": 0}},
+    {"a": 6,  "expect": {"red_or": 1, "red_and": 0, "red_xor": 0}}
+]
