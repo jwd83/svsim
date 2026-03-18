@@ -1241,6 +1241,11 @@ fn eval_expr(
                         .wrapping_sub(&right.normalized_bits(), left.width.max(right.width)),
                     left.width.max(right.width),
                 ),
+                BinaryOp::Mul => (
+                    left.normalized_bits()
+                        .wrapping_mul(&right.normalized_bits(), left.width.max(right.width)),
+                    left.width.max(right.width),
+                ),
             };
             Ok(Value::new(bits, width))
         }

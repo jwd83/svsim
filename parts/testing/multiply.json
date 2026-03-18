@@ -1,0 +1,9 @@
+[
+    {"a": 3,   "b": 4,   "expect": {"product": 12}},
+    {"a": 0,   "b": 255, "expect": {"product": 0}},
+    {"a": 1,   "b": 1,   "expect": {"product": 1}},
+    {"a": 15,  "b": 17,  "expect": {"product": 255}},
+    {"a": 16,  "b": 16,  "expect": {"product": 0}},
+    {"a": 10,  "b": 10,  "expect": {"product": 100}},
+    {"a": 7,   "b": 5,   "expect": {"product": 35}}
+]

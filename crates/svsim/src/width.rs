@@ -75,7 +75,8 @@ pub(crate) fn expr_width(expr: &Expr, module: &ModuleSummary) -> Result<usize> {
                 | BinaryOp::BitOr
                 | BinaryOp::BitXor
                 | BinaryOp::Add
-                | BinaryOp::Sub => left_width.max(right_width),
+                | BinaryOp::Sub
+                | BinaryOp::Mul => left_width.max(right_width),
             })
         }
         Expr::Ternary {

@@ -8,6 +8,7 @@ This repository is a Rust rewrite of the SystemVerilog simulator in `ref/`.
 - `crates/svsim-cli/`: thin CLI wrapper over `svsim`.
 - `crates/svsim-render/`: deferred rendering crate for truth-table and waveform output.
 - `parts/basic/`, `parts/overture/`, `parts/testing/`, `parts/rv32i/`: SystemVerilog corpus and JSON expectations used as the all-green compatibility suite.
+- `parts/picorv32/`: external RISC-V softcore (picorv32.v) used as a real-world compilation target. Compiles to HIR but does not yet simulate.
 - `parts/failing/`: intentionally failing negative corpus for manual compile/test failure checks.
 - `ref/`: Python reference implementation and historical planning notes.
 - `docs/`: architecture and rewrite plans.

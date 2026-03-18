@@ -270,6 +270,34 @@ impl BitValue {
         value
     }
 
+    pub fn wrapping_mul(&self, other: &Self, width: usize) -> Self {
+        let limit = limb_count(width);
+        if limit == 0 || self.is_zero() || other.is_zero() {
+            return Self::zero();
+        }
+
+        let mut limbs = vec![0u64; limit + 1];
+        for i in 0..limit {
+            let a = self.limb(i) as u128;
+            if a == 0 {
+                continue;
+            }
+            let mut carry = 0_u128;
+            for j in 0..limit {
+                if i + j >= limbs.len() {
+                    break;
+                }
+                let product = a * other.limb(j) as u128 + limbs[i + j] as u128 + carry;
+                limbs[i + j] = product as u64;
+                carry = product >> BIT_VALUE_LIMB_BITS;
+            }
+        }
+
+        let mut value = Self::new(limbs);
+        value.truncate_in_place(width);
+        value
+    }
+
     pub fn wrapping_sub(&self, other: &Self, width: usize) -> Self {
         let limit = limb_count(width);
         if limit == 0 {

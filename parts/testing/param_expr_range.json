@@ -1,0 +1,6 @@
+[
+    {"data_in": 0,   "expect": {"data_out": 255}},
+    {"data_in": 255, "expect": {"data_out": 0}},
+    {"data_in": 170, "expect": {"data_out": 85}},
+    {"data_in": 15,  "expect": {"data_out": 240}}
+]

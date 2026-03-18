@@ -136,6 +136,7 @@ pub enum BinaryOp {
     GtEq,
     Add,
     Sub,
+    Mul,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

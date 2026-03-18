@@ -18,11 +18,11 @@ These product decisions are fixed for the first Rust pass:
 
 ## Current Status
 
-Current implementation status as of March 17, 2026:
+Current implementation status as of March 18, 2026:
 
 - Cargo workspace created with `svsim`, `svsim-cli`, and `svsim-render`
 - `sv-parser` integrated for file-based parsing and in-memory source parsing via virtual paths
-- owned HIR covers source files, module summaries, continuous assignments, instantiations, `always_comb`, a first `always_ff @(posedge ...)` subset, concatenation/replication expressions, and concatenated assignment targets
+- owned HIR covers source files, module summaries, continuous assignments, instantiations, `always_comb`, `always_ff @(posedge ...)`, Verilog-2001 `always @*` and `always @(posedge clk)` mapped to their SystemVerilog equivalents, concatenation/replication expressions, and concatenated assignment targets
 - library API now exposes `Compiler`, `CompiledDesign`, and `SimulationSession`, including `compile_file` and `compile_str`
 - compilation now rejects duplicate module definitions during source registration and includes a semantic validation pass over lowered HIR, catching duplicate declarations, duplicate instance names, undeclared identifiers/memories, lowered select bounds, constant out-of-range memory indices, unsupported `inout` / `ref` ports, invalid named-port instance bindings including missing child input bindings, attempts to drive input ports, malformed legacy `rom_*` wrappers, missing legacy ROM backing files, and declarations or lowered value-shape constructs that fall outside the current supported `1..=64` bit runtime subset before simulation
 - `CompiledDesign::hierarchy()` now exposes an owned top-down instance tree so embedding callers can discover valid instance paths before using per-instance memory APIs
@@ -35,7 +35,9 @@ Current implementation status as of March 17, 2026:
 - runtime width handling now includes a shared lowered-expression width helper, fixed-width ternary evaluation, and an explicit coercion path for assignments and instance-port handoff, so self-determined `?:` results and in-range truncation/zero-extension no longer depend on scattered incidental `u64` shaping
 - `SimulationSession::step` now maintains per-instance state and can advance hierarchical designs using `always_ff @(posedge <clock>)` blocks with blocking immediate updates and nonblocking assignment staging
 - current procedural subset: blocking assignments in combinational blocks and `always_ff`, nonblocking assignments in `always_ff`, `if` / `else`, `case` / `default`, and `begin` / `end` statement blocks
-- current expression subset adds concatenation, replication, logical `&&` / `||`, equality `==` / `!=`, arithmetic `+` / `-`, logical shifts `<<` / `>>`, and single-dimension memory reads on top of literals, identifiers, slices, ternary expressions, and bitwise operators
+- current expression subset adds concatenation, replication, logical `&&` / `||`, equality `==` / `!=`, arithmetic `+` / `-` / `*`, logical shifts `<<` / `>>`, unary reduction operators `|` / `&` / `^`, and single-dimension memory reads on top of literals, identifiers, slices, ternary expressions, and bitwise operators
+- parameter-expression range bounds (e.g. `[WIDTH-1:0]`) are now resolved at parse time by const-evaluating against known module parameters, supporting binary arithmetic, ternary conditionals, and parameter cross-references in declaration ranges
+- `parts/picorv32/picorv32.v` (the open-source RISC-V softcore) now compiles successfully through the full frontend → HIR → validation pipeline
 - frontend lowering now accepts grouped ANSI port declarations such as `input [4:0] a, b, c` and lowers net declaration initializers like `wire [24:0] v = expr;` into signal declarations plus continuous assignments
 - `compile_str` can seed a design from an in-memory top module while still resolving instantiated dependencies from the virtual path's directory and configured search paths
 - current sequential limits: only `posedge` event controls are lowered, `always_ff` clock expressions must be local identifiers, and cross-block race semantics are not modeled beyond deterministic source order
@@ -129,7 +131,7 @@ Parse SystemVerilog with `sv-parser`, then lower only the supported constructs i
 - ports and net/variable declarations
 - packed ranges and unpacked memory arrays
 - continuous assignments
-- procedural blocks: `always_comb` and a first `always_ff @(posedge ...)` subset
+- procedural blocks: `always_comb`, `always_ff @(posedge ...)`, and Verilog-2001 `always @*` / `always @(posedge clk)` mapped to their equivalents
 - `if` / `else`
 - `case` / `default`
 - module instantiations with named port connections
@@ -138,8 +140,8 @@ Parse SystemVerilog with `sv-parser`, then lower only the supported constructs i
 Current lowered subset in the tree today:
 
 - continuous assignments
-- `always_comb`
-- `always_ff @(posedge <clock>)`
+- `always_comb` (and `always @*` mapped to it)
+- `always_ff @(posedge <clock>)` (and `always @(posedge <clock>)` mapped to it)
 - fixed-size single-dimension unpacked memory declarations
 - blocking and nonblocking procedural assignment
 - `if` / `else`
@@ -147,8 +149,8 @@ Current lowered subset in the tree today:
 - memory element reads
 - concatenation and replication expressions
 - bit-select and part-select expressions
-- unary bitwise-not
-- binary `&`, `|`, `^`, `&&`, `||`, `==`, `!=`, `+`, `-`
+- unary bitwise-not, logical-not, reduction `|` / `&` / `^`
+- binary `&`, `|`, `^`, `&&`, `||`, `==`, `!=`, `+`, `-`, `*`
 - ternary expressions
 - concatenated continuous/procedural assignment targets
 
@@ -396,11 +398,13 @@ Exit criterion:
 
 Current progress:
 - `always_ff @(posedge <clock>)` lowering is implemented
+- Verilog-2001 `always @*` and `always @(posedge clk)` are automatically mapped to `always_comb` and `always_ff` respectively
 - cycle-stepped state is preserved per instance across `step()` calls
 - blocking and nonblocking assignment semantics work for the supported subset
 - zero-initialized single-dimension memory reads, explicit memory preload/read APIs, text-file memory loading, and procedural single-element memory writes are implemented
 - library-side JSON regression execution now covers sequential `test_cases`, including memory-backed suites
-- remaining work is broader event controls and larger Overture sequential regressions
+- picorv32.v (open-source RISC-V softcore, ~3000 lines) now compiles successfully through the full pipeline
+- remaining work is broader event controls, generate blocks, and the remaining expression gaps needed for full picorv32 simulation
 
 Exit criterion:
 - parity for sequential register/counter tests and the math sequence stubs
@@ -447,8 +451,8 @@ These should stay out unless the existing corpus forces them in:
 
 - full preprocessor compatibility beyond what `sv-parser` already handles
 - delays and event-driven timing simulation
-- `always @(*)` generalization beyond the current subset
-- parameterized modules and generates
+- `generate` blocks and conditional compilation
+- parameterized module instantiation (parameter overrides at instantiation sites)
 - four-state logic (`X` / `Z`) semantics
 - full synthesizable SystemVerilog coverage
 

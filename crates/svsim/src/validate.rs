@@ -415,7 +415,8 @@ fn validate_expr(expr: &Expr, module: &ModuleSummary) -> Result<usize> {
                     | BinaryOp::BitOr
                     | BinaryOp::BitXor
                     | BinaryOp::Add
-                    | BinaryOp::Sub => left_width.max(right_width),
+                    | BinaryOp::Sub
+                    | BinaryOp::Mul => left_width.max(right_width),
                 },
                 "binary expression",
             )
@@ -719,6 +720,11 @@ fn const_eval_expr(expr: &Expr) -> Option<ConstValue> {
                 BinaryOp::Sub => (
                     left.normalized_bits()
                         .wrapping_sub(&right.normalized_bits(), left.width.max(right.width)),
+                    left.width.max(right.width),
+                ),
+                BinaryOp::Mul => (
+                    left.normalized_bits()
+                        .wrapping_mul(&right.normalized_bits(), left.width.max(right.width)),
                     left.width.max(right.width),
                 ),
             };

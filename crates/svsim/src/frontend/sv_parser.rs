@@ -135,7 +135,7 @@ fn lower_ansi_module(
         let mut context = None;
         if let Some(list) = port_decls.nodes.0.nodes.1.as_ref() {
             for port_decl in list.contents() {
-                match lower_ansi_port_declaration(syntax_tree, &port_decl.1, path, context) {
+                match lower_ansi_port_declaration(syntax_tree, &port_decl.1, path, context, &module.parameters) {
                     Ok((port, next_context)) => {
                         module.ports.push(port);
                         context = Some(next_context);
@@ -266,7 +266,7 @@ fn lower_parameter_port_declaration(
         }
         ParameterPortDeclaration::ParamList(decl) => {
             let range =
-                match lower_data_type_range(syntax_tree, &decl.nodes.0, path) {
+                match lower_data_type_range(syntax_tree, &decl.nodes.0, path, &module.parameters) {
                     Ok(range) => range,
                     Err(diag) => {
                         module.unsupported.push(diag);
@@ -296,7 +296,7 @@ fn lower_parameter_or_localparam_body(
     path: &Path,
     module: &mut ModuleSummary,
 ) {
-    let range = match lower_data_type_or_implicit_range(syntax_tree, data_type, path) {
+    let range = match lower_data_type_or_implicit_range(syntax_tree, data_type, path, &module.parameters) {
         Ok(r) => r,
         Err(diag) => {
             module.unsupported.push(diag);
@@ -624,7 +624,7 @@ fn lower_module_declaration_item(
     match decl {
         ModuleOrGenerateItemDeclaration::PackageOrGenerateItemDeclaration(decl) => match &**decl {
             PackageOrGenerateItemDeclaration::DataDeclaration(decl) => {
-                match lower_data_declaration(syntax_tree, decl, path) {
+                match lower_data_declaration(syntax_tree, decl, path, &module.parameters) {
                     Ok(decls) => {
                         module.signals.extend(decls.signals);
                         module.memories.extend(decls.memories);
@@ -681,6 +681,7 @@ fn lower_ansi_port_declaration(
     decl: &AnsiPortDeclaration,
     path: &Path,
     inherited: Option<AnsiPortContext>,
+    params: &[ParameterDecl],
 ) -> LowerResult<(PortDecl, AnsiPortContext)> {
     match decl {
         AnsiPortDeclaration::Net(decl) => {
@@ -689,7 +690,7 @@ fn lower_ansi_port_declaration(
                     sv_parser::NetPortHeaderOrInterfacePortHeader::NetPortHeader(header) => {
                         AnsiPortContext {
                             direction: lower_port_direction(header.nodes.0.as_ref(), path)?,
-                            range: lower_net_port_range(syntax_tree, &header.nodes.1, path)?,
+                            range: lower_net_port_range(syntax_tree, &header.nodes.1, path, params)?,
                         }
                     }
                     sv_parser::NetPortHeaderOrInterfacePortHeader::InterfacePortHeader(_) => {
@@ -723,7 +724,7 @@ fn lower_ansi_port_declaration(
             let context = if let Some(header) = decl.nodes.0.as_ref() {
                 AnsiPortContext {
                     direction: lower_port_direction(header.nodes.0.as_ref(), path)?,
-                    range: lower_variable_port_range(syntax_tree, &header.nodes.1, path)?,
+                    range: lower_variable_port_range(syntax_tree, &header.nodes.1, path, params)?,
                 }
             } else {
                 inherited
@@ -778,10 +779,11 @@ fn lower_net_port_range(
     syntax_tree: &SyntaxTree,
     port_type: &sv_parser::NetPortType,
     path: &Path,
+    params: &[ParameterDecl],
 ) -> LowerResult<Option<PackedRange>> {
     match port_type {
         sv_parser::NetPortType::DataType(data_type) => {
-            lower_data_type_or_implicit_range(syntax_tree, &data_type.nodes.1, path)
+            lower_data_type_or_implicit_range(syntax_tree, &data_type.nodes.1, path, params)
         }
         _ => Err(unsupported("unsupported net port type", None)),
     }
@@ -791,13 +793,14 @@ fn lower_variable_port_range(
     syntax_tree: &SyntaxTree,
     port_type: &VariablePortType,
     path: &Path,
+    params: &[ParameterDecl],
 ) -> LowerResult<Option<PackedRange>> {
     match &port_type.nodes.0 {
         sv_parser::VarDataType::DataType(data_type) => {
-            lower_data_type_range(syntax_tree, data_type, path)
+            lower_data_type_range(syntax_tree, data_type, path, params)
         }
         sv_parser::VarDataType::Var(var_type) => {
-            lower_data_type_or_implicit_range(syntax_tree, &var_type.nodes.1, path)
+            lower_data_type_or_implicit_range(syntax_tree, &var_type.nodes.1, path, params)
         }
     }
 }
@@ -806,10 +809,12 @@ fn lower_data_declaration(
     syntax_tree: &SyntaxTree,
     decl: &DataDeclaration,
     path: &Path,
+    params: &[ParameterDecl],
 ) -> LowerResult<LoweredDeclarations> {
     match decl {
         DataDeclaration::Variable(decl) => {
-            let range = lower_data_type_or_implicit_range(syntax_tree, &decl.nodes.3, path)?;
+            let range =
+                lower_data_type_or_implicit_range(syntax_tree, &decl.nodes.3, path, params)?;
             let mut lowered = LoweredDeclarations::default();
             for assignment in decl.nodes.4.nodes.0.contents() {
                 let sv_parser::VariableDeclAssignment::Variable(assignment) = assignment else {
@@ -830,7 +835,7 @@ fn lower_data_declaration(
                             unsupported("failed to determine variable declaration name", None)
                         })?;
                 let span = Some(span_from_locate(path, locate));
-                match lower_variable_dimensions(syntax_tree, &assignment.nodes.1, path)? {
+                match lower_variable_dimensions(syntax_tree, &assignment.nodes.1, path, params)? {
                     None => lowered.signals.push(SignalDecl { name, range, span }),
                     Some(index_range) => lowered.memories.push(MemoryDecl {
                         name,
@@ -854,7 +859,12 @@ fn lower_net_declaration(
 ) -> LowerResult<LoweredNetDeclarations> {
     match decl {
         NetDeclaration::NetType(decl) => {
-            let range = lower_data_type_or_implicit_range(syntax_tree, &decl.nodes.3, path)?;
+            let range = lower_data_type_or_implicit_range(
+                syntax_tree,
+                &decl.nodes.3,
+                path,
+                &module.parameters,
+            )?;
             let mut lowered = LoweredNetDeclarations::default();
             for assignment in decl.nodes.5.nodes.0.contents() {
                 if !assignment.nodes.1.is_empty() {
@@ -895,13 +905,14 @@ fn lower_data_type_or_implicit_range(
     syntax_tree: &SyntaxTree,
     data_type: &DataTypeOrImplicit,
     path: &Path,
+    params: &[ParameterDecl],
 ) -> LowerResult<Option<PackedRange>> {
     match data_type {
         DataTypeOrImplicit::DataType(data_type) => {
-            lower_data_type_range(syntax_tree, data_type, path)
+            lower_data_type_range(syntax_tree, data_type, path, params)
         }
         DataTypeOrImplicit::ImplicitDataType(data_type) => {
-            lower_implicit_data_type_range(syntax_tree, data_type, path)
+            lower_implicit_data_type_range(syntax_tree, data_type, path, params)
         }
     }
 }
@@ -910,13 +921,16 @@ fn lower_data_type_range(
     syntax_tree: &SyntaxTree,
     data_type: &DataType,
     path: &Path,
+    params: &[ParameterDecl],
 ) -> LowerResult<Option<PackedRange>> {
     match data_type {
         DataType::Vector(data_type) => {
-            lower_packed_dimensions(syntax_tree, &data_type.nodes.2, path)
+            lower_packed_dimensions(syntax_tree, &data_type.nodes.2, path, params)
         }
         DataType::Atom(_) => Ok(None),
-        DataType::Type(data_type) => lower_packed_dimensions(syntax_tree, &data_type.nodes.2, path),
+        DataType::Type(data_type) => {
+            lower_packed_dimensions(syntax_tree, &data_type.nodes.2, path, params)
+        }
         _ => Err(unsupported(
             "data type is outside the current executable subset",
             None,
@@ -928,19 +942,21 @@ fn lower_implicit_data_type_range(
     syntax_tree: &SyntaxTree,
     data_type: &ImplicitDataType,
     path: &Path,
+    params: &[ParameterDecl],
 ) -> LowerResult<Option<PackedRange>> {
-    lower_packed_dimensions(syntax_tree, &data_type.nodes.1, path)
+    lower_packed_dimensions(syntax_tree, &data_type.nodes.1, path, params)
 }
 
 fn lower_unpacked_dimensions(
     syntax_tree: &SyntaxTree,
     unpacked_dimensions: &[UnpackedDimension],
     path: &Path,
+    params: &[ParameterDecl],
 ) -> LowerResult<Option<PackedRange>> {
     match unpacked_dimensions {
         [] => Ok(None),
         [UnpackedDimension::Range(range)] => {
-            lower_constant_range(syntax_tree, &range.nodes.0.nodes.1, path).map(Some)
+            lower_constant_range(syntax_tree, &range.nodes.0.nodes.1, path, params).map(Some)
         }
         [UnpackedDimension::Expression(_)] => Err(unsupported(
             "unsized unpacked dimensions are not supported yet",
@@ -957,11 +973,17 @@ fn lower_variable_dimensions(
     syntax_tree: &SyntaxTree,
     dimensions: &[VariableDimension],
     path: &Path,
+    params: &[ParameterDecl],
 ) -> LowerResult<Option<PackedRange>> {
     match dimensions {
         [] => Ok(None),
         [VariableDimension::UnpackedDimension(dimension)] => {
-            lower_unpacked_dimensions(syntax_tree, std::slice::from_ref(dimension.as_ref()), path)
+            lower_unpacked_dimensions(
+                syntax_tree,
+                std::slice::from_ref(dimension.as_ref()),
+                path,
+                params,
+            )
         }
         [VariableDimension::UnsizedDimension(_)]
         | [VariableDimension::AssociativeDimension(_)]
@@ -980,11 +1002,12 @@ fn lower_packed_dimensions(
     syntax_tree: &SyntaxTree,
     packed_dimensions: &[sv_parser::PackedDimension],
     path: &Path,
+    params: &[ParameterDecl],
 ) -> LowerResult<Option<PackedRange>> {
     match packed_dimensions {
         [] => Ok(None),
         [sv_parser::PackedDimension::Range(range)] => {
-            lower_constant_range(syntax_tree, &range.nodes.0.nodes.1, path).map(Some)
+            lower_constant_range(syntax_tree, &range.nodes.0.nodes.1, path, params).map(Some)
         }
         _ => Err(unsupported(
             "multiple packed dimensions are not supported yet",
@@ -2164,6 +2187,7 @@ fn lower_binary_operator(
         ">=" => Ok(BinaryOp::GtEq),
         "+" => Ok(BinaryOp::Add),
         "-" => Ok(BinaryOp::Sub),
+        "*" => Ok(BinaryOp::Mul),
         _ => Err(unsupported("binary operator is not supported yet", None)),
     }
 }
@@ -2172,10 +2196,21 @@ fn lower_constant_range(
     syntax_tree: &SyntaxTree,
     range: &ConstantRange,
     path: &Path,
+    params: &[ParameterDecl],
 ) -> LowerResult<PackedRange> {
     Ok(PackedRange {
-        msb: lower_usize_constant_expression(syntax_tree, &range.nodes.0, path)?,
-        lsb: lower_usize_constant_expression(syntax_tree, &range.nodes.2, path)?,
+        msb: lower_usize_constant_expression_with_params(
+            syntax_tree,
+            &range.nodes.0,
+            path,
+            params,
+        )?,
+        lsb: lower_usize_constant_expression_with_params(
+            syntax_tree,
+            &range.nodes.2,
+            path,
+            params,
+        )?,
     })
 }
 
@@ -2236,6 +2271,15 @@ fn lower_usize_constant_expression(
     expr: &ConstantExpression,
     path: &Path,
 ) -> LowerResult<usize> {
+    lower_usize_constant_expression_with_params(syntax_tree, expr, path, &[])
+}
+
+fn lower_usize_constant_expression_with_params(
+    syntax_tree: &SyntaxTree,
+    expr: &ConstantExpression,
+    path: &Path,
+    params: &[ParameterDecl],
+) -> LowerResult<usize> {
     match expr {
         ConstantExpression::ConstantPrimary(primary) => match &**primary {
             sv_parser::ConstantPrimary::PrimaryLiteral(literal) => {
@@ -2249,17 +2293,183 @@ fn lower_usize_constant_expression(
                     .ok_or_else(|| unsupported("constant index exceeds host limits", None))
             }
             sv_parser::ConstantPrimary::MintypmaxExpression(expr) => {
-                lower_usize_constant_mintypmax_expression(syntax_tree, &expr.nodes.0.nodes.1, path)
+                lower_usize_constant_mintypmax_expression(
+                    syntax_tree,
+                    &expr.nodes.0.nodes.1,
+                    path,
+                    params,
+                )
+            }
+            sv_parser::ConstantPrimary::PsParameter(ps_param) => {
+                let (name, _) = identifier_name_from_node(
+                    syntax_tree,
+                    RefNode::from(&ps_param.nodes.0),
+                )
+                .ok_or_else(|| unsupported("failed to read parameter name", None))?;
+                let param = params
+                    .iter()
+                    .find(|p| p.name == name)
+                    .ok_or_else(|| {
+                        unsupported(
+                            format!("parameter '{name}' not found for constant evaluation"),
+                            None,
+                        )
+                    })?;
+                const_eval_param_value(&param.default_value, params)
+            }
+            // sv-parser parses bare identifiers in constant expressions as
+            // ConstantFunctionCall (a TfCall with no arguments). When the
+            // identifier matches a known parameter, treat it as a parameter
+            // reference.
+            sv_parser::ConstantPrimary::ConstantFunctionCall(call) => {
+                let (name, _) = identifier_name_from_node(
+                    syntax_tree,
+                    RefNode::from(&call.nodes.0),
+                )
+                .ok_or_else(|| unsupported("failed to read identifier in constant expression", None))?;
+                let param = params
+                    .iter()
+                    .find(|p| p.name == name)
+                    .ok_or_else(|| {
+                        unsupported(
+                            format!("identifier '{name}' is not a known parameter for constant evaluation"),
+                            None,
+                        )
+                    })?;
+                const_eval_param_value(&param.default_value, params)
             }
             _ => Err(unsupported(
                 "constant expression is outside the supported subset",
                 None,
             )),
         },
-        ConstantExpression::Ternary(_)
-        | ConstantExpression::Binary(_)
-        | ConstantExpression::Unary(_) => Err(unsupported(
-            "only literal constant expressions are supported in ranges",
+        ConstantExpression::Binary(binary) => {
+            let left = lower_usize_constant_expression_with_params(
+                syntax_tree,
+                &binary.nodes.0,
+                path,
+                params,
+            )?;
+            let op_text = symbol_text(syntax_tree, &binary.nodes.1.nodes.0)?;
+            let right = lower_usize_constant_expression_with_params(
+                syntax_tree,
+                &binary.nodes.3,
+                path,
+                params,
+            )?;
+            match op_text.as_str() {
+                "+" => Ok(left.wrapping_add(right)),
+                "-" => Ok(left.wrapping_sub(right)),
+                "*" => Ok(left.wrapping_mul(right)),
+                "/" => {
+                    if right == 0 {
+                        Err(unsupported("division by zero in constant expression", None))
+                    } else {
+                        Ok(left / right)
+                    }
+                }
+                _ => Err(unsupported(
+                    format!("operator '{op_text}' is not supported in constant expressions"),
+                    None,
+                )),
+            }
+        }
+        ConstantExpression::Ternary(ternary) => {
+            let cond = lower_usize_constant_expression_with_params(
+                syntax_tree,
+                &ternary.nodes.0,
+                path,
+                params,
+            )?;
+            if cond != 0 {
+                lower_usize_constant_expression_with_params(
+                    syntax_tree,
+                    &ternary.nodes.3,
+                    path,
+                    params,
+                )
+            } else {
+                lower_usize_constant_expression_with_params(
+                    syntax_tree,
+                    &ternary.nodes.5,
+                    path,
+                    params,
+                )
+            }
+        }
+        ConstantExpression::Unary(_) => Err(unsupported(
+            "unary constant expressions in ranges are not supported yet",
+            None,
+        )),
+    }
+}
+
+/// Evaluate an already-lowered HIR Expr to a usize, resolving parameter references.
+fn const_eval_param_value(expr: &Expr, params: &[ParameterDecl]) -> LowerResult<usize> {
+    match expr {
+        Expr::Literal(literal) => literal
+            .bits
+            .to_usize_checked()
+            .ok_or_else(|| unsupported("constant value exceeds host limits", None)),
+        Expr::Ident(name) => {
+            let param = params
+                .iter()
+                .find(|p| p.name == *name)
+                .ok_or_else(|| {
+                    unsupported(
+                        format!("parameter '{name}' not found for constant evaluation"),
+                        None,
+                    )
+                })?;
+            const_eval_param_value(&param.default_value, params)
+        }
+        Expr::Binary { left, op, right } => {
+            let l = const_eval_param_value(left, params)?;
+            let r = const_eval_param_value(right, params)?;
+            match op {
+                BinaryOp::Add => Ok(l.wrapping_add(r)),
+                BinaryOp::Sub => Ok(l.wrapping_sub(r)),
+                BinaryOp::Mul => Ok(l.wrapping_mul(r)),
+                BinaryOp::BitAnd => Ok(l & r),
+                BinaryOp::BitOr => Ok(l | r),
+                BinaryOp::BitXor => Ok(l ^ r),
+                BinaryOp::ShiftLeft => Ok(l << r),
+                BinaryOp::ShiftRight => Ok(l >> r),
+                BinaryOp::Eq => Ok(usize::from(l == r)),
+                BinaryOp::NotEq => Ok(usize::from(l != r)),
+                BinaryOp::Lt => Ok(usize::from(l < r)),
+                BinaryOp::LtEq => Ok(usize::from(l <= r)),
+                BinaryOp::Gt => Ok(usize::from(l > r)),
+                BinaryOp::GtEq => Ok(usize::from(l >= r)),
+                BinaryOp::LogicalAnd => Ok(usize::from(l != 0 && r != 0)),
+                BinaryOp::LogicalOr => Ok(usize::from(l != 0 || r != 0)),
+            }
+        }
+        Expr::Ternary {
+            cond,
+            when_true,
+            when_false,
+        } => {
+            let c = const_eval_param_value(cond, params)?;
+            if c != 0 {
+                const_eval_param_value(when_true, params)
+            } else {
+                const_eval_param_value(when_false, params)
+            }
+        }
+        Expr::Unary { op, expr } => {
+            let v = const_eval_param_value(expr, params)?;
+            match op {
+                UnaryOp::LogicalNot => Ok(usize::from(v == 0)),
+                UnaryOp::BitNot => Ok(!v),
+                _ => Err(unsupported(
+                    "unsupported unary operator in constant parameter expression",
+                    None,
+                )),
+            }
+        }
+        _ => Err(unsupported(
+            "expression is too complex for constant parameter evaluation",
             None,
         )),
     }
@@ -2269,10 +2479,11 @@ fn lower_usize_constant_mintypmax_expression(
     syntax_tree: &SyntaxTree,
     expr: &sv_parser::ConstantMintypmaxExpression,
     path: &Path,
+    params: &[ParameterDecl],
 ) -> LowerResult<usize> {
     match expr {
         sv_parser::ConstantMintypmaxExpression::Unary(expr) => {
-            lower_usize_constant_expression(syntax_tree, expr, path)
+            lower_usize_constant_expression_with_params(syntax_tree, expr, path, params)
         }
         sv_parser::ConstantMintypmaxExpression::Ternary(_) => Err(unsupported(
             "ternary constant ranges are not supported yet",
