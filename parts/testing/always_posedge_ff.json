@@ -1,0 +1,16 @@
+{
+  "sequential": true,
+  "clock": "clk",
+  "test_cases": [
+    {
+      "name": "Store and hold via Verilog-2001 always @(posedge clk)",
+      "sequence": [
+        {"inputs": {"clk": 1, "enable": 1, "data": 42}, "expected": {"q": 42}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 99}, "expected": {"q": 42}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 200}, "expected": {"q": 200}},
+        {"inputs": {"clk": 1, "enable": 0, "data": 0}, "expected": {"q": 200}},
+        {"inputs": {"clk": 1, "enable": 1, "data": 0}, "expected": {"q": 0}}
+      ]
+    }
+  ]
+}

@@ -1115,10 +1115,9 @@ fn lower_always_construct(
             body: lower_statement(syntax_tree, &construct.nodes.1, module, path)?,
             span: None,
         }),
-        AlwaysKeyword::Always(_) => Err(unsupported(
-            "`always` blocks are not supported yet; use `always_comb` or `always_ff`",
-            None,
-        )),
+        AlwaysKeyword::Always(_) => {
+            lower_always_generic(syntax_tree, &construct.nodes.1, module, path)
+        }
         AlwaysKeyword::AlwaysLatch(_) => Err(unsupported(
             "`always_latch` blocks are not supported yet",
             None,
@@ -1132,6 +1131,70 @@ fn lower_always_construct(
                 span: None,
             })
         }
+    }
+}
+
+/// Lower a Verilog-2001 `always @(...)` block by inspecting the sensitivity list:
+/// - `@*` or `@(*)` → AlwaysComb
+/// - `@(posedge clk)` → AlwaysFf { clock }
+fn lower_always_generic(
+    syntax_tree: &SyntaxTree,
+    statement: &Statement,
+    module: &ModuleSummary,
+    path: &Path,
+) -> LowerResult<ProcBlock> {
+    if statement.nodes.0.is_some() {
+        return Err(unsupported(
+            "named procedural blocks are not supported yet",
+            None,
+        ));
+    }
+
+    let StatementItem::ProceduralTimingControlStatement(timing_stmt) = &statement.nodes.2 else {
+        return Err(unsupported(
+            "`always` blocks must have a sensitivity list (e.g. `always @*` or `always @(posedge clk)`)",
+            None,
+        ));
+    };
+
+    let sv_parser::ProceduralTimingControl::EventControl(control) = &timing_stmt.nodes.0 else {
+        return Err(unsupported(
+            "`always` blocks only support event controls, not delays or cycle delays",
+            None,
+        ));
+    };
+
+    match control.as_ref() {
+        // always @* or always @(*)  →  AlwaysComb
+        sv_parser::EventControl::Asterisk(_) | sv_parser::EventControl::ParenAsterisk(_) => {
+            let body =
+                lower_statement_or_null(syntax_tree, &timing_stmt.nodes.1, module, path)?;
+            Ok(ProcBlock {
+                kind: ProcBlockKind::AlwaysComb,
+                body,
+                span: None,
+            })
+        }
+        // always @(posedge clk)  →  AlwaysFf
+        sv_parser::EventControl::EventExpression(expr) => {
+            let clock = lower_always_ff_event_expression(
+                syntax_tree,
+                &expr.nodes.1.nodes.1,
+                module,
+                path,
+            )?;
+            let body =
+                lower_statement_or_null(syntax_tree, &timing_stmt.nodes.1, module, path)?;
+            Ok(ProcBlock {
+                kind: ProcBlockKind::AlwaysFf { clock },
+                body,
+                span: None,
+            })
+        }
+        _ => Err(unsupported(
+            "`always` blocks only support `@*` or `@(posedge <clock>)` sensitivity lists",
+            None,
+        )),
     }
 }
 
