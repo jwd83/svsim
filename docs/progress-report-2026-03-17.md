@@ -1,5 +1,7 @@
 # Rewrite Progress Report
 
+Superseded by `docs/progress-report-2026-03-18.md`.
+
 Date: March 17, 2026
 
 ## Executive Summary

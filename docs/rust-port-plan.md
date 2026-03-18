@@ -43,8 +43,8 @@ Current implementation status as of March 18, 2026:
 - current sequential limits: only `posedge` event controls are lowered, `always_ff` clock expressions must be local identifiers, and cross-block race semantics are not modeled beyond deterministic source order
 - current memory subset supports fixed-size unpacked `reg` / `logic` arrays with zero-initialized reads, explicit programmatic preload/read access by instance path, text-file ROM/RAM loading, procedural single-element writes, and JSON-driven regression preload; explicit elaboration, broader event controls, and render integration are still pending
 - regression compatibility now covers the legacy corpus conventions that still matter in `parts/`: compile-time validation now enforces the supported interface-only `rom_*` wrapper shape and backing text-file lookup, and `pgm_*` JSON suites auto-bind `overture_fetch.rom` from a sibling program text file when no explicit memory bindings are present
-- measured verification: `cargo test` passes; the compile-only multi-directory corpus reports `parts/basic` at `44/44`, `parts/testing` at `42/42`, `parts/overture` at `41/41`, `parts/rv32i` at `1/1`, and the full `parts/basic` + `parts/testing` + `parts/overture` + `parts/rv32i` compile surface at `128/128` in about `2.1s`; the JSON regression corpus remains green at `145/145` in about `19.1s`
-- measured batch status: the compile-only multi-directory runner completes `parts/basic` in about `0.8s`, `parts/testing` in about `0.1s`, `parts/overture` in about `0.7s`, and `parts/rv32i` in about `0.4s`; the JSON multi-directory runner completes them in about `7.6s`, `0.2s`, `9.9s`, and `1.4s`
+- measured verification: `cargo test` passes at `98/98`; the compile-only multi-directory corpus reports `parts/basic` at `44/44`, `parts/testing` at `50/50`, `parts/overture` at `41/41`, `parts/rv32i` at `1/1`, and the full `parts/basic` + `parts/testing` + `parts/overture` + `parts/rv32i` compile surface at `136/136` in about `2.7s`; the JSON regression corpus reports `parts/basic` at `44/44`, `parts/testing` at `50/50`, `parts/overture` at `43/43`, `parts/rv32i` at `16/16`, for a full `153/153` passing suite surface in about `26.0s`
+- measured batch status: the compile-only multi-directory runner completes `parts/basic` in about `1.1s`, `parts/testing` in about `0.2s`, `parts/overture` in about `0.9s`, and `parts/rv32i` in about `0.5s`; the JSON multi-directory runner completes them in about `10.6s`, `0.2s`, `13.5s`, and `1.7s`
 - `parts/testing/020-WidthCoercion.sv` and `parts/testing/020-WidthCoercion.json` now pin widened and narrowed assignment/instance-port coercion behavior in the green corpus
 - `parts/testing/021-ShiftOps.sv` and `parts/testing/021-ShiftOps.json` now pin logical shift semantics, including left-operand result width and zeroing when the shift amount reaches the operand width
 - `parts/rv32i` now provides a 16-suite RV32I demo corpus covering arithmetic, compare, branch, jump, instruction-address misalignment traps, instruction/load/store access faults, subword memory, fence/system instructions, breakpoint and illegal-instruction traps, and misaligned load/store traps
@@ -56,7 +56,7 @@ Current implementation status as of March 18, 2026:
 
 The first meaningful milestone is feature parity with the subset exercised by the current repository:
 
-- `128` compile-green SystemVerilog files across `parts/basic`, `parts/testing`, `parts/overture`, and `parts/rv32i`
+- `136` compile-green SystemVerilog files across `parts/basic`, `parts/testing`, `parts/overture`, and `parts/rv32i`
 - hierarchical modules built from gates up through the Overture CPU
 - combinational logic with buses, slices, concatenation, replication, arithmetic, comparisons, and ternary expressions
 - `always_comb`
@@ -404,7 +404,7 @@ Current progress:
 - zero-initialized single-dimension memory reads, explicit memory preload/read APIs, text-file memory loading, and procedural single-element memory writes are implemented
 - library-side JSON regression execution now covers sequential `test_cases`, including memory-backed suites
 - picorv32.v (open-source RISC-V softcore, ~3000 lines) now compiles successfully through the full pipeline
-- remaining work is broader event controls, generate blocks, and the remaining expression gaps needed for full picorv32 simulation
+- remaining work is parameterized instantiations, non-constant selects, procedural local declarations, task declarations, `x` / `z` numeric literal digits, and the remaining primary-expression, statement, and module-item shapes still surfaced as `unsupported` in picorv32 HIR
 
 Exit criterion:
 - parity for sequential register/counter tests and the math sequence stubs
@@ -418,7 +418,7 @@ Exit criterion:
 Current progress:
 - library and CLI batch entry points now exist for both compile-only `*.sv` discovery and JSON regression discovery, runs stay sorted by source path, and JSON suites can explicitly reuse a shared source file through a `source` field
 - legacy corpus compatibility for `rom_*` wrappers and `pgm_*` program harnesses now exists without reintroducing those naming conventions into the main library memory API, and malformed `rom_*` wrappers now fail at compile time instead of degrading into empty modules or late runtime errors
-- measured Overture status now includes `41/41` clean compile-only source files and `43/43` passing JSON suites, including the two explicit-source `overture_cpu` program variants; the full multi-directory corpus snapshot is `126/126` compile-only in about `1.6s` and `128/128` JSON regressions in about `18.6s`
+- measured Overture status now includes `41/41` clean compile-only source files and `43/43` passing JSON suites, including the two explicit-source `overture_cpu` program variants; the full multi-directory corpus snapshot is `136/136` compile-only in about `2.7s` and `153/153` JSON regressions in about `26.0s`
 - shared helper functions (`mask`, shift primitives, `expr_to_lvalue`, `resolve_legacy_rom_data_path`) have been deduplicated between `sim.rs` and `validate.rs` and consolidated into `width.rs`, `hir.rs`, and `validate.rs` respectively, removing ~70 lines of cross-module duplication
 - remaining work is folding more in-range resolution and connection-shape checks into a single elaboration/validation layer now that the runtime coercion slices, constant memory-bounds checks, and shared helpers are explicit, and tightening unsupported-construct diagnostics where wider coverage finds gaps
 

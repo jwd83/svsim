@@ -11,7 +11,7 @@ Date: March 18, 2026
 3. Parameter-expression range bounds (`[regindex_bits-1:0]`)
 4. Multiply operator (`*`)
 
-All existing tests remain green. The test corpus grew from 145 to 160+ passing suites with targeted coverage for every new feature.
+All existing tests remain green. The measured repository state now sits at `98/98` Rust tests, `136/136` compile-only green source files, and `153/153` passing JSON regression suites across `parts/basic`, `parts/testing`, `parts/overture`, and `parts/rv32i`.
 
 ## What Changed Today
 
@@ -45,36 +45,35 @@ All existing tests remain green. The test corpus grew from 145 to 160+ passing s
 ## Verified Current State
 
 - `cargo test`: pass (98 tests: 90 unit + 8 integration)
-- `cargo run -- parts/picorv32/picorv32.v`: **compiles successfully**, emits 370KB HIR JSON
-- All golden suites: green (0 failures across testing, basic, rv32i, overture)
-- All report files regenerated
+- `cargo run -p svsim-cli -- parts/picorv32/picorv32.v`: **compiles successfully**, emits about 370KB of HIR JSON, and lowers 8 modules with `picorv32_wb` as the discovered top module
+- Compile-only multi-directory corpus: `136/136` (`parts/basic` `44/44`, `parts/testing` `50/50`, `parts/overture` `41/41`, `parts/rv32i` `1/1`)
+- JSON regression multi-directory corpus: `153/153` (`parts/basic` `44/44`, `parts/testing` `50/50`, `parts/overture` `43/43`, `parts/rv32i` `16/16`)
+- picorv32 HIR still carries `28` `unsupported` entries across 6 of the 8 lowered modules, so compile-clean does not yet mean full simulation coverage
 
 ## picorv32 Remaining Work
 
-The design compiles to HIR but cannot simulate yet. The `unsupported` diagnostics within the HIR show remaining gaps for full simulation:
+The design compiles to HIR but cannot simulate end-to-end yet. The current blockers come from each module's `unsupported` list in the emitted HIR:
 
-| Feature | picorv32 usage | Effort |
-|---------|---------------|--------|
-| `generate if` / `endgenerate` | conditional module inclusion | Medium |
-| task declarations | debug helper tasks | Small (can skip) |
-| `$display` / `$write` system tasks | debug output | Can ignore |
-| `ifdef` / `define` macros | already handled by sv-parser preprocessor |
-| Non-literal part selects in expressions | `decoded_rs1[regindex_bits-1]` | Medium |
-| Variable initializers | `reg foo = 0` | Small |
+| Gap | Current HIR message | Seen in |
+|-----|---------------------|---------|
+| Parameterized child instantiation | `parameterized module instantiations are not supported yet` | `picorv32_axi`, `picorv32_wb` |
+| Non-constant selects | `only constant bit and part select indices are supported` | `picorv32_pcpi_fast_mul` |
+| Procedural local declarations | `procedural blocks with local declarations are not supported yet` | `picorv32` |
+| Task declarations | `task declarations are not supported yet` | `picorv32` |
+| 4-state literal syntax | `x/z numeric literal digits are not supported yet` | `picorv32`, `picorv32_pcpi_div` |
+| Remaining expression / statement / module-item forms | `primary expression is not supported yet`, `statement is outside the current executable subset`, `statement attributes are not supported yet`, `module item is outside the current executable subset`, `unary operator is not supported yet`, `literal is outside the current executable subset` | `picorv32`, `picorv32_pcpi_mul`, `picorv32_pcpi_fast_mul` |
 
 ## Commands Run
 
 ```text
 cargo test
 cargo build
-cargo run -- parts/picorv32/picorv32.v
-cargo run -- parts/testing/always_star_comb.sv --json-test parts/testing/always_star_comb.json
-cargo run -- parts/testing/always_posedge_ff.sv --json-test parts/testing/always_posedge_ff.json
-cargo run -- parts/testing/reduction_ops.sv --json-test parts/testing/reduction_ops.json
-cargo run -- parts/testing/param_expr_range.sv --json-test parts/testing/param_expr_range.json
-cargo run -- parts/testing/multiply.sv --json-test parts/testing/multiply.json
-cargo run -- --json-test-dir parts/testing
-cargo run -- --json-test-dir parts/basic
-cargo run -- --json-test-dir parts/rv32i
-cargo run -- --compile-dir parts/overture
+cargo run -p svsim-cli -- parts/picorv32/picorv32.v
+cargo run -p svsim-cli -- parts/testing/always_star_comb.sv --json-test parts/testing/always_star_comb.json
+cargo run -p svsim-cli -- parts/testing/always_posedge_ff.sv --json-test parts/testing/always_posedge_ff.json
+cargo run -p svsim-cli -- parts/testing/reduction_ops.sv --json-test parts/testing/reduction_ops.json
+cargo run -p svsim-cli -- parts/testing/param_expr_range.sv --json-test parts/testing/param_expr_range.json
+cargo run -p svsim-cli -- parts/testing/multiply.sv --json-test parts/testing/multiply.json
+cargo run -p svsim-cli -- --compile-dir parts/basic --compile-dir parts/testing --compile-dir parts/overture --compile-dir parts/rv32i
+cargo run -p svsim-cli -- --json-test-dir parts/basic --json-test-dir parts/testing --json-test-dir parts/overture --json-test-dir parts/rv32i
 ```
