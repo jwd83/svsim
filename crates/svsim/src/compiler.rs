@@ -1230,8 +1230,8 @@ mod tests {
     }
 
     #[test]
-    fn compile_str_errors_on_port_width_exceeding_runtime_limit() {
-        let error = Compiler::new()
+    fn compile_str_accepts_wide_port_widths() {
+        let design = Compiler::new()
             .compile_str(
                 PathBuf::from("/virtual/top.sv"),
                 concat!(
@@ -1243,17 +1243,9 @@ mod tests {
                     "endmodule\n"
                 ),
             )
-            .expect_err("ports wider than BitValue bits should fail validation");
+            .expect("wide ports should compile");
 
-        match error {
-            Error::Unsupported(message) => {
-                assert!(
-                    message.contains("port 'inA' in 'top' has width 129"),
-                    "unexpected message: {message}"
-                );
-            }
-            other => panic!("unexpected error: {other}"),
-        }
+        assert_eq!(design.top_module(), Some("top"));
     }
 
     #[test]
@@ -1305,8 +1297,8 @@ mod tests {
     }
 
     #[test]
-    fn compile_str_errors_on_concatenation_expression_exceeding_runtime_limit() {
-        let error = Compiler::new()
+    fn compile_str_accepts_wide_concatenation_expressions() {
+        let design = Compiler::new()
             .compile_str(
                 PathBuf::from("/virtual/top.sv"),
                 concat!(
@@ -1319,22 +1311,14 @@ mod tests {
                     "endmodule\n"
                 ),
             )
-            .expect_err("wide concatenations should fail validation");
+            .expect("wide concatenations should compile");
 
-        match error {
-            Error::Unsupported(message) => {
-                assert!(
-                    message.contains("concatenation expression has width 160"),
-                    "unexpected message: {message}"
-                );
-            }
-            other => panic!("unexpected error: {other}"),
-        }
+        assert_eq!(design.top_module(), Some("top"));
     }
 
     #[test]
-    fn compile_str_errors_on_concatenated_lvalue_exceeding_runtime_limit() {
-        let error = Compiler::new()
+    fn compile_str_accepts_wide_concatenated_lvalues() {
+        let design = Compiler::new()
             .compile_str(
                 PathBuf::from("/virtual/top.sv"),
                 concat!(
@@ -1347,17 +1331,9 @@ mod tests {
                     "endmodule\n"
                 ),
             )
-            .expect_err("wide concatenated targets should fail validation");
+            .expect("wide concatenated targets should compile");
 
-        match error {
-            Error::Unsupported(message) => {
-                assert!(
-                    message.contains("concatenated assignment target has width 160"),
-                    "unexpected message: {message}"
-                );
-            }
-            other => panic!("unexpected error: {other}"),
-        }
+        assert_eq!(design.top_module(), Some("top"));
     }
 
     #[test]

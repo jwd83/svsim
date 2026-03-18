@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::Path;
 
-use crate::bit_value::{BitValue, BIT_VALUE_BITS};
+use crate::bit_value::{BitValue, ParseBitValueError};
 use crate::design::CompiledDesign;
 use crate::diag::{Error, Result};
 use crate::hir::{
@@ -59,7 +59,7 @@ impl MemoryState {
                 index, memory_name
             ))
         })?;
-        Ok(self.words[offset])
+        Ok(self.words[offset].clone())
     }
 
     fn write(&mut self, index: usize, value: Value, memory_name: &str) -> Result<bool> {
@@ -122,7 +122,7 @@ impl SimulationSession {
             let index = memory_decl.index_range.low() + offset;
             memory_state.write(
                 index,
-                Value::new(*word, memory_decl.element_width()),
+                Value::new(word.clone(), memory_decl.element_width()),
                 memory_name,
             )?;
         }
@@ -189,14 +189,20 @@ impl SimulationSession {
         Ok(memory_state.read(index, memory_name)?.normalized_bits())
     }
 
-    pub fn eval_once(&mut self, inputs: BTreeMap<String, BitValue>) -> Result<BTreeMap<String, BitValue>> {
+    pub fn eval_once(
+        &mut self,
+        inputs: BTreeMap<String, BitValue>,
+    ) -> Result<BTreeMap<String, BitValue>> {
         let module = top_module(self.design.hir(), self.top_module())?;
         let mut stack = Vec::new();
         let values = settle_module(self.design.hir(), module, &self.state, &inputs, &mut stack)?;
         Ok(collect_outputs(module, &values))
     }
 
-    pub fn step(&mut self, inputs: BTreeMap<String, BitValue>) -> Result<BTreeMap<String, BitValue>> {
+    pub fn step(
+        &mut self,
+        inputs: BTreeMap<String, BitValue>,
+    ) -> Result<BTreeMap<String, BitValue>> {
         let module = top_module(self.design.hir(), self.top_module())?;
         let mut stack = Vec::new();
         step_module(self.design.hir(), &mut self.state, &inputs, &mut stack)?;
@@ -213,7 +219,11 @@ impl SimulationSession {
     }
 }
 
-fn parse_memory_file(path: &Path, word_width: usize, depth: usize) -> Result<Vec<(usize, BitValue)>> {
+fn parse_memory_file(
+    path: &Path,
+    word_width: usize,
+    depth: usize,
+) -> Result<Vec<(usize, BitValue)>> {
     let text = fs::read_to_string(path)?;
     parse_memory_text(&text, path, word_width, depth)
 }
@@ -250,7 +260,7 @@ fn parse_memory_text(
         }
 
         let value = parse_memory_value(value_text, path, line_number + 1)?;
-        writes.push((address, value & mask(word_width)));
+        writes.push((address, value.truncate(word_width)));
         current_address = address + 1;
     }
 
@@ -272,7 +282,7 @@ fn strip_memory_comments(line: &str) -> Option<&str> {
 fn parse_memory_address(text: &str, path: &Path, line_number: usize) -> Result<usize> {
     let raw = text.trim().replace('_', "");
     if let Ok(value) = parse_prefixed_value(&raw) {
-        usize::try_from(value).map_err(|_| {
+        value.to_usize_checked().ok_or_else(|| {
             Error::Parse(format!(
                 "memory file '{}' line {} has an address too large for this host",
                 path.display(),
@@ -312,7 +322,7 @@ fn parse_memory_value(text: &str, path: &Path, line_number: usize) -> Result<Bit
     })
 }
 
-fn parse_prefixed_value(raw: &str) -> std::result::Result<BitValue, std::num::ParseIntError> {
+fn parse_prefixed_value(raw: &str) -> std::result::Result<BitValue, ParseBitValueError> {
     if let Some(rest) = raw.strip_prefix("0x").or_else(|| raw.strip_prefix("0X")) {
         BitValue::from_str_radix(rest, 16)
     } else if let Some(rest) = raw.strip_prefix("0b").or_else(|| raw.strip_prefix("0B")) {
@@ -324,7 +334,7 @@ fn parse_prefixed_value(raw: &str) -> std::result::Result<BitValue, std::num::Pa
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct Value {
     bits: BitValue,
     width: usize,
@@ -334,25 +344,25 @@ impl Value {
     fn new(bits: BitValue, width: usize) -> Self {
         let width = width.max(1);
         Self {
-            bits: bits & mask(width),
+            bits: bits.truncate(width),
             width,
         }
     }
 
-    fn coerced_to(self, width: usize) -> Self {
+    fn coerced_to(&self, width: usize) -> Self {
         Self::new(self.normalized_bits(), width)
     }
 
     fn zero(width: usize) -> Self {
-        Self::new(0, width)
+        Self::new(BitValue::zero(), width)
     }
 
-    fn normalized_bits(self) -> BitValue {
-        self.bits & mask(self.width)
+    fn normalized_bits(&self) -> BitValue {
+        self.bits.clone()
     }
 
-    fn truthy(self) -> bool {
-        self.normalized_bits() != 0
+    fn truthy(&self) -> bool {
+        !self.bits.is_zero()
     }
 }
 
@@ -506,7 +516,7 @@ fn step_module(
         match &block.kind {
             ProcBlockKind::AlwaysComb => {}
             ProcBlockKind::AlwaysFf { clock } => {
-                let clock_value = pre_values.get(clock).copied().ok_or_else(|| {
+                let clock_value = pre_values.get(clock).cloned().ok_or_else(|| {
                     Error::Resolve(format!(
                         "clock '{}' is not declared in '{}'",
                         clock, module.name
@@ -605,7 +615,7 @@ fn execute_comb_stmt(
             let value = eval_expr(expr, module, values, memories)?;
             for item in items {
                 for pattern in &item.patterns {
-                    if values_equal(value, eval_expr(pattern, module, values, memories)?) {
+                    if values_equal(&value, &eval_expr(pattern, module, values, memories)?) {
                         return execute_comb_stmt(&item.body, module, values, memories);
                     }
                 }
@@ -691,7 +701,10 @@ fn execute_sequential_stmt(
             let value = eval_expr(expr, module, current_values, memories)?;
             for item in items {
                 for pattern in &item.patterns {
-                    if values_equal(value, eval_expr(pattern, module, current_values, memories)?) {
+                    if values_equal(
+                        &value,
+                        &eval_expr(pattern, module, current_values, memories)?,
+                    ) {
                         return execute_sequential_stmt(
                             &item.body,
                             module,
@@ -828,15 +841,22 @@ fn apply_legacy_rom_outputs(
 ) -> Result<()> {
     let addr = values
         .get(&legacy_rom.addr_port)
-        .copied()
+        .cloned()
         .ok_or_else(|| {
             Error::Resolve(format!(
                 "legacy ROM primitive '{}' is missing address port '{}'",
                 module.name, legacy_rom.addr_port
             ))
         })?
-        .normalized_bits() as usize;
-    let data = legacy_rom.words.get(addr).copied().ok_or_else(|| {
+        .normalized_bits()
+        .to_usize_checked()
+        .ok_or_else(|| {
+            Error::Resolve(format!(
+                "legacy ROM primitive '{}' address exceeds host limits",
+                module.name
+            ))
+        })?;
+    let data = legacy_rom.words.get(addr).cloned().ok_or_else(|| {
         Error::Resolve(format!(
             "legacy ROM primitive '{}' address {} is out of range",
             module.name, addr
@@ -855,11 +875,17 @@ fn build_signal_table(
 
     for port in &module.ports {
         let value = if matches!(port.direction, PortDirection::Input) {
-            Value::new(*inputs.get(&port.name).unwrap_or(&0), port.width())
+            Value::new(
+                inputs
+                    .get(&port.name)
+                    .cloned()
+                    .unwrap_or_else(BitValue::zero),
+                port.width(),
+            )
         } else {
             persisted
                 .get(&port.name)
-                .copied()
+                .cloned()
                 .unwrap_or_else(|| Value::zero(port.width()))
         };
         values.insert(port.name.clone(), value);
@@ -870,7 +896,7 @@ fn build_signal_table(
             signal.name.clone(),
             persisted
                 .get(&signal.name)
-                .copied()
+                .cloned()
                 .unwrap_or_else(|| Value::zero(signal.width())),
         );
     }
@@ -963,7 +989,7 @@ fn evaluate_instance(
         })?;
         let value = child_values
             .get(&port.name)
-            .copied()
+            .cloned()
             .unwrap_or_else(|| Value::zero(port.width()))
             .coerced_to(port.width());
         let target = resolve_lvalue(&lvalue, parent, values, memories)?;
@@ -1006,7 +1032,7 @@ fn collect_outputs(
     {
         let value = values
             .get(&port.name)
-            .copied()
+            .cloned()
             .unwrap_or_else(|| Value::zero(port.width()))
             .coerced_to(port.width());
         outputs.insert(port.name.clone(), value.normalized_bits());
@@ -1056,7 +1082,7 @@ fn eval_expr(
     match expr {
         Expr::Ident(name) => values
             .get(name)
-            .copied()
+            .cloned()
             .ok_or_else(|| Error::Resolve(format!("signal '{}' is not declared", name))),
         Expr::Literal(literal) => Ok(value_from_literal(literal)),
         Expr::Concat(exprs) => {
@@ -1072,7 +1098,10 @@ fn eval_expr(
             concat_values(&values_out)
         }
         Expr::MemoryRead { memory, index } => {
-            let index = eval_expr(index, module, values, memories)?.normalized_bits() as usize;
+            let index = eval_expr(index, module, values, memories)?
+                .normalized_bits()
+                .to_usize_checked()
+                .ok_or_else(|| Error::Resolve("memory index exceeds host limits".into()))?;
             let memory_state = memories
                 .get(memory)
                 .ok_or_else(|| Error::Resolve(format!("memory '{}' is not declared", memory)))?;
@@ -1086,7 +1115,10 @@ fn eval_expr(
                     index, value.width
                 )));
             }
-            Ok(Value::new((value.normalized_bits() >> index) & 1, 1))
+            Ok(Value::new(
+                BitValue::from(value.normalized_bits().get_bit(*index)),
+                1,
+            ))
         }
         Expr::PartSelect { expr, msb, lsb } => {
             let value = eval_expr(expr, module, values, memories)?;
@@ -1099,15 +1131,15 @@ fn eval_expr(
                 )));
             }
             let width = high - low + 1;
-            Ok(Value::new(
-                (value.normalized_bits() >> low) & mask(width),
-                width,
-            ))
+            Ok(Value::new(value.normalized_bits().slice(low, width), width))
         }
         Expr::Unary { op, expr } => {
             let value = eval_expr(expr, module, values, memories)?;
             match op {
-                UnaryOp::BitNot => Ok(Value::new(!value.normalized_bits(), value.width)),
+                UnaryOp::BitNot => Ok(Value::new(
+                    value.normalized_bits().bitnot_with_width(value.width),
+                    value.width,
+                )),
             }
         }
         Expr::Binary { left, op, right } => {
@@ -1115,45 +1147,61 @@ fn eval_expr(
             let right = eval_expr(right, module, values, memories)?;
             let (bits, width) = match op {
                 BinaryOp::BitAnd => (
-                    left.normalized_bits() & right.normalized_bits(),
+                    left.normalized_bits().bitand(&right.normalized_bits()),
                     left.width.max(right.width),
                 ),
                 BinaryOp::BitOr => (
-                    left.normalized_bits() | right.normalized_bits(),
+                    left.normalized_bits().bitor(&right.normalized_bits()),
                     left.width.max(right.width),
                 ),
                 BinaryOp::BitXor => (
-                    left.normalized_bits() ^ right.normalized_bits(),
+                    left.normalized_bits().bitxor(&right.normalized_bits()),
                     left.width.max(right.width),
                 ),
                 BinaryOp::ShiftLeft => (
-                    shift_left_bits(left.normalized_bits(), right.normalized_bits(), left.width),
+                    shift_left_bits(
+                        &left.normalized_bits(),
+                        &right.normalized_bits(),
+                        left.width,
+                    ),
                     left.width,
                 ),
                 BinaryOp::ShiftRight => (
-                    shift_right_bits(left.normalized_bits(), right.normalized_bits(), left.width),
+                    shift_right_bits(
+                        &left.normalized_bits(),
+                        &right.normalized_bits(),
+                        left.width,
+                    ),
                     left.width,
                 ),
-                BinaryOp::LogicalAnd => ((left.truthy() && right.truthy()) as BitValue, 1),
-                BinaryOp::LogicalOr => ((left.truthy() || right.truthy()) as BitValue, 1),
-                BinaryOp::Eq => (values_equal(left, right) as BitValue, 1),
-                BinaryOp::NotEq => ((!values_equal(left, right)) as BitValue, 1),
-                BinaryOp::Lt => ((left.normalized_bits() < right.normalized_bits()) as BitValue, 1),
-                BinaryOp::LtEq => (
-                    (left.normalized_bits() <= right.normalized_bits()) as BitValue,
+                BinaryOp::LogicalAnd => (BitValue::from(left.truthy() && right.truthy()), 1),
+                BinaryOp::LogicalOr => (BitValue::from(left.truthy() || right.truthy()), 1),
+                BinaryOp::Eq => (BitValue::from(values_equal(&left, &right)), 1),
+                BinaryOp::NotEq => (BitValue::from(!values_equal(&left, &right)), 1),
+                BinaryOp::Lt => (
+                    BitValue::from(left.normalized_bits() < right.normalized_bits()),
                     1,
                 ),
-                BinaryOp::Gt => ((left.normalized_bits() > right.normalized_bits()) as BitValue, 1),
+                BinaryOp::LtEq => (
+                    BitValue::from(left.normalized_bits() <= right.normalized_bits()),
+                    1,
+                ),
+                BinaryOp::Gt => (
+                    BitValue::from(left.normalized_bits() > right.normalized_bits()),
+                    1,
+                ),
                 BinaryOp::GtEq => (
-                    (left.normalized_bits() >= right.normalized_bits()) as BitValue,
+                    BitValue::from(left.normalized_bits() >= right.normalized_bits()),
                     1,
                 ),
                 BinaryOp::Add => (
-                    left.normalized_bits().wrapping_add(right.normalized_bits()),
+                    left.normalized_bits()
+                        .wrapping_add(&right.normalized_bits(), left.width.max(right.width)),
                     left.width.max(right.width),
                 ),
                 BinaryOp::Sub => (
-                    left.normalized_bits().wrapping_sub(right.normalized_bits()),
+                    left.normalized_bits()
+                        .wrapping_sub(&right.normalized_bits(), left.width.max(right.width)),
                     left.width.max(right.width),
                 ),
             };
@@ -1181,29 +1229,30 @@ fn eval_expr(
 }
 
 fn value_from_literal(literal: &NumericLiteral) -> Value {
-    let width = literal.width.unwrap_or_else(|| minimum_width(literal.bits));
-    Value::new(literal.bits, width)
+    let width = literal
+        .width
+        .unwrap_or_else(|| minimum_width(&literal.bits));
+    Value::new(literal.bits.clone(), width)
 }
 
 fn concat_values(parts: &[Value]) -> Result<Value> {
-    let total_width: usize = parts.iter().map(|value| value.width).sum();
-    if total_width > BIT_VALUE_BITS {
-        return Err(Error::Unsupported(format!(
-            "concatenation width {} exceeds the current {}-bit runtime limit",
-            total_width, BIT_VALUE_BITS
-        )));
+    let mut total_width = 0usize;
+    for part in parts {
+        total_width = total_width
+            .checked_add(part.width)
+            .ok_or_else(|| Error::Unsupported("concatenation width exceeds host limits".into()))?;
     }
 
-    let mut bits: BitValue = 0;
+    let mut bits = BitValue::zero();
     let mut shift = total_width;
     for part in parts {
         shift -= part.width;
-        bits |= (part.normalized_bits() & mask(part.width)) << shift;
+        bits = bits.bitor(&part.normalized_bits().shift_left(shift));
     }
     Ok(Value::new(bits, total_width))
 }
 
-fn values_equal(left: Value, right: Value) -> bool {
+fn values_equal(left: &Value, right: &Value) -> bool {
     left.normalized_bits() == right.normalized_bits()
 }
 
@@ -1241,7 +1290,10 @@ fn resolve_lvalue(
         }),
         LValue::MemoryElement { memory, index } => Ok(ResolvedLValue::MemoryElement {
             memory: memory.clone(),
-            index: eval_expr(index, module, values, memories)?.normalized_bits() as usize,
+            index: eval_expr(index, module, values, memories)?
+                .normalized_bits()
+                .to_usize_checked()
+                .ok_or_else(|| Error::Resolve("memory index exceeds host limits".into()))?,
         }),
     }
 }
@@ -1342,10 +1394,7 @@ fn apply_resolved_lvalue(
             for item in items {
                 let item_width = resolved_lvalue_width(item, module)?;
                 remaining_width -= item_width;
-                let chunk = Value::new(
-                    (normalized >> remaining_width) & mask(item_width),
-                    item_width,
-                );
+                let chunk = Value::new(normalized.slice(remaining_width, item_width), item_width);
                 changed |= apply_resolved_lvalue(item, chunk, module, values, memories)?;
             }
             Ok(changed)
@@ -1363,10 +1412,9 @@ fn apply_resolved_lvalue(
                     index, signal
                 )));
             }
-            let bit = value.coerced_to(1).normalized_bits();
+            let bit = value.coerced_to(1).normalized_bits().get_bit(0);
             let mut bits = current.normalized_bits();
-            bits &= !((1 as BitValue) << index);
-            bits |= bit << index;
+            bits.set_bit(*index, bit);
             let next = Value::new(bits, current.width);
             let changed = *current != next;
             *current = next;
@@ -1388,10 +1436,10 @@ fn apply_resolved_lvalue(
                 )));
             }
             let width = high - low + 1;
-            let select_mask = mask(width) << low;
             let mut bits = current.normalized_bits();
-            bits &= !select_mask;
-            bits |= value.coerced_to(width).normalized_bits() << low;
+            let cleared =
+                bits.bitand(&mask(width).shift_left(low).bitnot_with_width(current.width));
+            bits = cleared.bitor(&value.coerced_to(width).normalized_bits().shift_left(low));
             let next = Value::new(bits, current.width);
             let changed = *current != next;
             *current = next;
@@ -1462,7 +1510,28 @@ mod tests {
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use crate::Compiler;
+    use crate::{BitValue, Compiler};
+
+    fn bv(value: u64) -> BitValue {
+        BitValue::from(value)
+    }
+
+    fn inputs<const N: usize>(pairs: [(String, u64); N]) -> BTreeMap<String, BitValue> {
+        pairs
+            .into_iter()
+            .map(|(name, value)| (name, bv(value)))
+            .collect()
+    }
+
+    fn words<const N: usize>(values: [u64; N]) -> Vec<BitValue> {
+        values.into_iter().map(bv).collect()
+    }
+
+    macro_rules! assert_signal_eq {
+        ($outputs:expr, $name:expr, $value:expr) => {
+            assert_eq!($outputs.get($name).cloned(), Some(bv($value)));
+        };
+    }
 
     fn repo_root() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -1479,10 +1548,10 @@ mod tests {
             .expect("compile nand gate");
         let mut sim = design.instantiate_top().expect("instantiate");
         let outputs = sim
-            .eval_once(BTreeMap::from([("inA".into(), 1), ("inB".into(), 1)]))
+            .eval_once(inputs([("inA".into(), 1), ("inB".into(), 1)]))
             .expect("eval");
 
-        assert_eq!(outputs.get("outY"), Some(&0));
+        assert_signal_eq!(outputs, "outY", 0);
     }
 
     #[test]
@@ -1493,15 +1562,15 @@ mod tests {
             .expect("compile full adder");
         let mut sim = design.instantiate_top().expect("instantiate");
         let outputs = sim
-            .eval_once(BTreeMap::from([
+            .eval_once(inputs([
                 ("inA".into(), 1),
                 ("inB".into(), 1),
                 ("inCarry".into(), 1),
             ]))
             .expect("eval");
 
-        assert_eq!(outputs.get("outSum"), Some(&1));
-        assert_eq!(outputs.get("outCarry"), Some(&1));
+        assert_signal_eq!(outputs, "outSum", 1);
+        assert_signal_eq!(outputs, "outCarry", 1);
     }
 
     #[test]
@@ -1512,14 +1581,14 @@ mod tests {
             .expect("compile ternary mux");
         let mut sim = design.instantiate_top().expect("instantiate");
         let outputs = sim
-            .eval_once(BTreeMap::from([
+            .eval_once(inputs([
                 ("a".into(), 0x12),
                 ("b".into(), 0x34),
                 ("sel".into(), 1),
             ]))
             .expect("eval");
 
-        assert_eq!(outputs.get("out"), Some(&0x12));
+        assert_signal_eq!(outputs, "out", 0x12);
     }
 
     #[test]
@@ -1540,14 +1609,14 @@ mod tests {
         let mut sim = design.instantiate_top().expect("instantiate");
 
         let outputs = sim
-            .eval_once(BTreeMap::from([("sel".into(), 0)]))
+            .eval_once(inputs([("sel".into(), 0)]))
             .expect("eval false branch");
-        assert_eq!(outputs.get("out"), Some(&0b1001));
+        assert_signal_eq!(outputs, "out", 0b1001);
 
         let outputs = sim
-            .eval_once(BTreeMap::from([("sel".into(), 1)]))
+            .eval_once(inputs([("sel".into(), 1)]))
             .expect("eval true branch");
-        assert_eq!(outputs.get("out"), Some(&0b1011));
+        assert_signal_eq!(outputs, "out", 0b1011);
     }
 
     #[test]
@@ -1568,14 +1637,14 @@ mod tests {
         let mut sim = design.instantiate_top().expect("instantiate");
 
         let outputs = sim
-            .eval_once(BTreeMap::from([("sel".into(), 0)]))
+            .eval_once(inputs([("sel".into(), 0)]))
             .expect("eval false branch");
-        assert_eq!(outputs.get("out"), Some(&0b0101));
+        assert_signal_eq!(outputs, "out", 0b0101);
 
         let outputs = sim
-            .eval_once(BTreeMap::from([("sel".into(), 1)]))
+            .eval_once(inputs([("sel".into(), 1)]))
             .expect("eval true branch");
-        assert_eq!(outputs.get("out"), Some(&0b1010));
+        assert_signal_eq!(outputs, "out", 0b1010);
     }
 
     #[test]
@@ -1629,24 +1698,24 @@ mod tests {
         let mut sim = design.instantiate_top().expect("instantiate");
 
         let outputs = sim
-            .eval_once(BTreeMap::from([("a".into(), 1), ("wide_in".into(), 0xab)]))
+            .eval_once(inputs([("a".into(), 1), ("wide_in".into(), 0xab)]))
             .expect("eval coercion case");
-        assert_eq!(outputs.get("assign_widened"), Some(&0b0001));
-        assert_eq!(outputs.get("assign_narrowed"), Some(&0b11));
-        assert_eq!(outputs.get("child_input_widened"), Some(&0b0001));
-        assert_eq!(outputs.get("child_input_narrowed"), Some(&0b11));
-        assert_eq!(outputs.get("child_output_widened"), Some(&0b000001));
-        assert_eq!(outputs.get("child_output_narrowed"), Some(&0b101));
+        assert_signal_eq!(outputs, "assign_widened", 0b0001);
+        assert_signal_eq!(outputs, "assign_narrowed", 0b11);
+        assert_signal_eq!(outputs, "child_input_widened", 0b0001);
+        assert_signal_eq!(outputs, "child_input_narrowed", 0b11);
+        assert_signal_eq!(outputs, "child_output_widened", 0b000001);
+        assert_signal_eq!(outputs, "child_output_narrowed", 0b101);
 
         let outputs = sim
-            .eval_once(BTreeMap::from([("a".into(), 0), ("wide_in".into(), 0x04)]))
+            .eval_once(inputs([("a".into(), 0), ("wide_in".into(), 0x04)]))
             .expect("eval truncated-away bits case");
-        assert_eq!(outputs.get("assign_widened"), Some(&0));
-        assert_eq!(outputs.get("assign_narrowed"), Some(&0));
-        assert_eq!(outputs.get("child_input_widened"), Some(&0));
-        assert_eq!(outputs.get("child_input_narrowed"), Some(&0));
-        assert_eq!(outputs.get("child_output_widened"), Some(&0b000001));
-        assert_eq!(outputs.get("child_output_narrowed"), Some(&0b101));
+        assert_signal_eq!(outputs, "assign_widened", 0);
+        assert_signal_eq!(outputs, "assign_narrowed", 0);
+        assert_signal_eq!(outputs, "child_input_widened", 0);
+        assert_signal_eq!(outputs, "child_input_narrowed", 0);
+        assert_signal_eq!(outputs, "child_output_widened", 0b000001);
+        assert_signal_eq!(outputs, "child_output_narrowed", 0b101);
     }
 
     #[test]
@@ -1672,18 +1741,18 @@ mod tests {
         let mut sim = design.instantiate_top().expect("instantiate");
 
         let outputs = sim
-            .eval_once(BTreeMap::from([("in".into(), 0x81), ("shamt".into(), 2)]))
+            .eval_once(inputs([("in".into(), 0x81), ("shamt".into(), 2)]))
             .expect("eval truncating shift case");
-        assert_eq!(outputs.get("left_shifted"), Some(&0x04));
-        assert_eq!(outputs.get("right_shifted"), Some(&0x20));
-        assert_eq!(outputs.get("right_past_width"), Some(&0x00));
+        assert_signal_eq!(outputs, "left_shifted", 0x04);
+        assert_signal_eq!(outputs, "right_shifted", 0x20);
+        assert_signal_eq!(outputs, "right_past_width", 0x00);
 
         let outputs = sim
-            .eval_once(BTreeMap::from([("in".into(), 0x03), ("shamt".into(), 6)]))
+            .eval_once(inputs([("in".into(), 0x03), ("shamt".into(), 6)]))
             .expect("eval large variable shift case");
-        assert_eq!(outputs.get("left_shifted"), Some(&0xc0));
-        assert_eq!(outputs.get("right_shifted"), Some(&0x00));
-        assert_eq!(outputs.get("right_past_width"), Some(&0x00));
+        assert_signal_eq!(outputs, "left_shifted", 0xc0);
+        assert_signal_eq!(outputs, "right_shifted", 0x00);
+        assert_signal_eq!(outputs, "right_past_width", 0x00);
     }
 
     #[test]
@@ -1694,10 +1763,10 @@ mod tests {
             .expect("compile vector test");
         let mut sim = design.instantiate_top().expect("instantiate");
         let outputs = sim
-            .eval_once(BTreeMap::from([("in".into(), 0x1122_3344)]))
+            .eval_once(inputs([("in".into(), 0x1122_3344)]))
             .expect("eval");
 
-        assert_eq!(outputs.get("out"), Some(&0x4433_2211));
+        assert_signal_eq!(outputs, "out", 0x4433_2211);
     }
 
     #[test]
@@ -1708,7 +1777,7 @@ mod tests {
             .expect("compile mux_4to1_comb");
         let mut sim = design.instantiate_top().expect("instantiate");
         let outputs = sim
-            .eval_once(BTreeMap::from([
+            .eval_once(inputs([
                 ("d0".into(), 10),
                 ("d1".into(), 20),
                 ("d2".into(), 30),
@@ -1717,7 +1786,7 @@ mod tests {
             ]))
             .expect("eval");
 
-        assert_eq!(outputs.get("out"), Some(&30));
+        assert_signal_eq!(outputs, "out", 30);
     }
 
     #[test]
@@ -1728,14 +1797,14 @@ mod tests {
             .expect("compile alu_1bit");
         let mut sim = design.instantiate_top().expect("instantiate");
         let outputs = sim
-            .eval_once(BTreeMap::from([
+            .eval_once(inputs([
                 ("a".into(), 0b1010_1010),
                 ("b".into(), 0b1100_1100),
                 ("op".into(), 0b01),
             ]))
             .expect("eval");
 
-        assert_eq!(outputs.get("out"), Some(&0b1110_1110));
+        assert_signal_eq!(outputs, "out", 0b1110_1110);
     }
 
     #[test]
@@ -1762,14 +1831,14 @@ endmodule
             .expect("compile arithmetic_ops");
         let mut sim = design.instantiate_top().expect("instantiate");
         let outputs = sim
-            .eval_once(BTreeMap::from([
+            .eval_once(inputs([
                 ("a".into(), 5),
                 ("b".into(), 3),
                 ("sel".into(), 0),
             ]))
             .expect("eval");
 
-        assert_eq!(outputs.get("out"), Some(&8));
+        assert_signal_eq!(outputs, "out", 8);
     }
 
     #[test]
@@ -1795,10 +1864,10 @@ endmodule
             .expect("compile logical_ops");
         let mut sim = design.instantiate_top().expect("instantiate");
         let outputs = sim
-            .eval_once(BTreeMap::from([("a".into(), 0), ("b".into(), 1)]))
+            .eval_once(inputs([("a".into(), 0), ("b".into(), 1)]))
             .expect("eval");
 
-        assert_eq!(outputs.get("out"), Some(&1));
+        assert_signal_eq!(outputs, "out", 1);
     }
 
     #[test]
@@ -1827,20 +1896,20 @@ endmodule
         let mut sim = design.instantiate_top().expect("instantiate");
 
         let outputs = sim
-            .eval_once(BTreeMap::from([("a".into(), 3), ("b".into(), 5)]))
+            .eval_once(inputs([("a".into(), 3), ("b".into(), 5)]))
             .expect("eval lt");
-        assert_eq!(outputs.get("lt"), Some(&1));
-        assert_eq!(outputs.get("le"), Some(&1));
-        assert_eq!(outputs.get("gt"), Some(&0));
-        assert_eq!(outputs.get("ge"), Some(&0));
+        assert_signal_eq!(outputs, "lt", 1);
+        assert_signal_eq!(outputs, "le", 1);
+        assert_signal_eq!(outputs, "gt", 0);
+        assert_signal_eq!(outputs, "ge", 0);
 
         let outputs = sim
-            .eval_once(BTreeMap::from([("a".into(), 5), ("b".into(), 5)]))
+            .eval_once(inputs([("a".into(), 5), ("b".into(), 5)]))
             .expect("eval eq");
-        assert_eq!(outputs.get("lt"), Some(&0));
-        assert_eq!(outputs.get("le"), Some(&1));
-        assert_eq!(outputs.get("gt"), Some(&0));
-        assert_eq!(outputs.get("ge"), Some(&1));
+        assert_signal_eq!(outputs, "lt", 0);
+        assert_signal_eq!(outputs, "le", 1);
+        assert_signal_eq!(outputs, "gt", 0);
+        assert_signal_eq!(outputs, "ge", 1);
     }
 
     #[test]
@@ -1851,14 +1920,14 @@ endmodule
             .expect("compile overture_alu_8bit");
         let mut sim = design.instantiate_top().expect("instantiate");
         let outputs = sim
-            .eval_once(BTreeMap::from([
+            .eval_once(inputs([
                 ("inA".into(), 5),
                 ("inB".into(), 3),
                 ("op".into(), 0b100),
             ]))
             .expect("eval");
 
-        assert_eq!(outputs.get("outY"), Some(&8));
+        assert_signal_eq!(outputs, "outY", 8);
     }
 
     #[test]
@@ -1870,22 +1939,22 @@ endmodule
         let mut sim = design.instantiate_top().expect("instantiate");
 
         let outputs = sim
-            .step(BTreeMap::from([
+            .step(inputs([
                 ("clk".into(), 1),
                 ("enable".into(), 1),
                 ("data".into(), 0x5a),
             ]))
             .expect("step");
-        assert_eq!(outputs.get("q"), Some(&0x5a));
+        assert_signal_eq!(outputs, "q", 0x5a);
 
         let outputs = sim
-            .step(BTreeMap::from([
+            .step(inputs([
                 ("clk".into(), 1),
                 ("enable".into(), 0),
                 ("data".into(), 0xff),
             ]))
             .expect("hold");
-        assert_eq!(outputs.get("q"), Some(&0x5a));
+        assert_signal_eq!(outputs, "q", 0x5a);
     }
 
     #[test]
@@ -1897,31 +1966,31 @@ endmodule
         let mut sim = design.instantiate_top().expect("instantiate");
 
         let outputs = sim
-            .step(BTreeMap::from([
+            .step(inputs([
                 ("clk".into(), 1),
                 ("reset".into(), 1),
                 ("enable".into(), 0),
             ]))
             .expect("reset");
-        assert_eq!(outputs.get("count"), Some(&0));
+        assert_signal_eq!(outputs, "count", 0);
 
         let outputs = sim
-            .step(BTreeMap::from([
+            .step(inputs([
                 ("clk".into(), 1),
                 ("reset".into(), 0),
                 ("enable".into(), 1),
             ]))
             .expect("increment");
-        assert_eq!(outputs.get("count"), Some(&1));
+        assert_signal_eq!(outputs, "count", 1);
 
         let outputs = sim
-            .step(BTreeMap::from([
+            .step(inputs([
                 ("clk".into(), 1),
                 ("reset".into(), 0),
                 ("enable".into(), 0),
             ]))
             .expect("hold");
-        assert_eq!(outputs.get("count"), Some(&1));
+        assert_signal_eq!(outputs, "count", 1);
     }
 
     #[test]
@@ -1933,7 +2002,7 @@ endmodule
         let mut sim = design.instantiate_top().expect("instantiate");
 
         let outputs = sim
-            .step(BTreeMap::from([
+            .step(inputs([
                 ("clk".into(), 1),
                 ("write_en".into(), 1),
                 ("write_addr".into(), 3),
@@ -1942,10 +2011,10 @@ endmodule
                 ("read_addr2".into(), 0),
             ]))
             .expect("write r3");
-        assert_eq!(outputs.get("read_data1"), Some(&0x42));
+        assert_signal_eq!(outputs, "read_data1", 0x42);
 
         let outputs = sim
-            .step(BTreeMap::from([
+            .step(inputs([
                 ("clk".into(), 1),
                 ("write_en".into(), 1),
                 ("write_addr".into(), 1),
@@ -1954,8 +2023,8 @@ endmodule
                 ("read_addr2".into(), 3),
             ]))
             .expect("write r1");
-        assert_eq!(outputs.get("read_data1"), Some(&0x99));
-        assert_eq!(outputs.get("read_data2"), Some(&0x42));
+        assert_signal_eq!(outputs, "read_data1", 0x99);
+        assert_signal_eq!(outputs, "read_data2", 0x42);
     }
 
     #[test]
@@ -1967,7 +2036,7 @@ endmodule
         let mut sim = design.instantiate_top().expect("instantiate");
 
         let outputs = sim
-            .step(BTreeMap::from([
+            .step(inputs([
                 ("clk".into(), 1),
                 ("reset".into(), 1),
                 ("run".into(), 0),
@@ -1975,10 +2044,10 @@ endmodule
                 ("jump_addr".into(), 0),
             ]))
             .expect("reset");
-        assert_eq!(outputs.get("pc"), Some(&0));
+        assert_signal_eq!(outputs, "pc", 0);
 
         let outputs = sim
-            .step(BTreeMap::from([
+            .step(inputs([
                 ("clk".into(), 1),
                 ("reset".into(), 0),
                 ("run".into(), 1),
@@ -1986,10 +2055,10 @@ endmodule
                 ("jump_addr".into(), 0),
             ]))
             .expect("increment");
-        assert_eq!(outputs.get("pc"), Some(&1));
+        assert_signal_eq!(outputs, "pc", 1);
 
         let outputs = sim
-            .step(BTreeMap::from([
+            .step(inputs([
                 ("clk".into(), 1),
                 ("reset".into(), 0),
                 ("run".into(), 1),
@@ -1997,7 +2066,7 @@ endmodule
                 ("jump_addr".into(), 10),
             ]))
             .expect("jump");
-        assert_eq!(outputs.get("pc"), Some(&10));
+        assert_signal_eq!(outputs, "pc", 10);
     }
 
     #[test]
@@ -2009,10 +2078,10 @@ endmodule
         let mut sim = design.instantiate_top().expect("instantiate");
 
         let outputs = sim
-            .eval_once(BTreeMap::from([("addr".into(), 0x2a)]))
+            .eval_once(inputs([("addr".into(), 0x2a)]))
             .expect("eval");
 
-        assert_eq!(outputs.get("data"), Some(&0));
+        assert_signal_eq!(outputs, "data", 0);
     }
 
     #[test]
@@ -2022,14 +2091,12 @@ endmodule
             .compile_file(repo.join("parts/overture/overture_fetch.sv"))
             .expect("compile overture_fetch");
         let mut sim = design.instantiate_top().expect("instantiate");
-        sim.load_memory_words(&[], "rom", &[0x12, 0x34, 0x56])
+        sim.load_memory_words(&[], "rom", &words([0x12, 0x34, 0x56]))
             .expect("load rom");
 
-        let outputs = sim
-            .eval_once(BTreeMap::from([("addr".into(), 1)]))
-            .expect("eval");
+        let outputs = sim.eval_once(inputs([("addr".into(), 1)])).expect("eval");
 
-        assert_eq!(outputs.get("data"), Some(&0x34));
+        assert_signal_eq!(outputs, "data", 0x34);
     }
 
     #[test]
@@ -2042,11 +2109,9 @@ endmodule
         sim.load_memory_file(&[], "rom", repo.join("parts/basic/deadbeef.txt"))
             .expect("load rom from file");
 
-        let outputs = sim
-            .eval_once(BTreeMap::from([("addr".into(), 2)]))
-            .expect("eval");
+        let outputs = sim.eval_once(inputs([("addr".into(), 2)])).expect("eval");
 
-        assert_eq!(outputs.get("data"), Some(&0xbe));
+        assert_signal_eq!(outputs, "data", 0xbe);
     }
 
     #[test]
@@ -2072,19 +2137,19 @@ endmodule
             .expect("load rom from sparse file");
 
         let outputs = sim
-            .eval_once(BTreeMap::from([("addr".into(), 0)]))
+            .eval_once(inputs([("addr".into(), 0)]))
             .expect("eval addr 0");
-        assert_eq!(outputs.get("data"), Some(&0));
+        assert_signal_eq!(outputs, "data", 0);
 
         let outputs = sim
-            .eval_once(BTreeMap::from([("addr".into(), 2)]))
+            .eval_once(inputs([("addr".into(), 2)]))
             .expect("eval addr 2");
-        assert_eq!(outputs.get("data"), Some(&0x2a));
+        assert_signal_eq!(outputs, "data", 0x2a);
 
         let outputs = sim
-            .eval_once(BTreeMap::from([("addr".into(), 3)]))
+            .eval_once(inputs([("addr".into(), 3)]))
             .expect("eval addr 3");
-        assert_eq!(outputs.get("data"), Some(&0x0f));
+        assert_signal_eq!(outputs, "data", 0x0f);
     }
 
     #[test]
@@ -2094,53 +2159,56 @@ endmodule
             .compile_file(repo.join("parts/testing/memory_cpu_stub.sv"))
             .expect("compile memory_cpu_stub");
         let mut sim = design.instantiate_top().expect("instantiate");
-        sim.load_memory_words(&[], "rom", &[0x03, 0x42, 0x80, 0xc0])
+        sim.load_memory_words(&[], "rom", &words([0x03, 0x42, 0x80, 0xc0]))
             .expect("load rom");
 
         let outputs = sim
-            .step(BTreeMap::from([
+            .step(inputs([
                 ("clk".into(), 1),
                 ("reset".into(), 1),
                 ("run".into(), 0),
             ]))
             .expect("reset");
-        assert_eq!(outputs.get("pc"), Some(&0));
-        assert_eq!(outputs.get("acc"), Some(&0));
-        assert_eq!(outputs.get("ram_out"), Some(&0));
+        assert_signal_eq!(outputs, "pc", 0);
+        assert_signal_eq!(outputs, "acc", 0);
+        assert_signal_eq!(outputs, "ram_out", 0);
 
         let outputs = sim
-            .step(BTreeMap::from([
+            .step(inputs([
                 ("clk".into(), 1),
                 ("reset".into(), 0),
                 ("run".into(), 1),
             ]))
             .expect("load immediate");
-        assert_eq!(outputs.get("pc"), Some(&1));
-        assert_eq!(outputs.get("acc"), Some(&3));
-        assert_eq!(outputs.get("ram_out"), Some(&0));
+        assert_signal_eq!(outputs, "pc", 1);
+        assert_signal_eq!(outputs, "acc", 3);
+        assert_signal_eq!(outputs, "ram_out", 0);
 
         let outputs = sim
-            .step(BTreeMap::from([
+            .step(inputs([
                 ("clk".into(), 1),
                 ("reset".into(), 0),
                 ("run".into(), 1),
             ]))
             .expect("add immediate");
-        assert_eq!(outputs.get("pc"), Some(&2));
-        assert_eq!(outputs.get("acc"), Some(&5));
-        assert_eq!(outputs.get("ram_out"), Some(&0));
+        assert_signal_eq!(outputs, "pc", 2);
+        assert_signal_eq!(outputs, "acc", 5);
+        assert_signal_eq!(outputs, "ram_out", 0);
 
         let outputs = sim
-            .step(BTreeMap::from([
+            .step(inputs([
                 ("clk".into(), 1),
                 ("reset".into(), 0),
                 ("run".into(), 1),
             ]))
             .expect("store acc");
-        assert_eq!(outputs.get("pc"), Some(&3));
-        assert_eq!(outputs.get("acc"), Some(&5));
-        assert_eq!(outputs.get("ram_out"), Some(&5));
-        assert_eq!(sim.read_memory_word(&[], "ram", 0).expect("read ram"), 5);
+        assert_signal_eq!(outputs, "pc", 3);
+        assert_signal_eq!(outputs, "acc", 5);
+        assert_signal_eq!(outputs, "ram_out", 5);
+        assert_eq!(
+            sim.read_memory_word(&[], "ram", 0).expect("read ram"),
+            bv(5)
+        );
     }
 
     #[test]
@@ -2151,34 +2219,34 @@ endmodule
             .compile_file(repo.join("parts/overture/overture_cpu.sv"))
             .expect("compile overture_cpu");
         let mut sim = design.instantiate_top().expect("instantiate");
-        sim.load_memory_words(&["fetch_unit"], "rom", &[0x05])
+        sim.load_memory_words(&["fetch_unit"], "rom", &words([0x05]))
             .expect("load child rom");
 
         let outputs = sim
-            .step(BTreeMap::from([
+            .step(inputs([
                 ("clk".into(), 1),
                 ("reset".into(), 1),
                 ("run".into(), 0),
                 ("in_port".into(), 0),
             ]))
             .expect("reset");
-        assert_eq!(outputs.get("pc"), Some(&0));
+        assert_signal_eq!(outputs, "pc", 0);
 
         let outputs = sim
-            .step(BTreeMap::from([
+            .step(inputs([
                 ("clk".into(), 1),
                 ("reset".into(), 0),
                 ("run".into(), 1),
                 ("in_port".into(), 0),
             ]))
             .expect("execute immediate");
-        assert_eq!(outputs.get("pc"), Some(&1));
-        assert_eq!(outputs.get("instr_debug"), Some(&0x05));
-        assert_eq!(outputs.get("r0_out"), Some(&0x05));
+        assert_signal_eq!(outputs, "pc", 1);
+        assert_signal_eq!(outputs, "instr_debug", 0x05);
+        assert_signal_eq!(outputs, "r0_out", 0x05);
         assert_eq!(
             sim.read_memory_word(&["fetch_unit"], "rom", 0)
                 .expect("read child rom"),
-            0x05
+            bv(0x05)
         );
     }
 
@@ -2200,17 +2268,17 @@ endmodule
         assert_eq!(
             sim.read_memory_word(&["fetch_unit"], "rom", 0)
                 .expect("read instruction 0"),
-            0x05
+            bv(0x05)
         );
         assert_eq!(
             sim.read_memory_word(&["fetch_unit"], "rom", 1)
                 .expect("read instruction 1"),
-            0x81
+            bv(0x81)
         );
         assert_eq!(
             sim.read_memory_word(&["fetch_unit"], "rom", 16)
                 .expect("read instruction 16"),
-            0x9e
+            bv(0x9e)
         );
     }
 
@@ -2222,7 +2290,7 @@ endmodule
             .expect("compile 016-Vector3");
         let mut sim = design.instantiate_top().expect("instantiate");
         let outputs = sim
-            .eval_once(BTreeMap::from([
+            .eval_once(inputs([
                 ("a".into(), 31),
                 ("b".into(), 21),
                 ("c".into(), 10),
@@ -2232,10 +2300,10 @@ endmodule
             ]))
             .expect("eval");
 
-        assert_eq!(outputs.get("w"), Some(&253));
-        assert_eq!(outputs.get("x"), Some(&84));
-        assert_eq!(outputs.get("y"), Some(&81));
-        assert_eq!(outputs.get("z"), Some(&135));
+        assert_signal_eq!(outputs, "w", 253);
+        assert_signal_eq!(outputs, "x", 84);
+        assert_signal_eq!(outputs, "y", 81);
+        assert_signal_eq!(outputs, "z", 135);
     }
 
     #[test]
@@ -2246,10 +2314,10 @@ endmodule
             .expect("compile 017-Vectorr");
         let mut sim = design.instantiate_top().expect("instantiate");
         let outputs = sim
-            .eval_once(BTreeMap::from([("in".into(), 0b1101_0011)]))
+            .eval_once(inputs([("in".into(), 0b1101_0011)]))
             .expect("eval");
 
-        assert_eq!(outputs.get("out"), Some(&0b1100_1011));
+        assert_signal_eq!(outputs, "out", 0b1100_1011);
     }
 
     #[test]
@@ -2259,11 +2327,9 @@ endmodule
             .compile_file(repo.join("parts/testing/018-Vector4SignExtension.sv"))
             .expect("compile 018-Vector4SignExtension");
         let mut sim = design.instantiate_top().expect("instantiate");
-        let outputs = sim
-            .eval_once(BTreeMap::from([("in".into(), 0x81)]))
-            .expect("eval");
+        let outputs = sim.eval_once(inputs([("in".into(), 0x81)])).expect("eval");
 
-        assert_eq!(outputs.get("out"), Some(&0xffff_ff81));
+        assert_signal_eq!(outputs, "out", 0xffff_ff81);
     }
 
     #[test]
@@ -2274,7 +2340,7 @@ endmodule
             .expect("compile 019-Vector5");
         let mut sim = design.instantiate_top().expect("instantiate");
         let outputs = sim
-            .eval_once(BTreeMap::from([
+            .eval_once(inputs([
                 ("a".into(), 1),
                 ("b".into(), 0),
                 ("c".into(), 1),
@@ -2283,7 +2349,33 @@ endmodule
             ]))
             .expect("eval");
 
-        assert_eq!(outputs.get("out"), Some(&22_369_621));
+        assert_signal_eq!(outputs, "out", 22_369_621);
+    }
+
+    #[test]
+    fn eval_once_runs_arbitrary_width_passthrough() {
+        let design = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module top(",
+                    "input logic [191:0] inA, ",
+                    "output logic [191:0] outY",
+                    "); ",
+                    "assign outY = inA; ",
+                    "endmodule\n"
+                ),
+            )
+            .expect("compile wide passthrough");
+        let mut sim = design.instantiate_top().expect("instantiate");
+        let input =
+            BitValue::from_prefixed_str("0x1234567890abcdef1234567890abcdef1234567890abcdef")
+                .expect("parse wide input");
+        let outputs = sim
+            .eval_once(BTreeMap::from([("inA".into(), input.clone())]))
+            .expect("eval");
+
+        assert_eq!(outputs.get("outY").cloned(), Some(input));
     }
 
     fn unique_temp_dir(name: &str) -> PathBuf {

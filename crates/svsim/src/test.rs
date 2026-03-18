@@ -81,14 +81,9 @@ pub struct JsonTestCaseReport {
 pub struct JsonTestFailure {
     pub step: Option<usize>,
     pub signal: String,
-    pub expected: u64,
-    pub actual: Option<u64>,
+    pub expected: BitValue,
+    pub actual: Option<BitValue>,
 }
-
-fn to_bitvalue_map(map: BTreeMap<String, u64>) -> BTreeMap<String, BitValue> {
-    map.into_iter().map(|(k, v)| (k, BitValue::from(v))).collect()
-}
-
 
 #[derive(Debug, Clone)]
 pub struct JsonTestSuite {
@@ -169,8 +164,8 @@ impl JsonTestSuite {
                 cases
                     .into_iter()
                     .map(|case| CombinationalTestCase {
-                        inputs: to_bitvalue_map(case.inputs),
-                        expected: to_bitvalue_map(case.expect),
+                        inputs: case.inputs,
+                        expected: case.expect,
                     })
                     .collect(),
             ),
@@ -281,14 +276,14 @@ impl SequentialTestSuite {
                     sequence
                         .into_iter()
                         .map(|step| TestStep {
-                            inputs: to_bitvalue_map(step.inputs),
-                            expected: to_bitvalue_map(step.expected),
+                            inputs: step.inputs,
+                            expected: step.expected,
                         })
                         .collect()
                 } else {
                     vec![TestStep {
-                        inputs: to_bitvalue_map(case.inputs.unwrap_or_default()),
-                        expected: to_bitvalue_map(case.expected.unwrap_or_default()),
+                        inputs: case.inputs.unwrap_or_default(),
+                        expected: case.expected.unwrap_or_default(),
                     }]
                 },
             })
@@ -471,13 +466,13 @@ fn compare_outputs(
 ) -> Vec<JsonTestFailure> {
     let mut failures = Vec::new();
     for (signal, expected_value) in expected {
-        let actual_value = actual.get(signal).copied();
-        if actual_value != Some(*expected_value) {
+        let actual_value = actual.get(signal).cloned();
+        if actual_value.as_ref() != Some(expected_value) {
             failures.push(JsonTestFailure {
                 step,
                 signal: signal.clone(),
-                expected: *expected_value as u64,
-                actual: actual_value.map(|v| v as u64),
+                expected: expected_value.clone(),
+                actual: actual_value,
             });
         }
     }
@@ -543,9 +538,9 @@ enum RawJsonTestSuite {
 #[derive(Debug, Deserialize)]
 struct RawCombinationalTestCase {
     #[serde(default)]
-    expect: BTreeMap<String, u64>,
+    expect: BTreeMap<String, BitValue>,
     #[serde(flatten)]
-    inputs: BTreeMap<String, u64>,
+    inputs: BTreeMap<String, BitValue>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -577,9 +572,9 @@ struct RawSequentialTestCase {
     #[serde(default)]
     description: Option<String>,
     #[serde(default)]
-    inputs: Option<BTreeMap<String, u64>>,
+    inputs: Option<BTreeMap<String, BitValue>>,
     #[serde(default)]
-    expected: Option<BTreeMap<String, u64>>,
+    expected: Option<BTreeMap<String, BitValue>>,
     #[serde(default)]
     sequence: Option<Vec<RawTestStep>>,
 }
@@ -587,9 +582,9 @@ struct RawSequentialTestCase {
 #[derive(Debug, Deserialize)]
 struct RawTestStep {
     #[serde(default)]
-    inputs: BTreeMap<String, u64>,
+    inputs: BTreeMap<String, BitValue>,
     #[serde(default)]
-    expected: BTreeMap<String, u64>,
+    expected: BTreeMap<String, BitValue>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -632,7 +627,7 @@ mod tests {
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use crate::Compiler;
+    use crate::{BitValue, Compiler};
 
     fn repo_root() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -747,8 +742,45 @@ mod tests {
         assert_eq!(report.passed, 0);
         assert_eq!(report.cases[0].failures.len(), 1);
         assert_eq!(report.cases[0].failures[0].signal, "one");
-        assert_eq!(report.cases[0].failures[0].actual, Some(1));
-        assert_eq!(report.cases[0].failures[0].expected, 0);
+        assert_eq!(
+            report.cases[0].failures[0].actual,
+            Some(BitValue::from(1_u64))
+        );
+        assert_eq!(report.cases[0].failures[0].expected, BitValue::from(0_u64));
+    }
+
+    #[test]
+    fn run_json_file_accepts_large_string_values() {
+        let temp_dir = unique_temp_dir("json-test-large-values");
+        let design = Compiler::new()
+            .compile_str(
+                temp_dir.join("top.sv"),
+                concat!(
+                    "module top(",
+                    "input logic [191:0] inA, ",
+                    "output logic [191:0] outY",
+                    "); ",
+                    "assign outY = inA; ",
+                    "endmodule\n"
+                ),
+            )
+            .expect("compile top");
+        let json_path = temp_dir.join("top.json");
+        fs::write(
+            &json_path,
+            concat!(
+                "[{",
+                "\"inA\":\"0x1234567890abcdef1234567890abcdef1234567890abcdef\",",
+                "\"expect\":{\"outY\":\"0x1234567890abcdef1234567890abcdef1234567890abcdef\"}",
+                "}]"
+            ),
+        )
+        .expect("write json");
+
+        let report = design.run_json_file(&json_path).expect("run json tests");
+
+        assert!(report.all_passed());
+        assert_eq!(report.passed, report.total);
     }
 
     fn unique_temp_dir(name: &str) -> PathBuf {

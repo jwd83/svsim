@@ -1,16 +1,14 @@
 use std::collections::HashSet;
 use std::path::Path;
 
-use crate::bit_value::{BitValue, BIT_VALUE_BITS};
+use crate::bit_value::BitValue;
 use crate::diag::{Error, Result};
 use crate::hir::{
     AssignmentKind, BinaryOp, CaseStmtItem, Expr, HirDesign, LValue, MemoryDecl,
     ModuleInstanceSummary, ModuleSummary, NumericLiteral, PortDirection, ProcBlockKind, Stmt,
     UnaryOp, expr_to_lvalue,
 };
-use crate::width::{mask, minimum_width, shift_left_bits, shift_right_bits};
-
-const MAX_RUNTIME_WIDTH: usize = BIT_VALUE_BITS;
+use crate::width::{minimum_width, shift_left_bits, shift_right_bits};
 
 pub(crate) fn validate_design(hir: &HirDesign) -> Result<()> {
     let mut validated = HashSet::new();
@@ -327,7 +325,9 @@ fn validate_expr(expr: &Expr, module: &ModuleSummary) -> Result<usize> {
             ))
         }),
         Expr::Literal(literal) => ensure_runtime_width(
-            literal.width.unwrap_or_else(|| minimum_width(literal.bits)),
+            literal
+                .width
+                .unwrap_or_else(|| minimum_width(&literal.bits)),
             "literal",
         ),
         Expr::Concat(exprs) => {
@@ -525,7 +525,7 @@ fn validate_constant_memory_index(
         return Ok(());
     };
     let raw_index = index.normalized_bits();
-    let index = usize::try_from(raw_index).map_err(|_| {
+    let index = raw_index.to_usize_checked().ok_or_else(|| {
         Error::Resolve(format!(
             "memory index [{}] is out of range for '{}' in '{}'",
             raw_index, memory.name, module.name
@@ -542,7 +542,7 @@ fn validate_constant_memory_index(
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 struct ConstValue {
     bits: BitValue,
     width: usize,
@@ -551,17 +551,17 @@ struct ConstValue {
 impl ConstValue {
     fn new(bits: BitValue, width: usize) -> Self {
         Self {
-            bits: bits & mask(width),
+            bits: bits.truncate(width),
             width,
         }
     }
 
-    fn normalized_bits(self) -> BitValue {
-        self.bits & mask(self.width)
+    fn normalized_bits(&self) -> BitValue {
+        self.bits.clone()
     }
 
-    fn truthy(self) -> bool {
-        self.normalized_bits() != 0
+    fn truthy(&self) -> bool {
+        !self.bits.is_zero()
     }
 }
 
@@ -578,12 +578,15 @@ fn const_eval_expr(expr: &Expr) -> Option<ConstValue> {
         }
         Expr::Repeat { count, expr } => {
             let value = const_eval_expr(expr)?;
-            let values = vec![value; *count];
+            let values = vec![value.clone(); *count];
             concat_const_values(&values)
         }
         Expr::BitSelect { expr, index } => {
             let value = const_eval_expr(expr)?;
-            Some(ConstValue::new((value.normalized_bits() >> index) & 1, 1))
+            Some(ConstValue::new(
+                BitValue::from(value.normalized_bits().get_bit(*index)),
+                1,
+            ))
         }
         Expr::PartSelect { expr, msb, lsb } => {
             let value = const_eval_expr(expr)?;
@@ -591,14 +594,17 @@ fn const_eval_expr(expr: &Expr) -> Option<ConstValue> {
             let high = (*msb).max(*lsb);
             let width = high - low + 1;
             Some(ConstValue::new(
-                (value.normalized_bits() >> low) & mask(width),
+                value.normalized_bits().slice(low, width),
                 width,
             ))
         }
         Expr::Unary { op, expr } => {
             let value = const_eval_expr(expr)?;
             match op {
-                UnaryOp::BitNot => Some(ConstValue::new(!value.normalized_bits(), value.width)),
+                UnaryOp::BitNot => Some(ConstValue::new(
+                    value.normalized_bits().bitnot_with_width(value.width),
+                    value.width,
+                )),
             }
         }
         Expr::Binary { left, op, right } => {
@@ -606,51 +612,67 @@ fn const_eval_expr(expr: &Expr) -> Option<ConstValue> {
             let right = const_eval_expr(right)?;
             let (bits, width) = match op {
                 BinaryOp::BitAnd => (
-                    left.normalized_bits() & right.normalized_bits(),
+                    left.normalized_bits().bitand(&right.normalized_bits()),
                     left.width.max(right.width),
                 ),
                 BinaryOp::BitOr => (
-                    left.normalized_bits() | right.normalized_bits(),
+                    left.normalized_bits().bitor(&right.normalized_bits()),
                     left.width.max(right.width),
                 ),
                 BinaryOp::BitXor => (
-                    left.normalized_bits() ^ right.normalized_bits(),
+                    left.normalized_bits().bitxor(&right.normalized_bits()),
                     left.width.max(right.width),
                 ),
                 BinaryOp::ShiftLeft => (
-                    shift_left_bits(left.normalized_bits(), right.normalized_bits(), left.width),
+                    shift_left_bits(
+                        &left.normalized_bits(),
+                        &right.normalized_bits(),
+                        left.width,
+                    ),
                     left.width,
                 ),
                 BinaryOp::ShiftRight => (
-                    shift_right_bits(left.normalized_bits(), right.normalized_bits(), left.width),
+                    shift_right_bits(
+                        &left.normalized_bits(),
+                        &right.normalized_bits(),
+                        left.width,
+                    ),
                     left.width,
                 ),
-                BinaryOp::LogicalAnd => ((left.truthy() && right.truthy()) as BitValue, 1),
-                BinaryOp::LogicalOr => ((left.truthy() || right.truthy()) as BitValue, 1),
+                BinaryOp::LogicalAnd => (BitValue::from(left.truthy() && right.truthy()), 1),
+                BinaryOp::LogicalOr => (BitValue::from(left.truthy() || right.truthy()), 1),
                 BinaryOp::Eq => (
-                    (left.normalized_bits() == right.normalized_bits()) as BitValue,
+                    BitValue::from(left.normalized_bits() == right.normalized_bits()),
                     1,
                 ),
                 BinaryOp::NotEq => (
-                    (left.normalized_bits() != right.normalized_bits()) as BitValue,
+                    BitValue::from(left.normalized_bits() != right.normalized_bits()),
                     1,
                 ),
-                BinaryOp::Lt => ((left.normalized_bits() < right.normalized_bits()) as BitValue, 1),
+                BinaryOp::Lt => (
+                    BitValue::from(left.normalized_bits() < right.normalized_bits()),
+                    1,
+                ),
                 BinaryOp::LtEq => (
-                    (left.normalized_bits() <= right.normalized_bits()) as BitValue,
+                    BitValue::from(left.normalized_bits() <= right.normalized_bits()),
                     1,
                 ),
-                BinaryOp::Gt => ((left.normalized_bits() > right.normalized_bits()) as BitValue, 1),
+                BinaryOp::Gt => (
+                    BitValue::from(left.normalized_bits() > right.normalized_bits()),
+                    1,
+                ),
                 BinaryOp::GtEq => (
-                    (left.normalized_bits() >= right.normalized_bits()) as BitValue,
+                    BitValue::from(left.normalized_bits() >= right.normalized_bits()),
                     1,
                 ),
                 BinaryOp::Add => (
-                    left.normalized_bits().wrapping_add(right.normalized_bits()),
+                    left.normalized_bits()
+                        .wrapping_add(&right.normalized_bits(), left.width.max(right.width)),
                     left.width.max(right.width),
                 ),
                 BinaryOp::Sub => (
-                    left.normalized_bits().wrapping_sub(right.normalized_bits()),
+                    left.normalized_bits()
+                        .wrapping_sub(&right.normalized_bits(), left.width.max(right.width)),
                     left.width.max(right.width),
                 ),
             };
@@ -676,21 +698,26 @@ fn const_eval_expr(expr: &Expr) -> Option<ConstValue> {
 }
 
 fn const_value_from_literal(literal: &NumericLiteral) -> ConstValue {
-    let width = literal.width.unwrap_or_else(|| minimum_width(literal.bits));
-    ConstValue::new(literal.bits, width)
+    let width = literal
+        .width
+        .unwrap_or_else(|| minimum_width(&literal.bits));
+    ConstValue::new(literal.bits.clone(), width)
 }
 
 fn concat_const_values(parts: &[ConstValue]) -> Option<ConstValue> {
-    let total_width: usize = parts.iter().map(|value| value.width).sum();
-    if total_width == 0 || total_width > MAX_RUNTIME_WIDTH {
+    let mut total_width = 0usize;
+    for part in parts {
+        total_width = total_width.checked_add(part.width)?;
+    }
+    if total_width == 0 {
         return None;
     }
 
-    let mut bits: BitValue = 0;
+    let mut bits = BitValue::zero();
     let mut shift = total_width;
     for part in parts {
         shift -= part.width;
-        bits |= (part.normalized_bits() & mask(part.width)) << shift;
+        bits = bits.bitor(&part.normalized_bits().shift_left(shift));
     }
 
     Some(ConstValue::new(bits, total_width))
@@ -701,15 +728,8 @@ fn ensure_runtime_width(width: usize, context: impl Into<String>) -> Result<usiz
 
     if width == 0 {
         return Err(Error::Unsupported(format!(
-            "{} has width 0 outside the supported 1..={} bit runtime subset",
-            context, MAX_RUNTIME_WIDTH
-        )));
-    }
-
-    if width > MAX_RUNTIME_WIDTH {
-        return Err(Error::Unsupported(format!(
-            "{} has width {} exceeding the current {}-bit runtime limit",
-            context, width, MAX_RUNTIME_WIDTH
+            "{} has width 0 outside the supported runtime subset",
+            context
         )));
     }
 

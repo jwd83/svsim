@@ -1321,8 +1321,8 @@ fn lower_literal(
         sv_parser::PrimaryLiteral::UnbasedUnsizedLiteral(literal) => {
             let text = symbol_text(syntax_tree, &literal.nodes.0)?;
             let bits = match text.as_str() {
-                "'0" => 0,
-                "'1" => 1,
+                "'0" => BitValue::zero(),
+                "'1" => BitValue::one(),
                 _ => return Err(unsupported("unsupported unbased unsized literal", None)),
             };
             Ok(Expr::Literal(NumericLiteral { bits, width: None }))
@@ -1344,7 +1344,11 @@ fn lower_number(
     match &**number {
         sv_parser::IntegralNumber::DecimalNumber(number) => match &**number {
             sv_parser::DecimalNumber::UnsignedNumber(number) => {
-                let bits = locate_usize(syntax_tree, &number.nodes.0)? as BitValue;
+                let text = syntax_tree
+                    .get_str(&number.nodes.0)
+                    .ok_or_else(|| unsupported("failed to read numeric literal text", None))?;
+                let bits = BitValue::from_str_radix(&text.replace('_', ""), 10)
+                    .map_err(|_| unsupported("failed to parse numeric literal", None))?;
                 Ok(NumericLiteral { bits, width: None })
             }
             sv_parser::DecimalNumber::BaseUnsigned(number) => Ok(NumericLiteral {
@@ -1763,7 +1767,10 @@ fn lower_usize_expression(
             None,
         ));
     };
-    Ok(literal.bits as usize)
+    literal
+        .bits
+        .to_usize_checked()
+        .ok_or_else(|| unsupported("constant index exceeds host limits", None))
 }
 
 fn lower_usize_constant_expression(
@@ -1778,7 +1785,10 @@ fn lower_usize_constant_expression(
                 let Expr::Literal(literal) = expr else {
                     unreachable!();
                 };
-                Ok(literal.bits as usize)
+                literal
+                    .bits
+                    .to_usize_checked()
+                    .ok_or_else(|| unsupported("constant index exceeds host limits", None))
             }
             sv_parser::ConstantPrimary::MintypmaxExpression(expr) => {
                 lower_usize_constant_mintypmax_expression(syntax_tree, &expr.nodes.0.nodes.1, path)
@@ -1813,7 +1823,11 @@ fn lower_usize_constant_mintypmax_expression(
     }
 }
 
-fn parse_based_value(syntax_tree: &SyntaxTree, locate: &Locate, radix: u32) -> LowerResult<BitValue> {
+fn parse_based_value(
+    syntax_tree: &SyntaxTree,
+    locate: &Locate,
+    radix: u32,
+) -> LowerResult<BitValue> {
     let text = syntax_tree
         .get_str(locate)
         .ok_or_else(|| unsupported("failed to read numeric literal text", None))?;

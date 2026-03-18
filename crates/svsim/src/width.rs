@@ -1,4 +1,4 @@
-use crate::bit_value::{BitValue, BIT_VALUE_BITS};
+use crate::bit_value::BitValue;
 use crate::diag::{Error, Result};
 use crate::hir::{BinaryOp, Expr, ModuleSummary};
 
@@ -10,7 +10,9 @@ pub(crate) fn expr_width(expr: &Expr, module: &ModuleSummary) -> Result<usize> {
                 name, module.name
             ))
         }),
-        Expr::Literal(literal) => Ok(literal.width.unwrap_or_else(|| minimum_width(literal.bits))),
+        Expr::Literal(literal) => Ok(literal
+            .width
+            .unwrap_or_else(|| minimum_width(&literal.bits))),
         Expr::Concat(exprs) => {
             let mut width = 0usize;
             for expr in exprs {
@@ -83,20 +85,12 @@ pub(crate) fn expr_width(expr: &Expr, module: &ModuleSummary) -> Result<usize> {
     }
 }
 
-pub(crate) fn minimum_width(bits: BitValue) -> usize {
-    if bits == 0 {
-        1
-    } else {
-        (BIT_VALUE_BITS as u32 - bits.leading_zeros()) as usize
-    }
+pub(crate) fn minimum_width(bits: &BitValue) -> usize {
+    bits.bit_len().max(1)
 }
 
 pub(crate) fn mask(width: usize) -> BitValue {
-    if width >= BIT_VALUE_BITS {
-        BitValue::MAX
-    } else {
-        (1 as BitValue).checked_shl(width as u32).unwrap_or(0).wrapping_sub(1)
-    }
+    BitValue::mask(width)
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -106,28 +100,28 @@ pub(crate) enum ShiftDirection {
 }
 
 pub(crate) fn shift_bits(
-    bits: BitValue,
-    amount_bits: BitValue,
+    bits: &BitValue,
+    amount_bits: &BitValue,
     width: usize,
     direction: ShiftDirection,
 ) -> BitValue {
-    let normalized = bits & mask(width);
-    let Ok(amount) = u32::try_from(amount_bits) else {
-        return 0;
+    let normalized = bits.truncate(width);
+    let Some(amount) = amount_bits.to_usize_checked() else {
+        return BitValue::zero();
     };
-    if amount as usize >= width {
-        return 0;
+    if amount >= width {
+        return BitValue::zero();
     }
     match direction {
-        ShiftDirection::Left => normalized.checked_shl(amount).unwrap_or(0) & mask(width),
-        ShiftDirection::Right => normalized.checked_shr(amount).unwrap_or(0),
+        ShiftDirection::Left => normalized.shift_left(amount).truncate(width),
+        ShiftDirection::Right => normalized.shift_right(amount),
     }
 }
 
-pub(crate) fn shift_left_bits(bits: BitValue, amount_bits: BitValue, width: usize) -> BitValue {
+pub(crate) fn shift_left_bits(bits: &BitValue, amount_bits: &BitValue, width: usize) -> BitValue {
     shift_bits(bits, amount_bits, width, ShiftDirection::Left)
 }
 
-pub(crate) fn shift_right_bits(bits: BitValue, amount_bits: BitValue, width: usize) -> BitValue {
+pub(crate) fn shift_right_bits(bits: &BitValue, amount_bits: &BitValue, width: usize) -> BitValue {
     shift_bits(bits, amount_bits, width, ShiftDirection::Right)
 }
