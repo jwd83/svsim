@@ -6,10 +6,11 @@ use sv_parser::{
     CaseStatement, CondPredicate, ConditionalStatement, ConstantExpression,
     ConstantPartSelectRange, ConstantRange, ConstantSelect, ContinuousAssign, DataDeclaration,
     DataType, DataTypeOrImplicit, Define, Defines, Expression, HierarchicalIdentifier,
-    ImplicitDataType, ListOfPortConnections, Locate, ModuleDeclarationAnsi,
-    ModuleDeclarationNonansi, ModuleInstantiation, ModuleOrGenerateItem,
+    ImplicitDataType, ListOfPortConnections, LocalParameterDeclaration, Locate,
+    ModuleDeclarationAnsi, ModuleDeclarationNonansi, ModuleInstantiation, ModuleOrGenerateItem,
     ModuleOrGenerateItemDeclaration, NamedPortConnection, NetDeclaration, NetLvalue,
-    NonPortModuleItem, PackageOrGenerateItemDeclaration, PartSelectRange, PortDirection, Primary,
+    NonPortModuleItem, PackageOrGenerateItemDeclaration, ParameterDeclaration,
+    ParameterPortDeclaration, ParameterPortList, PartSelectRange, PortDirection, Primary,
     PsOrHierarchicalNetIdentifier, RefNode, Select, SeqBlock, Statement, StatementItem,
     StatementOrNull, SyntaxTree, UnaryOperator, UnpackedDimension, VariableAssignment,
     VariableDeclAssignment, VariableDimension, VariableLvalue, VariablePortType, parse_sv,
@@ -21,9 +22,9 @@ use crate::diag::{Diagnostic, Error, Result, SourceSpan};
 use crate::hir::{
     AssignmentKind, BinaryOp, CaseStmtItem, ContinuousAssign as HirContinuousAssign, Expr, LValue,
     MemoryDecl, ModuleDeclStyle, ModuleInstanceSummary, ModuleSummary,
-    NamedPortConnection as HirNamedPortConnection, NumericLiteral, PackedRange, PortDecl,
-    PortDirection as HirPortDirection, ProcBlock, ProcBlockKind, SignalDecl, SourceFile, Stmt,
-    UnaryOp,
+    NamedPortConnection as HirNamedPortConnection, NumericLiteral, PackedRange, ParameterDecl,
+    PortDecl, PortDirection as HirPortDirection, ProcBlock, ProcBlockKind, SignalDecl, SourceFile,
+    Stmt, UnaryOp,
 };
 
 type LowerResult<T> = std::result::Result<T, Diagnostic>;
@@ -117,6 +118,7 @@ fn lower_ansi_module(
         style: ModuleDeclStyle::Ansi,
         span: Some(span_from_locate(path, locate)),
         ports: Vec::new(),
+        parameters: Vec::new(),
         signals: Vec::new(),
         memories: Vec::new(),
         continuous_assignments: Vec::new(),
@@ -124,6 +126,10 @@ fn lower_ansi_module(
         instantiations: Vec::new(),
         unsupported: Vec::new(),
     };
+
+    if let Some(param_list) = decl.nodes.0.nodes.5.as_ref() {
+        lower_parameter_port_list(syntax_tree, param_list, path, &mut module);
+    }
 
     if let Some(port_decls) = decl.nodes.0.nodes.6.as_ref() {
         let mut context = None;
@@ -166,6 +172,7 @@ fn lower_nonansi_module(
         style: ModuleDeclStyle::NonAnsi,
         span: Some(span_from_locate(path, locate)),
         ports: Vec::new(),
+        parameters: Vec::new(),
         signals: Vec::new(),
         memories: Vec::new(),
         continuous_assignments: Vec::new(),
@@ -202,6 +209,368 @@ fn lower_non_port_module_item(
             message: "module item is outside the current executable subset".into(),
             span: module.span.clone(),
         }),
+    }
+}
+
+fn lower_parameter_port_list(
+    syntax_tree: &SyntaxTree,
+    list: &ParameterPortList,
+    path: &Path,
+    module: &mut ModuleSummary,
+) {
+    match list {
+        ParameterPortList::Assignment(list) => {
+            // First: the initial ListOfParamAssignments (bare assignments inheriting `parameter`)
+            for assignment in list.nodes.1.nodes.1 .0.nodes.0.contents() {
+                match lower_param_assignment(syntax_tree, assignment, None, module, path) {
+                    Ok(param) => module.parameters.push(param),
+                    Err(diag) => module.unsupported.push(diag),
+                }
+            }
+            // Then: subsequent ParameterPortDeclaration entries
+            for (_, decl) in &list.nodes.1.nodes.1 .1 {
+                lower_parameter_port_declaration(syntax_tree, decl, path, module);
+            }
+        }
+        ParameterPortList::Declaration(list) => {
+            for decl in list.nodes.1.nodes.1.contents() {
+                lower_parameter_port_declaration(syntax_tree, decl, path, module);
+            }
+        }
+        ParameterPortList::Empty(_) => {}
+    }
+}
+
+fn lower_parameter_port_declaration(
+    syntax_tree: &SyntaxTree,
+    decl: &ParameterPortDeclaration,
+    path: &Path,
+    module: &mut ModuleSummary,
+) {
+    match decl {
+        ParameterPortDeclaration::ParameterDeclaration(decl) => {
+            lower_parameter_or_localparam_declaration_into(
+                syntax_tree,
+                ParameterOrLocal::from_parameter_declaration(decl),
+                path,
+                module,
+            );
+        }
+        ParameterPortDeclaration::LocalParameterDeclaration(decl) => {
+            lower_parameter_or_localparam_declaration_into(
+                syntax_tree,
+                ParameterOrLocal::from_localparam_declaration(decl),
+                path,
+                module,
+            );
+        }
+        ParameterPortDeclaration::ParamList(decl) => {
+            let range =
+                match lower_data_type_range(syntax_tree, &decl.nodes.0, path) {
+                    Ok(range) => range,
+                    Err(diag) => {
+                        module.unsupported.push(diag);
+                        return;
+                    }
+                };
+            for assignment in decl.nodes.1.nodes.0.contents() {
+                match lower_param_assignment(syntax_tree, assignment, range, module, path) {
+                    Ok(param) => module.parameters.push(param),
+                    Err(diag) => module.unsupported.push(diag),
+                }
+            }
+        }
+        ParameterPortDeclaration::TypeList(_) => {
+            module.unsupported.push(Diagnostic {
+                message: "type parameter declarations are not supported yet".into(),
+                span: None,
+            });
+        }
+    }
+}
+
+fn lower_parameter_or_localparam_body(
+    syntax_tree: &SyntaxTree,
+    data_type: &DataTypeOrImplicit,
+    assignments: &sv_parser::ListOfParamAssignments,
+    path: &Path,
+    module: &mut ModuleSummary,
+) {
+    let range = match lower_data_type_or_implicit_range(syntax_tree, data_type, path) {
+        Ok(r) => r,
+        Err(diag) => {
+            module.unsupported.push(diag);
+            return;
+        }
+    };
+    for assignment in assignments.nodes.0.contents() {
+        match lower_param_assignment(syntax_tree, assignment, range, module, path) {
+            Ok(param) => module.parameters.push(param),
+            Err(diag) => module.unsupported.push(diag),
+        }
+    }
+}
+
+fn lower_parameter_or_localparam_declaration_into(
+    syntax_tree: &SyntaxTree,
+    pol: ParameterOrLocal<'_>,
+    path: &Path,
+    module: &mut ModuleSummary,
+) {
+    match pol {
+        ParameterOrLocal::Param {
+            data_type,
+            assignments,
+        } => {
+            lower_parameter_or_localparam_body(
+                syntax_tree, data_type, assignments, path, module,
+            );
+        }
+        ParameterOrLocal::TypeParam => {
+            module.unsupported.push(Diagnostic {
+                message: "type parameter declarations are not supported yet".into(),
+                span: None,
+            });
+        }
+    }
+}
+
+/// Helper to unify parameter/localparam declaration shapes.
+enum ParameterOrLocal<'a> {
+    Param {
+        data_type: &'a DataTypeOrImplicit,
+        assignments: &'a sv_parser::ListOfParamAssignments,
+    },
+    TypeParam,
+}
+
+impl<'a> ParameterOrLocal<'a> {
+    fn from_parameter_declaration(decl: &'a ParameterDeclaration) -> Self {
+        match decl {
+            ParameterDeclaration::Param(d) => ParameterOrLocal::Param {
+                data_type: &d.nodes.1,
+                assignments: &d.nodes.2,
+            },
+            ParameterDeclaration::Type(_) => ParameterOrLocal::TypeParam,
+        }
+    }
+
+    fn from_localparam_declaration(decl: &'a LocalParameterDeclaration) -> Self {
+        match decl {
+            LocalParameterDeclaration::Param(d) => ParameterOrLocal::Param {
+                data_type: &d.nodes.1,
+                assignments: &d.nodes.2,
+            },
+            LocalParameterDeclaration::Type(_) => ParameterOrLocal::TypeParam,
+        }
+    }
+}
+
+fn lower_param_assignment(
+    syntax_tree: &SyntaxTree,
+    assignment: &sv_parser::ParamAssignment,
+    range: Option<PackedRange>,
+    module: &ModuleSummary,
+    path: &Path,
+) -> LowerResult<ParameterDecl> {
+    let (name, locate) =
+        identifier_name_from_node(syntax_tree, RefNode::from(&assignment.nodes.0))
+            .ok_or_else(|| unsupported("failed to determine parameter name", None))?;
+
+    if !assignment.nodes.1.is_empty() {
+        return Err(unsupported(
+            "parameter declarations with unpacked dimensions are not supported yet",
+            None,
+        ));
+    }
+
+    let (_, const_param_expr) = assignment.nodes.2.as_ref().ok_or_else(|| {
+        unsupported(
+            "parameter declarations without a default value are not supported yet",
+            None,
+        )
+    })?;
+
+    let default_value = lower_constant_param_expression(syntax_tree, const_param_expr, module, path)?;
+
+    Ok(ParameterDecl {
+        name,
+        range,
+        default_value,
+        span: Some(span_from_locate(path, locate)),
+    })
+}
+
+fn lower_constant_param_expression(
+    syntax_tree: &SyntaxTree,
+    expr: &sv_parser::ConstantParamExpression,
+    module: &ModuleSummary,
+    path: &Path,
+) -> LowerResult<Expr> {
+    match expr {
+        sv_parser::ConstantParamExpression::ConstantMintypmaxExpression(cmtm) => {
+            lower_constant_mintypmax_to_expr(syntax_tree, cmtm, module, path)
+        }
+        _ => Err(unsupported(
+            "parameter default expression is outside the supported subset",
+            None,
+        )),
+    }
+}
+
+fn lower_constant_mintypmax_to_expr(
+    syntax_tree: &SyntaxTree,
+    expr: &sv_parser::ConstantMintypmaxExpression,
+    module: &ModuleSummary,
+    path: &Path,
+) -> LowerResult<Expr> {
+    match expr {
+        sv_parser::ConstantMintypmaxExpression::Unary(ce) => {
+            lower_constant_expression_to_expr(syntax_tree, ce, module, path)
+        }
+        sv_parser::ConstantMintypmaxExpression::Ternary(t) => Ok(Expr::Ternary {
+            cond: Box::new(lower_constant_expression_to_expr(
+                syntax_tree,
+                &t.nodes.0,
+                module,
+                path,
+            )?),
+            when_true: Box::new(lower_constant_expression_to_expr(
+                syntax_tree,
+                &t.nodes.2,
+                module,
+                path,
+            )?),
+            when_false: Box::new(lower_constant_expression_to_expr(
+                syntax_tree,
+                &t.nodes.4,
+                module,
+                path,
+            )?),
+        }),
+    }
+}
+
+fn lower_constant_expression_to_expr(
+    syntax_tree: &SyntaxTree,
+    expr: &ConstantExpression,
+    module: &ModuleSummary,
+    path: &Path,
+) -> LowerResult<Expr> {
+    match expr {
+        ConstantExpression::ConstantPrimary(primary) => {
+            lower_constant_primary_to_expr(syntax_tree, primary, module, path)
+        }
+        ConstantExpression::Unary(u) => {
+            let op = lower_unary_operator(syntax_tree, &u.nodes.0)?;
+            let operand = lower_constant_primary_to_expr(syntax_tree, &u.nodes.2, module, path)?;
+            Ok(Expr::Unary {
+                op,
+                expr: Box::new(operand),
+            })
+        }
+        ConstantExpression::Binary(b) => {
+            let left = lower_constant_expression_to_expr(syntax_tree, &b.nodes.0, module, path)?;
+            let op = lower_binary_operator(syntax_tree, &b.nodes.1)?;
+            let right = lower_constant_expression_to_expr(syntax_tree, &b.nodes.3, module, path)?;
+            Ok(Expr::Binary {
+                left: Box::new(left),
+                op,
+                right: Box::new(right),
+            })
+        }
+        ConstantExpression::Ternary(t) => Ok(Expr::Ternary {
+            cond: Box::new(lower_constant_expression_to_expr(
+                syntax_tree,
+                &t.nodes.0,
+                module,
+                path,
+            )?),
+            when_true: Box::new(lower_constant_expression_to_expr(
+                syntax_tree,
+                &t.nodes.3,
+                module,
+                path,
+            )?),
+            when_false: Box::new(lower_constant_expression_to_expr(
+                syntax_tree,
+                &t.nodes.5,
+                module,
+                path,
+            )?),
+        }),
+    }
+}
+
+fn lower_constant_primary_to_expr(
+    syntax_tree: &SyntaxTree,
+    primary: &sv_parser::ConstantPrimary,
+    module: &ModuleSummary,
+    path: &Path,
+) -> LowerResult<Expr> {
+    match primary {
+        sv_parser::ConstantPrimary::PrimaryLiteral(lit) => lower_literal(syntax_tree, lit),
+        sv_parser::ConstantPrimary::PsParameter(ps) => {
+            let (name, _) = identifier_name_from_node(
+                syntax_tree,
+                RefNode::from(&ps.nodes.0),
+            )
+            .ok_or_else(|| unsupported("failed to determine parameter reference name", None))?;
+            Ok(Expr::Ident(name))
+        }
+        sv_parser::ConstantPrimary::MintypmaxExpression(expr) => {
+            lower_constant_mintypmax_to_expr(syntax_tree, &expr.nodes.0.nodes.1, module, path)
+        }
+        sv_parser::ConstantPrimary::Concatenation(concat) => {
+            let mut exprs = Vec::new();
+            for expr in concat.nodes.0.nodes.0.nodes.1.contents() {
+                exprs.push(lower_constant_expression_to_expr(
+                    syntax_tree, expr, module, path,
+                )?);
+            }
+            Ok(Expr::Concat(exprs))
+        }
+        sv_parser::ConstantPrimary::MultipleConcatenation(concat) => {
+            let inner = &concat.nodes.0.nodes.0;
+            let count_expr =
+                lower_constant_expression_to_expr(syntax_tree, &inner.nodes.1 .0, module, path)?;
+            let Expr::Literal(count_lit) = &count_expr else {
+                return Err(unsupported(
+                    "replication count must be a literal in parameter expressions",
+                    None,
+                ));
+            };
+            let count = count_lit
+                .bits
+                .to_usize_checked()
+                .ok_or_else(|| unsupported("replication count exceeds host limits", None))?;
+            let mut exprs = Vec::new();
+            for expr in inner.nodes.1 .1.nodes.0.nodes.1.contents() {
+                exprs.push(lower_constant_expression_to_expr(
+                    syntax_tree, expr, module, path,
+                )?);
+            }
+            Ok(Expr::Repeat {
+                count,
+                expr: Box::new(Expr::Concat(exprs)),
+            })
+        }
+        sv_parser::ConstantPrimary::ConstantFunctionCall(call) => {
+            // sv-parser often parses bare identifier references (like parameter names)
+            // as ConstantFunctionCall with no arguments. Extract the identifier.
+            let (name, _) = identifier_name_from_node(
+                syntax_tree,
+                RefNode::from(call.as_ref()),
+            )
+            .ok_or_else(|| {
+                unsupported("constant function calls are not supported yet", None)
+            })?;
+            Ok(Expr::Ident(name))
+        }
+        _ => Err(unsupported(
+            "constant primary expression is outside the supported subset",
+            None,
+        )),
     }
 }
 
@@ -271,6 +640,28 @@ fn lower_module_declaration_item(
                     }
                     Err(diag) => module.unsupported.push(diag),
                 }
+            }
+            PackageOrGenerateItemDeclaration::LocalParameterDeclaration(decl) => {
+                lower_parameter_or_localparam_declaration_into(
+                    syntax_tree,
+                    ParameterOrLocal::from_localparam_declaration(&decl.0),
+                    path,
+                    module,
+                );
+            }
+            PackageOrGenerateItemDeclaration::ParameterDeclaration(decl) => {
+                lower_parameter_or_localparam_declaration_into(
+                    syntax_tree,
+                    ParameterOrLocal::from_parameter_declaration(&decl.0),
+                    path,
+                    module,
+                );
+            }
+            PackageOrGenerateItemDeclaration::TaskDeclaration(_) => {
+                module.unsupported.push(Diagnostic {
+                    message: "task declarations are not supported yet".into(),
+                    span: module.span.clone(),
+                });
             }
             PackageOrGenerateItemDeclaration::Empty(_) => {}
             _ => module.unsupported.push(Diagnostic {
@@ -1682,6 +2073,7 @@ fn lower_unary_operator(
 ) -> LowerResult<UnaryOp> {
     match symbol_text(syntax_tree, &operator.nodes.0)?.as_str() {
         "~" => Ok(UnaryOp::BitNot),
+        "!" => Ok(UnaryOp::LogicalNot),
         _ => Err(unsupported("unary operator is not supported yet", None)),
     }
 }

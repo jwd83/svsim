@@ -1,0 +1,17 @@
+{
+  "module": "param_cross_ref",
+  "test_cases": [
+    {
+      "inputs": { "a": 0 },
+      "outputs": { "y": 10 }
+    },
+    {
+      "inputs": { "a": 100 },
+      "outputs": { "y": 110 }
+    },
+    {
+      "inputs": { "a": 250 },
+      "outputs": { "y": 4 }
+    }
+  ]
+}

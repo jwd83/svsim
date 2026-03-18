@@ -1,0 +1,25 @@
+{
+  "module": "parameter_defaults",
+  "test_cases": [
+    {
+      "inputs": { "a": 0 },
+      "outputs": { "y": 0 }
+    },
+    {
+      "inputs": { "a": 5 },
+      "outputs": { "y": 0 }
+    },
+    {
+      "inputs": { "a": 6 },
+      "outputs": { "y": 16 }
+    },
+    {
+      "inputs": { "a": 22 },
+      "outputs": { "y": 32 }
+    },
+    {
+      "inputs": { "a": 246 },
+      "outputs": { "y": 0 }
+    }
+  ]
+}

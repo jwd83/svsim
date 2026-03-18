@@ -1,0 +1,25 @@
+{
+  "module": "localparam_constants",
+  "test_cases": [
+    {
+      "inputs": { "sel": 0 },
+      "outputs": { "y": 170 }
+    },
+    {
+      "inputs": { "sel": 1 },
+      "outputs": { "y": 187 }
+    },
+    {
+      "inputs": { "sel": 2 },
+      "outputs": { "y": 204 }
+    },
+    {
+      "inputs": { "sel": 3 },
+      "outputs": { "y": 221 }
+    },
+    {
+      "inputs": { "sel": 99 },
+      "outputs": { "y": 255 }
+    }
+  ]
+}

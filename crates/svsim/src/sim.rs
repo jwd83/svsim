@@ -741,6 +741,11 @@ fn build_persisted_signal_table(module: &ModuleSummary) -> HashMap<String, Value
     for signal in &module.signals {
         values.insert(signal.name.clone(), Value::zero(signal.width()));
     }
+    // Parameters are placeholder-initialized here; they get their true values
+    // in build_signal_table where expression evaluation is available.
+    for param in &module.parameters {
+        values.insert(param.name.clone(), Value::zero(param.width()));
+    }
 
     values
 }
@@ -899,6 +904,15 @@ fn build_signal_table(
                 .cloned()
                 .unwrap_or_else(|| Value::zero(signal.width())),
         );
+    }
+
+    // Evaluate parameter defaults in declaration order so later parameters can
+    // reference earlier ones.
+    let empty_memories = HashMap::new();
+    for param in &module.parameters {
+        let value = eval_expr(&param.default_value, module, &values, &empty_memories)?;
+        let coerced = value.coerced_to(param.width());
+        values.insert(param.name.clone(), coerced);
     }
 
     for name in inputs.keys() {
@@ -1140,6 +1154,10 @@ fn eval_expr(
                     value.normalized_bits().bitnot_with_width(value.width),
                     value.width,
                 )),
+                UnaryOp::LogicalNot => {
+                    let is_zero = value.normalized_bits().is_zero();
+                    Ok(Value::new(BitValue::from(u64::from(is_zero)), 1))
+                }
             }
         }
         Expr::Binary { left, op, right } => {

@@ -70,6 +70,10 @@ fn validate_module(hir: &HirDesign, module: &ModuleSummary) -> Result<()> {
     validate_runtime_widths(module)?;
     validate_legacy_rom_primitive(hir, module)?;
 
+    for param in &module.parameters {
+        validate_expr(&param.default_value, module)?;
+    }
+
     for assign in &module.continuous_assignments {
         validate_expr(&assign.expr, module)?;
         validate_assignment_target(&assign.target, module)?;
@@ -103,6 +107,13 @@ fn validate_runtime_widths(module: &ModuleSummary) -> Result<()> {
         )?;
     }
 
+    for param in &module.parameters {
+        ensure_runtime_width(
+            param.width(),
+            format!("parameter '{}' in '{}'", param.name, module.name),
+        )?;
+    }
+
     for signal in &module.signals {
         ensure_runtime_width(
             signal.width(),
@@ -128,6 +139,15 @@ fn validate_unique_declarations(module: &ModuleSummary) -> Result<()> {
             return Err(Error::Resolve(format!(
                 "module '{}' declares '{}' more than once",
                 module.name, port.name
+            )));
+        }
+    }
+
+    for param in &module.parameters {
+        if !names.insert(param.name.as_str()) {
+            return Err(Error::Resolve(format!(
+                "module '{}' declares '{}' more than once",
+                module.name, param.name
             )));
         }
     }
@@ -605,6 +625,10 @@ fn const_eval_expr(expr: &Expr) -> Option<ConstValue> {
                     value.normalized_bits().bitnot_with_width(value.width),
                     value.width,
                 )),
+                UnaryOp::LogicalNot => {
+                    let is_zero = value.normalized_bits().is_zero();
+                    Some(ConstValue::new(BitValue::from(u64::from(is_zero)), 1))
+                }
             }
         }
         Expr::Binary { left, op, right } => {

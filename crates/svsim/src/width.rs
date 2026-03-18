@@ -1,6 +1,6 @@
 use crate::bit_value::BitValue;
 use crate::diag::{Error, Result};
-use crate::hir::{BinaryOp, Expr, ModuleSummary};
+use crate::hir::{BinaryOp, Expr, ModuleSummary, UnaryOp};
 
 pub(crate) fn expr_width(expr: &Expr, module: &ModuleSummary) -> Result<usize> {
     match expr {
@@ -51,7 +51,10 @@ pub(crate) fn expr_width(expr: &Expr, module: &ModuleSummary) -> Result<usize> {
             }
             Ok(high - (*msb).min(*lsb) + 1)
         }
-        Expr::Unary { expr, .. } => expr_width(expr, module),
+        Expr::Unary { op, expr } => match op {
+            UnaryOp::LogicalNot => Ok(1),
+            UnaryOp::BitNot => expr_width(expr, module),
+        },
         Expr::Binary { left, op, right } => {
             let left_width = expr_width(left, module)?;
             let right_width = expr_width(right, module)?;

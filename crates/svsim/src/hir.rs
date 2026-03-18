@@ -73,6 +73,20 @@ impl SignalDecl {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ParameterDecl {
+    pub name: String,
+    pub range: Option<PackedRange>,
+    pub default_value: Expr,
+    pub span: Option<SourceSpan>,
+}
+
+impl ParameterDecl {
+    pub fn width(&self) -> usize {
+        self.range.map_or(32, |range| range.width())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct MemoryDecl {
     pub name: String,
     pub element_range: Option<PackedRange>,
@@ -99,6 +113,7 @@ pub struct NumericLiteral {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum UnaryOp {
     BitNot,
+    LogicalNot,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -257,6 +272,7 @@ pub struct ModuleSummary {
     pub style: ModuleDeclStyle,
     pub span: Option<SourceSpan>,
     pub ports: Vec<PortDecl>,
+    pub parameters: Vec<ParameterDecl>,
     pub signals: Vec<SignalDecl>,
     pub memories: Vec<MemoryDecl>,
     pub continuous_assignments: Vec<ContinuousAssign>,
@@ -278,10 +294,15 @@ impl ModuleSummary {
         self.memories.iter().find(|memory| memory.name == name)
     }
 
+    pub fn parameter_decl(&self, name: &str) -> Option<&ParameterDecl> {
+        self.parameters.iter().find(|param| param.name == name)
+    }
+
     pub fn signal_width(&self, name: &str) -> Option<usize> {
         self.port(name)
             .map(PortDecl::width)
             .or_else(|| self.signal_decl(name).map(SignalDecl::width))
+            .or_else(|| self.parameter_decl(name).map(ParameterDecl::width))
     }
 }
 
