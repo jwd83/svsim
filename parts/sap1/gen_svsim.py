@@ -295,6 +295,11 @@ PROGRAMS = [
         "label": "Multiply 7x8",
         "description": "Multiplies 7*8=56 via repeated addition",
     },
+    {
+        "name": "test_jumps",
+        "label": "Branch and flag regression",
+        "description": "Exercises JNZ, JZ, JC, and JNC via decrement and underflow loops",
+    },
 ]
 
 
