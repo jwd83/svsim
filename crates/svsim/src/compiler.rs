@@ -590,7 +590,7 @@ fn resolve_json_test_source_path(json_path: &Path) -> Result<Option<PathBuf>> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
+    use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -661,6 +661,30 @@ mod tests {
                 .collect::<BTreeSet<_>>(),
             BTreeSet::from(["child", "top"]),
         );
+    }
+
+    #[test]
+    fn compile_file_resolves_includes_from_source_directory() {
+        let temp_dir = unique_temp_dir("source-dir-include");
+        fs::write(temp_dir.join("defs.svh"), "`define TOP_VALUE 1'b1\n").expect("write defs");
+        fs::write(
+            temp_dir.join("top.sv"),
+            concat!(
+                "`include \"defs.svh\"\n",
+                "module top(output logic outY);\n",
+                "assign outY = `TOP_VALUE;\n",
+                "endmodule\n"
+            ),
+        )
+        .expect("write top");
+
+        let design = Compiler::new()
+            .compile_file(temp_dir.join("top.sv"))
+            .expect("compile top with sibling include");
+        let mut sim = design.instantiate_top().expect("instantiate top");
+        let outputs = sim.eval_once(BTreeMap::new()).expect("eval top");
+
+        assert_eq!(outputs["outY"], 1_u64.into());
     }
 
     #[test]

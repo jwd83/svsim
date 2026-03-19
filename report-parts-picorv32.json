@@ -1,0 +1,255 @@
+{
+  "directory": "parts/picorv32",
+  "report": {
+    "duration_ms": 853,
+    "passed": 4,
+    "total": 4,
+    "suites": [
+      {
+        "source_path": "parts/picorv32/picorv32_program_harness.sv",
+        "json_path": "parts/picorv32/demo_add_chain.json",
+        "top_module": "picorv32_program_harness",
+        "duration_ms": 705,
+        "passed": true,
+        "report": {
+          "duration_ms": 247,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "accumulates 1 through 10 and stores 55",
+              "description": null,
+              "steps": 50,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/picorv32/picorv32_program_harness.sv",
+        "json_path": "parts/picorv32/demo_add_chain_long.json",
+        "top_module": "picorv32_program_harness",
+        "duration_ms": 852,
+        "passed": true,
+        "report": {
+          "duration_ms": 393,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "accumulates 1 through 20 and stores 210",
+              "description": null,
+              "steps": 79,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/picorv32/picorv32_program_harness.sv",
+        "json_path": "parts/picorv32/demo_shift_pack.json",
+        "top_module": "picorv32_program_harness",
+        "duration_ms": 707,
+        "passed": true,
+        "report": {
+          "duration_ms": 248,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "builds 0x01020304 with shifts and stores it",
+              "description": null,
+              "steps": 50,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/picorv32/picorv32_smoke.sv",
+        "json_path": "parts/picorv32/picorv32_smoke.json",
+        "top_module": "picorv32_smoke",
+        "duration_ms": 493,
+        "passed": true,
+        "report": {
+          "duration_ms": 50,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "stores 1 to address 8",
+              "description": null,
+              "steps": 12,
+              "passed": true,
+              "failures": [],
+              "trace": {
+                "signals": [
+                  "trap",
+                  "mem_valid",
+                  "mem_instr",
+                  "mem_addr",
+                  "store_seen",
+                  "store_addr",
+                  "store_data"
+                ],
+                "steps": [
+                  {
+                    "step": 1,
+                    "values": {
+                      "mem_addr": 0,
+                      "mem_instr": 0,
+                      "mem_valid": 0,
+                      "store_addr": 0,
+                      "store_data": 0,
+                      "store_seen": 0,
+                      "trap": 0
+                    }
+                  },
+                  {
+                    "step": 2,
+                    "values": {
+                      "mem_addr": 0,
+                      "mem_instr": 0,
+                      "mem_valid": 0,
+                      "store_addr": 0,
+                      "store_data": 0,
+                      "store_seen": 0,
+                      "trap": 0
+                    }
+                  },
+                  {
+                    "step": 3,
+                    "values": {
+                      "mem_addr": 0,
+                      "mem_instr": 1,
+                      "mem_valid": 1,
+                      "store_addr": 0,
+                      "store_data": 0,
+                      "store_seen": 0,
+                      "trap": 0
+                    }
+                  },
+                  {
+                    "step": 4,
+                    "values": {
+                      "mem_addr": 0,
+                      "mem_instr": 1,
+                      "mem_valid": 0,
+                      "store_addr": 0,
+                      "store_data": 0,
+                      "store_seen": 0,
+                      "trap": 0
+                    }
+                  },
+                  {
+                    "step": 5,
+                    "values": {
+                      "mem_addr": 0,
+                      "mem_instr": 1,
+                      "mem_valid": 0,
+                      "store_addr": 0,
+                      "store_data": 0,
+                      "store_seen": 0,
+                      "trap": 0
+                    }
+                  },
+                  {
+                    "step": 6,
+                    "values": {
+                      "mem_addr": 4,
+                      "mem_instr": 1,
+                      "mem_valid": 1,
+                      "store_addr": 0,
+                      "store_data": 0,
+                      "store_seen": 0,
+                      "trap": 0
+                    }
+                  },
+                  {
+                    "step": 7,
+                    "values": {
+                      "mem_addr": 4,
+                      "mem_instr": 1,
+                      "mem_valid": 0,
+                      "store_addr": 0,
+                      "store_data": 0,
+                      "store_seen": 0,
+                      "trap": 0
+                    }
+                  },
+                  {
+                    "step": 8,
+                    "values": {
+                      "mem_addr": 4,
+                      "mem_instr": 1,
+                      "mem_valid": 0,
+                      "store_addr": 0,
+                      "store_data": 0,
+                      "store_seen": 0,
+                      "trap": 0
+                    }
+                  },
+                  {
+                    "step": 9,
+                    "values": {
+                      "mem_addr": 8,
+                      "mem_instr": 1,
+                      "mem_valid": 1,
+                      "store_addr": 0,
+                      "store_data": 0,
+                      "store_seen": 0,
+                      "trap": 0
+                    }
+                  },
+                  {
+                    "step": 10,
+                    "values": {
+                      "mem_addr": 8,
+                      "mem_instr": 1,
+                      "mem_valid": 0,
+                      "store_addr": 0,
+                      "store_data": 0,
+                      "store_seen": 0,
+                      "trap": 0
+                    }
+                  },
+                  {
+                    "step": 11,
+                    "values": {
+                      "mem_addr": 8,
+                      "mem_instr": 0,
+                      "mem_valid": 1,
+                      "store_addr": 0,
+                      "store_data": 0,
+                      "store_seen": 0,
+                      "trap": 0
+                    }
+                  },
+                  {
+                    "step": 12,
+                    "values": {
+                      "mem_addr": 8,
+                      "mem_instr": 0,
+                      "mem_valid": 0,
+                      "store_addr": 8,
+                      "store_data": 1,
+                      "store_seen": 1,
+                      "trap": 1
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "error": null
+      }
+    ]
+  }
+}

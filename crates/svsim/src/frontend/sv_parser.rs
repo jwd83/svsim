@@ -62,10 +62,10 @@ impl SvParserFrontend {
 
     pub fn parse_file(&self, path: &Path) -> Result<SourceFile> {
         let defines: Defines = HashMap::<String, Option<Define>>::new();
-        let (syntax_tree, _) = parse_sv(path, &defines, &self.include_paths, false, false)
-            .map_err(|error| {
-                Error::Parse(format!("failed to parse {}: {error}", path.display()))
-            })?;
+        let include_paths = self.include_paths_for(path);
+        let (syntax_tree, _) = parse_sv(path, &defines, &include_paths, false, false).map_err(
+            |error| Error::Parse(format!("failed to parse {}: {error}", path.display())),
+        )?;
 
         lower_source_file(&syntax_tree, path)
     }
@@ -73,12 +73,22 @@ impl SvParserFrontend {
     pub fn parse_str(&self, virtual_path: impl AsRef<Path>, source: &str) -> Result<SourceFile> {
         let path = virtual_path.as_ref();
         let defines: Defines = HashMap::<String, Option<Define>>::new();
-        let (syntax_tree, _) =
-            parse_sv_str(source, path, &defines, &self.include_paths, false, false).map_err(
-                |error| Error::Parse(format!("failed to parse {}: {error}", path.display())),
-            )?;
+        let include_paths = self.include_paths_for(path);
+        let (syntax_tree, _) = parse_sv_str(source, path, &defines, &include_paths, false, false)
+            .map_err(|error| {
+                Error::Parse(format!("failed to parse {}: {error}", path.display()))
+            })?;
 
         lower_source_file(&syntax_tree, path)
+    }
+
+    fn include_paths_for(&self, path: &Path) -> Vec<PathBuf> {
+        let mut include_paths = Vec::with_capacity(self.include_paths.len() + 1);
+        if let Some(parent) = path.parent() {
+            include_paths.push(parent.to_path_buf());
+        }
+        include_paths.extend(self.include_paths.iter().cloned());
+        include_paths
     }
 }
 
