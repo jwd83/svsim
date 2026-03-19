@@ -57,7 +57,9 @@ pub(crate) fn expr_width(expr: &Expr, module: &ModuleSummary) -> Result<usize> {
             | UnaryOp::ReductionNand
             | UnaryOp::ReductionOr
             | UnaryOp::ReductionXor => Ok(1),
-            UnaryOp::BitNot | UnaryOp::Signed => expr_width(expr, module),
+            UnaryOp::BitNot | UnaryOp::Negate | UnaryOp::Signed | UnaryOp::Unsigned => {
+                expr_width(expr, module)
+            }
         },
         Expr::Binary { left, op, right } => {
             let left_width = expr_width(left, module)?;

@@ -427,7 +427,9 @@ fn validate_expr(expr: &Expr, module: &ModuleSummary) -> Result<usize> {
                     | UnaryOp::ReductionNand
                     | UnaryOp::ReductionOr
                     | UnaryOp::ReductionXor => 1,
-                    UnaryOp::BitNot | UnaryOp::Signed => expr_width,
+                    UnaryOp::BitNot | UnaryOp::Negate | UnaryOp::Signed | UnaryOp::Unsigned => {
+                        expr_width
+                    }
                 },
                 "unary expression",
             )
@@ -680,6 +682,11 @@ fn const_eval_expr(expr: &Expr) -> Option<ConstValue> {
                     value.width,
                     value.signed,
                 )),
+                UnaryOp::Negate => Some(ConstValue::new_with_signed(
+                    BitValue::zero().wrapping_sub(&value.normalized_bits(), value.width),
+                    value.width,
+                    value.signed,
+                )),
                 UnaryOp::LogicalNot => {
                     let is_zero = value.normalized_bits().is_zero();
                     Some(ConstValue::new(BitValue::from(u64::from(is_zero)), 1))
@@ -715,6 +722,11 @@ fn const_eval_expr(expr: &Expr) -> Option<ConstValue> {
                     value.normalized_bits(),
                     value.width,
                     true,
+                )),
+                UnaryOp::Unsigned => Some(ConstValue::new_with_signed(
+                    value.normalized_bits(),
+                    value.width,
+                    false,
                 )),
             }
         }

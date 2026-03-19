@@ -1264,6 +1264,11 @@ fn eval_expr(
                     value.width,
                     value.signed,
                 )),
+                UnaryOp::Negate => Ok(Value::new_with_signed(
+                    BitValue::zero().wrapping_sub(&value.normalized_bits(), value.width),
+                    value.width,
+                    value.signed,
+                )),
                 UnaryOp::LogicalNot => {
                     let is_zero = value.normalized_bits().is_zero();
                     Ok(Value::new(BitValue::from(u64::from(is_zero)), 1))
@@ -1296,6 +1301,11 @@ fn eval_expr(
                     value.normalized_bits(),
                     value.width,
                     true,
+                )),
+                UnaryOp::Unsigned => Ok(Value::new_with_signed(
+                    value.normalized_bits(),
+                    value.width,
+                    false,
                 )),
             }
         }
@@ -2259,6 +2269,39 @@ endmodule
 
         assert_signal_eq!(outputs, "lt", 1);
         assert_signal_eq!(outputs, "sra", 0xfc);
+    }
+
+    #[test]
+    fn eval_once_supports_unsigned_cast_compare_and_unary_negation() {
+        let temp_dir = unique_temp_dir("unsigned-cast-negate");
+        let source = r#"
+module unsigned_negate_ops (
+    input  logic [7:0] a,
+    input  logic [7:0] b,
+    output logic       lt_signed,
+    output logic       lt_unsigned,
+    output logic [7:0] neg
+);
+    assign lt_signed = $signed(a) < $signed(b);
+    assign lt_unsigned = $unsigned($signed(a)) < $unsigned($signed(b));
+    assign neg = -a;
+endmodule
+"#;
+        fs::write(temp_dir.join("unsigned_negate_ops.sv"), source)
+            .expect("write unsigned_negate_ops");
+
+        let design = Compiler::new()
+            .compile_file(temp_dir.join("unsigned_negate_ops.sv"))
+            .expect("compile unsigned_negate_ops");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let outputs = sim
+            .eval_once(inputs([("a".into(), 0xf0), ("b".into(), 0x01)]))
+            .expect("eval unsigned negate ops");
+
+        assert_signal_eq!(outputs, "lt_signed", 1);
+        assert_signal_eq!(outputs, "lt_unsigned", 0);
+        assert_signal_eq!(outputs, "neg", 0x10);
     }
 
     #[test]

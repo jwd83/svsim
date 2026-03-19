@@ -811,6 +811,28 @@ mod tests {
                 .iter()
                 .any(|param| param.parameter_name == "PROGADDR_RESET")
         );
+
+        let picorv32_pcpi_fast_mul = design
+            .hir()
+            .module("picorv32_pcpi_fast_mul")
+            .expect("picorv32_pcpi_fast_mul module");
+        assert!(picorv32_pcpi_fast_mul.unsupported.is_empty());
+
+        let picorv32_pcpi_div = design
+            .hir()
+            .module("picorv32_pcpi_div")
+            .expect("picorv32_pcpi_div module");
+        assert!(picorv32_pcpi_div.unsupported.is_empty());
+
+        let picorv32_pcpi_mul = design
+            .hir()
+            .module("picorv32_pcpi_mul")
+            .expect("picorv32_pcpi_mul module");
+        assert_eq!(picorv32_pcpi_mul.unsupported.len(), 1);
+        assert_eq!(
+            picorv32_pcpi_mul.unsupported[0].message,
+            "statement is outside the current executable subset"
+        );
     }
 
     #[test]

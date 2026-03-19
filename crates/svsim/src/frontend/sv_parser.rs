@@ -6,13 +6,12 @@ use sv_parser::{
     CaseStatement, CondPredicate, ConditionalStatement, ConstantExpression,
     ConstantPartSelectRange, ConstantRange, ConstantSelect, ContinuousAssign, DataDeclaration,
     DataType, DataTypeOrImplicit, Define, Defines, Expression, FunctionSubroutineCall,
-    HierarchicalIdentifier, ImplicitDataType, InitialConstruct, Keyword, ListOfPortConnections,
-    ListOfParameterAssignments, LocalParameterDeclaration, Locate, ModuleDeclarationAnsi,
-    ModuleDeclarationNonansi, ModuleInstantiation, ModuleOrGenerateItem,
+    HierarchicalIdentifier, ImplicitDataType, InitialConstruct, Keyword,
+    ListOfParameterAssignments, ListOfPortConnections, LocalParameterDeclaration, Locate,
+    ModuleDeclarationAnsi, ModuleDeclarationNonansi, ModuleInstantiation, ModuleOrGenerateItem,
     ModuleOrGenerateItemDeclaration, NamedPortConnection, NetDeclaration, NetLvalue,
-    NonPortModuleItem,
-    PackageOrGenerateItemDeclaration, ParameterDeclaration, ParameterPortDeclaration,
-    ParameterPortList, Paren, PartSelectRange, PortDirection, Primary,
+    NonPortModuleItem, PackageOrGenerateItemDeclaration, ParameterDeclaration,
+    ParameterPortDeclaration, ParameterPortList, Paren, PartSelectRange, PortDirection, Primary,
     PsOrHierarchicalNetIdentifier, RefNode, Select, SeqBlock, Statement, StatementItem,
     StatementOrNull, SyntaxTree, UnaryOperator, UnpackedDimension, VariableAssignment,
     VariableDeclAssignment, VariableDimension, VariableLvalue, VariablePortType, parse_sv,
@@ -24,10 +23,9 @@ use crate::diag::{Diagnostic, Error, Result, SourceSpan};
 use crate::hir::{
     AssignmentKind, BinaryOp, CaseStmtItem, ContinuousAssign as HirContinuousAssign, Expr, LValue,
     MemoryDecl, ModuleDeclStyle, ModuleInstanceSummary, ModuleSummary,
-    NamedParameterAssign as HirNamedParameterAssign,
-    NamedPortConnection as HirNamedPortConnection, NumericLiteral, PackedRange, ParameterDecl,
-    PortDecl, PortDirection as HirPortDirection, ProcBlock, ProcBlockKind, SignalDecl, SourceFile,
-    Stmt, UnaryOp,
+    NamedParameterAssign as HirNamedParameterAssign, NamedPortConnection as HirNamedPortConnection,
+    NumericLiteral, PackedRange, ParameterDecl, PortDecl, PortDirection as HirPortDirection,
+    ProcBlock, ProcBlockKind, SignalDecl, SourceFile, Stmt, UnaryOp,
 };
 
 type LowerResult<T> = std::result::Result<T, Diagnostic>;
@@ -63,9 +61,10 @@ impl SvParserFrontend {
     pub fn parse_file(&self, path: &Path) -> Result<SourceFile> {
         let defines: Defines = HashMap::<String, Option<Define>>::new();
         let include_paths = self.include_paths_for(path);
-        let (syntax_tree, _) = parse_sv(path, &defines, &include_paths, false, false).map_err(
-            |error| Error::Parse(format!("failed to parse {}: {error}", path.display())),
-        )?;
+        let (syntax_tree, _) =
+            parse_sv(path, &defines, &include_paths, false, false).map_err(|error| {
+                Error::Parse(format!("failed to parse {}: {error}", path.display()))
+            })?;
 
         lower_source_file(&syntax_tree, path)
     }
@@ -76,8 +75,8 @@ impl SvParserFrontend {
         let include_paths = self.include_paths_for(path);
         let (syntax_tree, _) = parse_sv_str(source, path, &defines, &include_paths, false, false)
             .map_err(|error| {
-                Error::Parse(format!("failed to parse {}: {error}", path.display()))
-            })?;
+            Error::Parse(format!("failed to parse {}: {error}", path.display()))
+        })?;
 
         lower_source_file(&syntax_tree, path)
     }
@@ -1238,7 +1237,9 @@ fn lower_module_instantiation(
                 .nodes
                 .1
                 .as_ref()
-                .ok_or_else(|| unsupported("named parameter overrides must provide an expression", None))
+                .ok_or_else(|| {
+                    unsupported("named parameter overrides must provide an expression", None)
+                })
                 .and_then(|expr| lower_param_expression(syntax_tree, expr, module, path))?;
             parameter_overrides.push(HirNamedParameterAssign {
                 parameter_name,
@@ -2152,13 +2153,15 @@ fn lower_function_subroutine_call(
     let name = syntax_tree
         .get_str(&call.nodes.0.nodes.0)
         .ok_or_else(|| unsupported("failed to read system function name", None))?;
-    if name != "$signed" {
-        return Err(unsupported("primary expression is not supported yet", None));
-    }
+    let op = match name.as_ref() {
+        "$signed" => UnaryOp::Signed,
+        "$unsigned" => UnaryOp::Unsigned,
+        _ => return Err(unsupported("primary expression is not supported yet", None)),
+    };
 
     if call.nodes.1.nodes.1.1.is_some() {
         return Err(unsupported(
-            "`$signed` clocking event arguments are not supported",
+            format!("`{name}` clocking event arguments are not supported"),
             None,
         ));
     }
@@ -2166,13 +2169,13 @@ fn lower_function_subroutine_call(
     let args = call.nodes.1.nodes.1.0.contents();
     let [Some(arg)] = args.as_slice() else {
         return Err(unsupported(
-            "`$signed` expects exactly one expression argument",
+            format!("`{name}` expects exactly one expression argument"),
             None,
         ));
     };
 
     Ok(Expr::Unary {
-        op: UnaryOp::Signed,
+        op,
         expr: Box::new(lower_expression(syntax_tree, arg, module, path)?),
     })
 }
@@ -2614,6 +2617,7 @@ fn lower_unary_operator(
 ) -> LowerResult<UnaryOp> {
     match symbol_text(syntax_tree, &operator.nodes.0)?.as_str() {
         "~" => Ok(UnaryOp::BitNot),
+        "-" => Ok(UnaryOp::Negate),
         "!" => Ok(UnaryOp::LogicalNot),
         "&" => Ok(UnaryOp::ReductionAnd),
         "~&" => Ok(UnaryOp::ReductionNand),
@@ -2910,6 +2914,7 @@ fn const_eval_param_value(expr: &Expr, params: &[ParameterDecl]) -> LowerResult<
                 UnaryOp::LogicalNot => Ok(usize::from(v == 0)),
                 UnaryOp::BitNot => Ok(!v),
                 UnaryOp::Signed => Ok(v),
+                UnaryOp::Unsigned => Ok(v),
                 _ => Err(unsupported(
                     "unsupported unary operator in constant parameter expression",
                     None,
