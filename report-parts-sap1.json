@@ -1,7 +1,7 @@
 {
   "directory": "parts/sap1",
   "report": {
-    "duration_ms": 791,
+    "duration_ms": 784,
     "passed": 3,
     "total": 3,
     "suites": [
@@ -9,10 +9,10 @@
         "source_path": "parts/sap1/sap1.sv",
         "json_path": "parts/sap1/sap1_add3to42.json",
         "top_module": "machine",
-        "duration_ms": 789,
+        "duration_ms": 782,
         "passed": true,
         "report": {
-          "duration_ms": 767,
+          "duration_ms": 762,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -31,10 +31,10 @@
         "source_path": "parts/sap1/sap1.sv",
         "json_path": "parts/sap1/sap1_fib.json",
         "top_module": "machine",
-        "duration_ms": 109,
+        "duration_ms": 106,
         "passed": true,
         "report": {
-          "duration_ms": 88,
+          "duration_ms": 87,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -53,10 +53,10 @@
         "source_path": "parts/sap1/sap1.sv",
         "json_path": "parts/sap1/sap1_multiply.json",
         "top_module": "machine",
-        "duration_ms": 99,
+        "duration_ms": 96,
         "passed": true,
         "report": {
-          "duration_ms": 79,
+          "duration_ms": 78,
           "passed": 1,
           "total": 1,
           "cases": [
