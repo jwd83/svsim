@@ -1,18 +1,18 @@
 {
   "directory": "parts/sap1",
   "report": {
-    "duration_ms": 940,
+    "duration_ms": 1152,
     "passed": 6,
     "total": 6,
     "suites": [
       {
-        "source_path": "parts/sap1/sap1.sv",
-        "json_path": "parts/sap1/sap1_add3to42.json",
+        "source_path": "parts/sap1\\sap1.sv",
+        "json_path": "parts/sap1\\sap1_add3to42.json",
         "top_module": "machine",
-        "duration_ms": 937,
+        "duration_ms": 1113,
         "passed": true,
         "report": {
-          "duration_ms": 904,
+          "duration_ms": 1070,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -28,13 +28,13 @@
         "error": null
       },
       {
-        "source_path": "parts/sap1/sap1.sv",
-        "json_path": "parts/sap1/sap1_fib.json",
+        "source_path": "parts/sap1\\sap1.sv",
+        "json_path": "parts/sap1\\sap1_fib.json",
         "top_module": "machine",
-        "duration_ms": 143,
+        "duration_ms": 181,
         "passed": true,
         "report": {
-          "duration_ms": 116,
+          "duration_ms": 141,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -50,13 +50,13 @@
         "error": null
       },
       {
-        "source_path": "parts/sap1/sap1.sv",
-        "json_path": "parts/sap1/sap1_memory_traffic.json",
+        "source_path": "parts/sap1\\sap1.sv",
+        "json_path": "parts/sap1\\sap1_memory_traffic.json",
         "top_module": "machine",
-        "duration_ms": 87,
+        "duration_ms": 102,
         "passed": true,
         "report": {
-          "duration_ms": 56,
+          "duration_ms": 63,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -72,13 +72,13 @@
         "error": null
       },
       {
-        "source_path": "parts/sap1/sap1.sv",
-        "json_path": "parts/sap1/sap1_multiply.json",
+        "source_path": "parts/sap1\\sap1.sv",
+        "json_path": "parts/sap1\\sap1_multiply.json",
         "top_module": "machine",
-        "duration_ms": 125,
+        "duration_ms": 165,
         "passed": true,
         "report": {
-          "duration_ms": 102,
+          "duration_ms": 125,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -94,13 +94,13 @@
         "error": null
       },
       {
-        "source_path": "parts/sap1/sap1.sv",
-        "json_path": "parts/sap1/sap1_self_modify_fetch.json",
+        "source_path": "parts/sap1\\sap1.sv",
+        "json_path": "parts/sap1\\sap1_self_modify_fetch.json",
         "top_module": "machine",
-        "duration_ms": 33,
+        "duration_ms": 59,
         "passed": true,
         "report": {
-          "duration_ms": 10,
+          "duration_ms": 20,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -116,13 +116,13 @@
         "error": null
       },
       {
-        "source_path": "parts/sap1/sap1.sv",
-        "json_path": "parts/sap1/sap1_test_jumps.json",
+        "source_path": "parts/sap1\\sap1.sv",
+        "json_path": "parts/sap1\\sap1_test_jumps.json",
         "top_module": "machine",
-        "duration_ms": 90,
+        "duration_ms": 112,
         "passed": true,
         "report": {
-          "duration_ms": 56,
+          "duration_ms": 73,
           "passed": 1,
           "total": 1,
           "cases": [
