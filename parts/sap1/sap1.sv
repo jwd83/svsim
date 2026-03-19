@@ -1,6 +1,5 @@
-// SAP-1 (Ben Eater 8-bit CPU) adapted for svsim
-// Original: cpu.v — removes testbench modules, $readmemh, inout ports,
-// positional connections, and reg-init-in-decl.
+// SAP-1 (Ben Eater 8-bit CPU) ported for the svsim harness.
+// This is the maintained version in this repository.
 
 module register(
 	input wire [7:0] bus,
