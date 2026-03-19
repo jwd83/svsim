@@ -1,0 +1,76 @@
+{
+  "directory": "parts/sap1",
+  "report": {
+    "duration_ms": 791,
+    "passed": 3,
+    "total": 3,
+    "suites": [
+      {
+        "source_path": "parts/sap1/sap1.sv",
+        "json_path": "parts/sap1/sap1_add3to42.json",
+        "top_module": "machine",
+        "duration_ms": 789,
+        "passed": true,
+        "report": {
+          "duration_ms": 767,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Repeatedly adds 3 starting from 42, outputs each step, halts at 0",
+              "description": null,
+              "steps": 2670,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/sap1/sap1.sv",
+        "json_path": "parts/sap1/sap1_fib.json",
+        "top_module": "machine",
+        "duration_ms": 109,
+        "passed": true,
+        "report": {
+          "duration_ms": 88,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Fibonacci sequence halts with out=233",
+              "description": null,
+              "steps": 277,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/sap1/sap1.sv",
+        "json_path": "parts/sap1/sap1_multiply.json",
+        "top_module": "machine",
+        "duration_ms": 99,
+        "passed": true,
+        "report": {
+          "duration_ms": 79,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Multiplies 7*8=56 via repeated addition",
+              "description": null,
+              "steps": 247,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      }
+    ]
+  }
+}

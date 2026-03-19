@@ -6,10 +6,10 @@
     "total": 50,
     "suites": [
       {
-        "source_path": "parts/testing\\001-GettingStarted.sv",
-        "json_path": "parts/testing\\001-GettingStarted.json",
+        "source_path": "parts/testing/001-GettingStarted.sv",
+        "json_path": "parts/testing/001-GettingStarted.json",
         "top_module": "top_module",
-        "duration_ms": 3,
+        "duration_ms": 2,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -28,10 +28,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\002-OutputZero.sv",
-        "json_path": "parts/testing\\002-OutputZero.json",
+        "source_path": "parts/testing/002-OutputZero.sv",
+        "json_path": "parts/testing/002-OutputZero.json",
         "top_module": "top_module",
-        "duration_ms": 1,
+        "duration_ms": 0,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -50,8 +50,8 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\003-Wire.sv",
-        "json_path": "parts/testing\\003-Wire.json",
+        "source_path": "parts/testing/003-Wire.sv",
+        "json_path": "parts/testing/003-Wire.json",
         "top_module": "top_module",
         "duration_ms": 1,
         "passed": true,
@@ -79,10 +79,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\004-Wire4.sv",
-        "json_path": "parts/testing\\004-Wire4.json",
+        "source_path": "parts/testing/004-Wire4.sv",
+        "json_path": "parts/testing/004-Wire4.json",
         "top_module": "top_module",
-        "duration_ms": 5,
+        "duration_ms": 1,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -136,10 +136,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\005-Notgate.sv",
-        "json_path": "parts/testing\\005-Notgate.json",
+        "source_path": "parts/testing/005-Notgate.sv",
+        "json_path": "parts/testing/005-Notgate.json",
         "top_module": "top_module",
-        "duration_ms": 1,
+        "duration_ms": 0,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -165,8 +165,94 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\006-Andgate.sv",
-        "json_path": "parts/testing\\006-Andgate.json",
+        "source_path": "parts/testing/006-Andgate.sv",
+        "json_path": "parts/testing/006-Andgate.json",
+        "top_module": "top_module",
+        "duration_ms": 0,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "passed": 4,
+          "total": 4,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/testing/007-Norgate.sv",
+        "json_path": "parts/testing/007-Norgate.json",
+        "top_module": "top_module",
+        "duration_ms": 0,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "passed": 4,
+          "total": 4,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/testing/008-Xnorgate.sv",
+        "json_path": "parts/testing/008-Xnorgate.json",
         "top_module": "top_module",
         "duration_ms": 1,
         "passed": true,
@@ -208,96 +294,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\007-Norgate.sv",
-        "json_path": "parts/testing\\007-Norgate.json",
+        "source_path": "parts/testing/009-DeclaringWires.sv",
+        "json_path": "parts/testing/009-DeclaringWires.json",
         "top_module": "top_module",
-        "duration_ms": 4,
-        "passed": true,
-        "report": {
-          "duration_ms": 0,
-          "passed": 4,
-          "total": 4,
-          "cases": [
-            {
-              "name": "Test 1",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 2",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 3",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 4",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            }
-          ]
-        },
-        "error": null
-      },
-      {
-        "source_path": "parts/testing\\008-Xnorgate.sv",
-        "json_path": "parts/testing\\008-Xnorgate.json",
-        "top_module": "top_module",
-        "duration_ms": 4,
-        "passed": true,
-        "report": {
-          "duration_ms": 0,
-          "passed": 4,
-          "total": 4,
-          "cases": [
-            {
-              "name": "Test 1",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 2",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 3",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 4",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            }
-          ]
-        },
-        "error": null
-      },
-      {
-        "source_path": "parts/testing\\009-DeclaringWires.sv",
-        "json_path": "parts/testing\\009-DeclaringWires.json",
-        "top_module": "top_module",
-        "duration_ms": 3,
+        "duration_ms": 2,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -365,10 +365,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\010-7458.sv",
-        "json_path": "parts/testing\\010-7458.json",
+        "source_path": "parts/testing/010-7458.sv",
+        "json_path": "parts/testing/010-7458.json",
         "top_module": "top_module",
-        "duration_ms": 8,
+        "duration_ms": 2,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -415,8 +415,306 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\011-Vector0.sv",
-        "json_path": "parts/testing\\011-Vector0.json",
+        "source_path": "parts/testing/011-Vector0.sv",
+        "json_path": "parts/testing/011-Vector0.json",
+        "top_module": "top_module",
+        "duration_ms": 1,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "passed": 8,
+          "total": 8,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/testing/012-Vector1.sv",
+        "json_path": "parts/testing/012-Vector1.json",
+        "top_module": "top_module",
+        "duration_ms": 1,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "passed": 8,
+          "total": 8,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/testing/013-Vector2.sv",
+        "json_path": "parts/testing/013-Vector2.json",
+        "top_module": "top_module",
+        "duration_ms": 5,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "passed": 10,
+          "total": 10,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 9",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 10",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/testing/014-VectorGates.sv",
+        "json_path": "parts/testing/014-VectorGates.json",
+        "top_module": "top_module",
+        "duration_ms": 5,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "passed": 8,
+          "total": 8,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/testing/015-Gates4.sv",
+        "json_path": "parts/testing/015-Gates4.json",
         "top_module": "top_module",
         "duration_ms": 3,
         "passed": true,
@@ -486,10 +784,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\012-Vector1.sv",
-        "json_path": "parts/testing\\012-Vector1.json",
+        "source_path": "parts/testing/016-Vector3.sv",
+        "json_path": "parts/testing/016-Vector3.json",
         "top_module": "top_module",
-        "duration_ms": 3,
+        "duration_ms": 2,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -557,8 +855,8 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\013-Vector2.sv",
-        "json_path": "parts/testing\\013-Vector2.json",
+        "source_path": "parts/testing/017-Vectorr.sv",
+        "json_path": "parts/testing/017-Vectorr.json",
         "top_module": "top_module",
         "duration_ms": 8,
         "passed": true,
@@ -642,10 +940,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\014-VectorGates.sv",
-        "json_path": "parts/testing\\014-VectorGates.json",
+        "source_path": "parts/testing/018-Vector4SignExtension.sv",
+        "json_path": "parts/testing/018-Vector4SignExtension.json",
         "top_module": "top_module",
-        "duration_ms": 6,
+        "duration_ms": 1,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -713,311 +1011,13 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\015-Gates4.sv",
-        "json_path": "parts/testing\\015-Gates4.json",
-        "top_module": "top_module",
-        "duration_ms": 6,
-        "passed": true,
-        "report": {
-          "duration_ms": 0,
-          "passed": 8,
-          "total": 8,
-          "cases": [
-            {
-              "name": "Test 1",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 2",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 3",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 4",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 5",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 6",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 7",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 8",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            }
-          ]
-        },
-        "error": null
-      },
-      {
-        "source_path": "parts/testing\\016-Vector3.sv",
-        "json_path": "parts/testing\\016-Vector3.json",
-        "top_module": "top_module",
-        "duration_ms": 3,
-        "passed": true,
-        "report": {
-          "duration_ms": 0,
-          "passed": 8,
-          "total": 8,
-          "cases": [
-            {
-              "name": "Test 1",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 2",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 3",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 4",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 5",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 6",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 7",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 8",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            }
-          ]
-        },
-        "error": null
-      },
-      {
-        "source_path": "parts/testing\\017-Vectorr.sv",
-        "json_path": "parts/testing\\017-Vectorr.json",
+        "source_path": "parts/testing/019-Vector5.sv",
+        "json_path": "parts/testing/019-Vector5.json",
         "top_module": "top_module",
         "duration_ms": 8,
         "passed": true,
         "report": {
           "duration_ms": 0,
-          "passed": 10,
-          "total": 10,
-          "cases": [
-            {
-              "name": "Test 1",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 2",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 3",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 4",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 5",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 6",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 7",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 8",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 9",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 10",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            }
-          ]
-        },
-        "error": null
-      },
-      {
-        "source_path": "parts/testing\\018-Vector4SignExtension.sv",
-        "json_path": "parts/testing\\018-Vector4SignExtension.json",
-        "top_module": "top_module",
-        "duration_ms": 3,
-        "passed": true,
-        "report": {
-          "duration_ms": 0,
-          "passed": 8,
-          "total": 8,
-          "cases": [
-            {
-              "name": "Test 1",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 2",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 3",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 4",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 5",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 6",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 7",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 8",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            }
-          ]
-        },
-        "error": null
-      },
-      {
-        "source_path": "parts/testing\\019-Vector5.sv",
-        "json_path": "parts/testing\\019-Vector5.json",
-        "top_module": "top_module",
-        "duration_ms": 17,
-        "passed": true,
-        "report": {
-          "duration_ms": 1,
           "passed": 7,
           "total": 7,
           "cases": [
@@ -1075,10 +1075,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\020-WidthCoercion.sv",
-        "json_path": "parts/testing\\020-WidthCoercion.json",
+        "source_path": "parts/testing/020-WidthCoercion.sv",
+        "json_path": "parts/testing/020-WidthCoercion.json",
         "top_module": "top_module",
-        "duration_ms": 10,
+        "duration_ms": 4,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -1111,10 +1111,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\021-ShiftOps.sv",
-        "json_path": "parts/testing\\021-ShiftOps.json",
+        "source_path": "parts/testing/021-ShiftOps.sv",
+        "json_path": "parts/testing/021-ShiftOps.json",
         "top_module": "top_module",
-        "duration_ms": 3,
+        "duration_ms": 1,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -1147,13 +1147,13 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\adder_16bit.sv",
-        "json_path": "parts/testing\\adder_16bit.json",
+        "source_path": "parts/testing/adder_16bit.sv",
+        "json_path": "parts/testing/adder_16bit.json",
         "top_module": "adder_16bit",
-        "duration_ms": 39,
+        "duration_ms": 23,
         "passed": true,
         "report": {
-          "duration_ms": 10,
+          "duration_ms": 6,
           "passed": 8,
           "total": 8,
           "cases": [
@@ -1218,13 +1218,13 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\adder_4bit.sv",
-        "json_path": "parts/testing\\adder_4bit.json",
+        "source_path": "parts/testing/adder_4bit.sv",
+        "json_path": "parts/testing/adder_4bit.json",
         "top_module": "adder_4bit",
-        "duration_ms": 19,
+        "duration_ms": 11,
         "passed": true,
         "report": {
-          "duration_ms": 3,
+          "duration_ms": 2,
           "passed": 10,
           "total": 10,
           "cases": [
@@ -1303,13 +1303,13 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\adder_8bit.sv",
-        "json_path": "parts/testing\\adder_8bit.json",
+        "source_path": "parts/testing/adder_8bit.sv",
+        "json_path": "parts/testing/adder_8bit.json",
         "top_module": "adder_8bit",
-        "duration_ms": 27,
+        "duration_ms": 13,
         "passed": true,
         "report": {
-          "duration_ms": 7,
+          "duration_ms": 4,
           "passed": 10,
           "total": 10,
           "cases": [
@@ -1388,10 +1388,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\always_posedge_ff.sv",
-        "json_path": "parts/testing\\always_posedge_ff.json",
+        "source_path": "parts/testing/always_posedge_ff.sv",
+        "json_path": "parts/testing/always_posedge_ff.json",
         "top_module": "always_posedge_ff",
-        "duration_ms": 3,
+        "duration_ms": 1,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -1410,10 +1410,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\always_star_comb.sv",
-        "json_path": "parts/testing\\always_star_comb.json",
+        "source_path": "parts/testing/always_star_comb.sv",
+        "json_path": "parts/testing/always_star_comb.json",
         "top_module": "always_star_comb",
-        "duration_ms": 6,
+        "duration_ms": 3,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -1453,10 +1453,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\and_gate.sv",
-        "json_path": "parts/testing\\and_gate.json",
+        "source_path": "parts/testing/and_gate.sv",
+        "json_path": "parts/testing/and_gate.json",
         "top_module": "and_gate",
-        "duration_ms": 4,
+        "duration_ms": 5,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -1496,13 +1496,13 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\and_gate_8bit.sv",
-        "json_path": "parts/testing\\and_gate_8bit.json",
+        "source_path": "parts/testing/and_gate_8bit.sv",
+        "json_path": "parts/testing/and_gate_8bit.json",
         "top_module": "and_gate_8bit",
         "duration_ms": 14,
         "passed": true,
         "report": {
-          "duration_ms": 1,
+          "duration_ms": 0,
           "passed": 12,
           "total": 12,
           "cases": [
@@ -1595,13 +1595,13 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\full_adder.sv",
-        "json_path": "parts/testing\\full_adder.json",
+        "source_path": "parts/testing/full_adder.sv",
+        "json_path": "parts/testing/full_adder.json",
         "top_module": "full_adder",
-        "duration_ms": 12,
+        "duration_ms": 9,
         "passed": true,
         "report": {
-          "duration_ms": 1,
+          "duration_ms": 0,
           "passed": 8,
           "total": 8,
           "cases": [
@@ -1666,10 +1666,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\half_adder.sv",
-        "json_path": "parts/testing\\half_adder.json",
+        "source_path": "parts/testing/half_adder.sv",
+        "json_path": "parts/testing/half_adder.json",
         "top_module": "half_adder",
-        "duration_ms": 7,
+        "duration_ms": 4,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -1709,10 +1709,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\localparam_constants.sv",
-        "json_path": "parts/testing\\localparam_constants.json",
+        "source_path": "parts/testing/localparam_constants.sv",
+        "json_path": "parts/testing/localparam_constants.json",
         "top_module": "localparam_constants",
-        "duration_ms": 6,
+        "duration_ms": 4,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -1759,10 +1759,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\memory_cpu_stub.sv",
-        "json_path": "parts/testing\\memory_cpu_stub.json",
+        "source_path": "parts/testing/memory_cpu_stub.sv",
+        "json_path": "parts/testing/memory_cpu_stub.json",
         "top_module": "memory_cpu_stub",
-        "duration_ms": 14,
+        "duration_ms": 15,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -1781,10 +1781,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\multiply.sv",
-        "json_path": "parts/testing\\multiply.json",
+        "source_path": "parts/testing/multiply.sv",
+        "json_path": "parts/testing/multiply.json",
         "top_module": "multiply",
-        "duration_ms": 2,
+        "duration_ms": 1,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -1845,10 +1845,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\nand_gate.sv",
-        "json_path": "parts/testing\\nand_gate.json",
+        "source_path": "parts/testing/nand_gate.sv",
+        "json_path": "parts/testing/nand_gate.json",
         "top_module": "nand_gate",
-        "duration_ms": 2,
+        "duration_ms": 0,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -1888,10 +1888,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\nand_gate_8bit.sv",
-        "json_path": "parts/testing\\nand_gate_8bit.json",
+        "source_path": "parts/testing/nand_gate_8bit.sv",
+        "json_path": "parts/testing/nand_gate_8bit.json",
         "top_module": "nand_gate_8bit",
-        "duration_ms": 10,
+        "duration_ms": 5,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -1987,10 +1987,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\nor_gate.sv",
-        "json_path": "parts/testing\\nor_gate.json",
+        "source_path": "parts/testing/nor_gate.sv",
+        "json_path": "parts/testing/nor_gate.json",
         "top_module": "nor_gate",
-        "duration_ms": 5,
+        "duration_ms": 1,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -2030,10 +2030,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\nor_gate_8bit.sv",
-        "json_path": "parts/testing\\nor_gate_8bit.json",
+        "source_path": "parts/testing/nor_gate_8bit.sv",
+        "json_path": "parts/testing/nor_gate_8bit.json",
         "top_module": "nor_gate_8bit",
-        "duration_ms": 13,
+        "duration_ms": 7,
         "passed": true,
         "report": {
           "duration_ms": 1,
@@ -2129,10 +2129,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\not_gate.sv",
-        "json_path": "parts/testing\\not_gate.json",
+        "source_path": "parts/testing/not_gate.sv",
+        "json_path": "parts/testing/not_gate.json",
         "top_module": "not_gate",
-        "duration_ms": 5,
+        "duration_ms": 3,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -2158,10 +2158,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\not_gate_8bit.sv",
-        "json_path": "parts/testing\\not_gate_8bit.json",
+        "source_path": "parts/testing/not_gate_8bit.sv",
+        "json_path": "parts/testing/not_gate_8bit.json",
         "top_module": "not_gate_8bit",
-        "duration_ms": 10,
+        "duration_ms": 7,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -2229,10 +2229,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\or_gate.sv",
-        "json_path": "parts/testing\\or_gate.json",
+        "source_path": "parts/testing/or_gate.sv",
+        "json_path": "parts/testing/or_gate.json",
         "top_module": "or_gate",
-        "duration_ms": 5,
+        "duration_ms": 4,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -2272,10 +2272,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\or_gate_8bit.sv",
-        "json_path": "parts/testing\\or_gate_8bit.json",
+        "source_path": "parts/testing/or_gate_8bit.sv",
+        "json_path": "parts/testing/or_gate_8bit.json",
         "top_module": "or_gate_8bit",
-        "duration_ms": 15,
+        "duration_ms": 13,
         "passed": true,
         "report": {
           "duration_ms": 2,
@@ -2371,10 +2371,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\overture_cpu_8bit_math_sequence.sv",
-        "json_path": "parts/testing\\overture_cpu_8bit_math_sequence.json",
+        "source_path": "parts/testing/overture_cpu_8bit_math_sequence.sv",
+        "json_path": "parts/testing/overture_cpu_8bit_math_sequence.json",
         "top_module": "overture_cpu_8bit_math_sequence",
-        "duration_ms": 24,
+        "duration_ms": 19,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -2400,10 +2400,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\param_cross_ref.sv",
-        "json_path": "parts/testing\\param_cross_ref.json",
+        "source_path": "parts/testing/param_cross_ref.sv",
+        "json_path": "parts/testing/param_cross_ref.json",
         "top_module": "param_cross_ref",
-        "duration_ms": 2,
+        "duration_ms": 1,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -2436,10 +2436,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\param_expr_range.sv",
-        "json_path": "parts/testing\\param_expr_range.json",
+        "source_path": "parts/testing/param_expr_range.sv",
+        "json_path": "parts/testing/param_expr_range.json",
         "top_module": "param_expr_range",
-        "duration_ms": 2,
+        "duration_ms": 3,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -2479,10 +2479,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\parameter_defaults.sv",
-        "json_path": "parts/testing\\parameter_defaults.json",
+        "source_path": "parts/testing/parameter_defaults.sv",
+        "json_path": "parts/testing/parameter_defaults.json",
         "top_module": "parameter_defaults",
-        "duration_ms": 3,
+        "duration_ms": 2,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -2529,10 +2529,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\reduction_ops.sv",
-        "json_path": "parts/testing\\reduction_ops.json",
+        "source_path": "parts/testing/reduction_ops.sv",
+        "json_path": "parts/testing/reduction_ops.json",
         "top_module": "reduction_ops",
-        "duration_ms": 2,
+        "duration_ms": 1,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -2600,10 +2600,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\xnor_gate.sv",
-        "json_path": "parts/testing\\xnor_gate.json",
+        "source_path": "parts/testing/xnor_gate.sv",
+        "json_path": "parts/testing/xnor_gate.json",
         "top_module": "xnor_gate",
-        "duration_ms": 5,
+        "duration_ms": 4,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -2643,10 +2643,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\xnor_gate_8bit.sv",
-        "json_path": "parts/testing\\xnor_gate_8bit.json",
+        "source_path": "parts/testing/xnor_gate_8bit.sv",
+        "json_path": "parts/testing/xnor_gate_8bit.json",
         "top_module": "xnor_gate_8bit",
-        "duration_ms": 15,
+        "duration_ms": 12,
         "passed": true,
         "report": {
           "duration_ms": 2,
@@ -2742,10 +2742,10 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\xor_gate.sv",
-        "json_path": "parts/testing\\xor_gate.json",
+        "source_path": "parts/testing/xor_gate.sv",
+        "json_path": "parts/testing/xor_gate.json",
         "top_module": "xor_gate",
-        "duration_ms": 4,
+        "duration_ms": 2,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -2785,13 +2785,13 @@
         "error": null
       },
       {
-        "source_path": "parts/testing\\xor_gate_8bit.sv",
-        "json_path": "parts/testing\\xor_gate_8bit.json",
+        "source_path": "parts/testing/xor_gate_8bit.sv",
+        "json_path": "parts/testing/xor_gate_8bit.json",
         "top_module": "xor_gate_8bit",
-        "duration_ms": 12,
+        "duration_ms": 8,
         "passed": true,
         "report": {
-          "duration_ms": 1,
+          "duration_ms": 0,
           "passed": 12,
           "total": 12,
           "cases": [

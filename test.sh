@@ -6,5 +6,6 @@ echo "Testing..."
 ./target/release/svsim --json-test-dir parts/overture > report-parts-overture.json
 ./target/release/svsim --json-test-dir parts/picorv32 > report-parts-picorv32.json
 ./target/release/svsim --json-test-dir parts/rv32i > report-parts-rv32i.json
+./target/release/svsim --json-test-dir parts/sap1 > report-parts-sap1.json
 ./target/release/svsim --json-test-dir parts/testing > report-parts-testing.json
 echo "Done"
