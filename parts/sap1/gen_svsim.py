@@ -300,6 +300,16 @@ PROGRAMS = [
         "label": "Branch and flag regression",
         "description": "Exercises JNZ, JZ, JC, and JNC via decrement and underflow loops",
     },
+    {
+        "name": "memory_traffic",
+        "label": "Memory traffic regression",
+        "description": "Accumulates through RAM-backed sum/count cells and halts with out=6",
+    },
+    {
+        "name": "self_modify_fetch",
+        "label": "Self-modifying fetch regression",
+        "description": "Overwrites a future HLT with NOP, jumps into it, outputs 7, then halts",
+    },
 ]
 
 
