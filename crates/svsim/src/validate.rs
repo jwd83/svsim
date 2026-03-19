@@ -218,6 +218,25 @@ fn validate_instance(
     instance: &ModuleInstanceSummary,
     child: &ModuleSummary,
 ) -> Result<()> {
+    let mut overridden_params = HashSet::new();
+    for parameter in &instance.parameter_overrides {
+        if !overridden_params.insert(parameter.parameter_name.as_str()) {
+            return Err(Error::Resolve(format!(
+                "instance '{}' overrides parameter '{}' more than once",
+                instance.instance_name, parameter.parameter_name
+            )));
+        }
+
+        if child.parameter_decl(&parameter.parameter_name).is_none() {
+            return Err(Error::Resolve(format!(
+                "instance '{}' overrides unknown parameter '{}' on module '{}'",
+                instance.instance_name, parameter.parameter_name, child.name
+            )));
+        }
+
+        validate_expr(&parameter.expr, parent)?;
+    }
+
     let mut connected_ports = HashSet::new();
 
     for connection in &instance.connections {

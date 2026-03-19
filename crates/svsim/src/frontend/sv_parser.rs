@@ -7,9 +7,10 @@ use sv_parser::{
     ConstantPartSelectRange, ConstantRange, ConstantSelect, ContinuousAssign, DataDeclaration,
     DataType, DataTypeOrImplicit, Define, Defines, Expression, FunctionSubroutineCall,
     HierarchicalIdentifier, ImplicitDataType, InitialConstruct, Keyword, ListOfPortConnections,
-    LocalParameterDeclaration, Locate, ModuleDeclarationAnsi, ModuleDeclarationNonansi,
-    ModuleInstantiation, ModuleOrGenerateItem, ModuleOrGenerateItemDeclaration,
-    NamedPortConnection, NetDeclaration, NetLvalue, NonPortModuleItem,
+    ListOfParameterAssignments, LocalParameterDeclaration, Locate, ModuleDeclarationAnsi,
+    ModuleDeclarationNonansi, ModuleInstantiation, ModuleOrGenerateItem,
+    ModuleOrGenerateItemDeclaration, NamedPortConnection, NetDeclaration, NetLvalue,
+    NonPortModuleItem,
     PackageOrGenerateItemDeclaration, ParameterDeclaration, ParameterPortDeclaration,
     ParameterPortList, Paren, PartSelectRange, PortDirection, Primary,
     PsOrHierarchicalNetIdentifier, RefNode, Select, SeqBlock, Statement, StatementItem,
@@ -23,6 +24,7 @@ use crate::diag::{Diagnostic, Error, Result, SourceSpan};
 use crate::hir::{
     AssignmentKind, BinaryOp, CaseStmtItem, ContinuousAssign as HirContinuousAssign, Expr, LValue,
     MemoryDecl, ModuleDeclStyle, ModuleInstanceSummary, ModuleSummary,
+    NamedParameterAssign as HirNamedParameterAssign,
     NamedPortConnection as HirNamedPortConnection, NumericLiteral, PackedRange, ParameterDecl,
     PortDecl, PortDirection as HirPortDirection, ProcBlock, ProcBlockKind, SignalDecl, SourceFile,
     Stmt, UnaryOp,
@@ -1198,16 +1200,43 @@ fn lower_module_instantiation(
     module: &ModuleSummary,
     path: &Path,
 ) -> LowerResult<Vec<ModuleInstanceSummary>> {
-    if instantiation.nodes.1.is_some() {
-        return Err(unsupported(
-            "parameterized module instantiations are not supported yet",
-            None,
-        ));
-    }
-
     let (module_name, _) =
         identifier_name_from_node(syntax_tree, RefNode::from(&instantiation.nodes.0))
             .ok_or_else(|| unsupported("failed to determine instantiated module name", None))?;
+    let mut parameter_overrides = Vec::new();
+    if let Some(parameter_value_assignment) = &instantiation.nodes.1 {
+        let Some(assignments) = parameter_value_assignment.nodes.1.nodes.1.as_ref() else {
+            return Err(unsupported(
+                "empty parameter override lists are not supported yet",
+                None,
+            ));
+        };
+        let ListOfParameterAssignments::Named(assignments) = assignments else {
+            return Err(unsupported(
+                "ordered parameter overrides are not supported yet",
+                None,
+            ));
+        };
+
+        for assignment in assignments.nodes.0.contents() {
+            let (parameter_name, locate) =
+                identifier_name_from_node(syntax_tree, RefNode::from(&assignment.nodes.1))
+                    .ok_or_else(|| unsupported("failed to determine parameter name", None))?;
+            let expr = assignment
+                .nodes
+                .2
+                .nodes
+                .1
+                .as_ref()
+                .ok_or_else(|| unsupported("named parameter overrides must provide an expression", None))
+                .and_then(|expr| lower_param_expression(syntax_tree, expr, module, path))?;
+            parameter_overrides.push(HirNamedParameterAssign {
+                parameter_name,
+                expr,
+                span: Some(span_from_locate(path, locate)),
+            });
+        }
+    }
     let mut instances = Vec::new();
 
     for instance in instantiation.nodes.2.contents() {
@@ -1258,11 +1287,47 @@ fn lower_module_instantiation(
             module_name: module_name.clone(),
             instance_name,
             span: Some(span_from_locate(path, locate)),
+            parameter_overrides: parameter_overrides.clone(),
             connections: lowered_connections,
         });
     }
 
     Ok(instances)
+}
+
+fn lower_param_expression(
+    syntax_tree: &SyntaxTree,
+    expr: &sv_parser::ParamExpression,
+    module: &ModuleSummary,
+    path: &Path,
+) -> LowerResult<Expr> {
+    match expr {
+        sv_parser::ParamExpression::MintypmaxExpression(expr) => {
+            lower_mintypmax_expression_to_expr(syntax_tree, expr, module, path)
+        }
+        _ => Err(unsupported(
+            "parameter override expression is outside the supported subset",
+            None,
+        )),
+    }
+}
+
+fn lower_mintypmax_expression_to_expr(
+    syntax_tree: &SyntaxTree,
+    expr: &sv_parser::MintypmaxExpression,
+    module: &ModuleSummary,
+    path: &Path,
+) -> LowerResult<Expr> {
+    match expr {
+        sv_parser::MintypmaxExpression::Expression(expr) => {
+            lower_expression(syntax_tree, expr, module, path)
+        }
+        sv_parser::MintypmaxExpression::Ternary(expr) => Ok(Expr::Ternary {
+            cond: Box::new(lower_expression(syntax_tree, &expr.nodes.0, module, path)?),
+            when_true: Box::new(lower_expression(syntax_tree, &expr.nodes.2, module, path)?),
+            when_false: Box::new(lower_expression(syntax_tree, &expr.nodes.4, module, path)?),
+        }),
+    }
 }
 
 fn lower_always_construct(
@@ -3015,6 +3080,49 @@ mod tests {
             "half_adder"
         );
         assert_eq!(source.modules[0].instantiations[0].instance_name, "u_half1");
+        assert!(
+            source.modules[0].instantiations[0]
+                .parameter_overrides
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn parse_file_lowers_named_parameter_overrides() {
+        let repo = repo_root();
+        let frontend = SvParserFrontend::default();
+        let source = frontend
+            .parse_file(&repo.join("parts/picorv32/picorv32.v"))
+            .expect("parse picorv32");
+
+        let module = source
+            .modules
+            .iter()
+            .find(|module| module.name == "picorv32_wb")
+            .expect("picorv32_wb module");
+        let instance = module
+            .instantiations
+            .iter()
+            .find(|instance| instance.instance_name == "picorv32_core")
+            .expect("picorv32_core instance");
+
+        assert!(
+            module.unsupported.is_empty(),
+            "unexpected unsupported entries: {:?}",
+            module.unsupported
+        );
+        assert!(
+            instance
+                .parameter_overrides
+                .iter()
+                .any(|param| param.parameter_name == "ENABLE_COUNTERS")
+        );
+        assert!(
+            instance
+                .parameter_overrides
+                .iter()
+                .any(|param| param.parameter_name == "PROGADDR_RESET")
+        );
     }
 
     #[test]

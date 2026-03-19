@@ -24,6 +24,7 @@ pub struct SimulationSession {
 #[derive(Debug, Clone)]
 struct ModuleState {
     module_name: String,
+    parameter_values: HashMap<String, Value>,
     persisted: HashMap<String, Value>,
     memories: HashMap<String, MemoryState>,
     previous_clocks: HashMap<String, bool>,
@@ -90,7 +91,7 @@ impl SimulationSession {
             .top_module()
             .expect("compiled designs always carry a top module");
         let mut stack = Vec::new();
-        let state = instantiate_module_state(design.hir(), top_module, &mut stack)?;
+        let state = instantiate_module_state(design.hir(), top_module, None, &mut stack)?;
         Ok(Self { design, state })
     }
 
@@ -389,6 +390,7 @@ fn top_module<'a>(hir: &'a HirDesign, module_name: &str) -> Result<&'a ModuleSum
 fn instantiate_module_state(
     hir: &HirDesign,
     module_name: &str,
+    parameter_values: Option<HashMap<String, Value>>,
     stack: &mut Vec<String>,
 ) -> Result<ModuleState> {
     if stack.iter().any(|name| name == module_name) {
@@ -400,18 +402,41 @@ fn instantiate_module_state(
     }
 
     let module = resolve_supported_module(hir, module_name)?;
+    let parameter_values = if let Some(parameter_values) = parameter_values {
+        parameter_values
+    } else {
+        elaborate_module_parameters(module, None, None, None)?
+    };
     stack.push(module_name.to_owned());
 
     let mut children = Vec::with_capacity(module.instantiations.len());
     for instance in &module.instantiations {
+        let child = resolve_supported_module(hir, &instance.module_name).map_err(|_| {
+            Error::Resolve(format!(
+                "instance '{}' references missing module '{}'",
+                instance.instance_name, instance.module_name
+            ))
+        })?;
+        let child_parameter_values = elaborate_module_parameters(
+            child,
+            Some(module),
+            Some(&parameter_values),
+            Some(instance),
+        )?;
         children.push(ChildState {
-            state: Box::new(instantiate_module_state(hir, &instance.module_name, stack)?),
+            state: Box::new(instantiate_module_state(
+                hir,
+                &instance.module_name,
+                Some(child_parameter_values),
+                stack,
+            )?),
         });
     }
 
     stack.pop();
     Ok(ModuleState {
         module_name: module_name.to_owned(),
+        parameter_values,
         persisted: build_persisted_signal_table(module),
         memories: build_memory_table(module),
         previous_clocks: build_clock_state_table(module),
@@ -435,7 +460,7 @@ fn settle_module(
         )));
     }
 
-    let mut values = build_signal_table(module, inputs, &state.persisted)?;
+    let mut values = build_signal_table(module, inputs, &state.persisted, &state.parameter_values)?;
     if let Some(legacy_rom) = &state.legacy_rom {
         apply_legacy_rom_outputs(module, &mut values, legacy_rom)?;
         return Ok(values);
@@ -911,10 +936,54 @@ fn apply_legacy_rom_outputs(
     Ok(())
 }
 
+fn elaborate_module_parameters(
+    module: &ModuleSummary,
+    parent_module: Option<&ModuleSummary>,
+    parent_parameter_values: Option<&HashMap<String, Value>>,
+    instance: Option<&ModuleInstanceSummary>,
+) -> Result<HashMap<String, Value>> {
+    let empty_memories = HashMap::new();
+    let mut values = HashMap::new();
+
+    for param in &module.parameters {
+        let value = if let Some(override_expr) = instance.and_then(|instance| {
+            instance
+                .parameter_overrides
+                .iter()
+                .find(|override_expr| override_expr.parameter_name == param.name)
+        }) {
+            let parent_module = parent_module.ok_or_else(|| {
+                Error::Resolve(format!(
+                    "parameter override for '{}' on '{}' is missing parent module context",
+                    param.name, module.name
+                ))
+            })?;
+            let parent_values = parent_parameter_values.ok_or_else(|| {
+                Error::Resolve(format!(
+                    "parameter override for '{}' on '{}' is missing parent parameter values",
+                    param.name, module.name
+                ))
+            })?;
+            eval_expr(
+                &override_expr.expr,
+                parent_module,
+                parent_values,
+                &empty_memories,
+            )?
+        } else {
+            eval_expr(&param.default_value, module, &values, &empty_memories)?
+        };
+        values.insert(param.name.clone(), value.coerced_to(param.width()));
+    }
+
+    Ok(values)
+}
+
 fn build_signal_table(
     module: &ModuleSummary,
     inputs: &BTreeMap<String, BitValue>,
     persisted: &HashMap<String, Value>,
+    parameter_values: &HashMap<String, Value>,
 ) -> Result<HashMap<String, Value>> {
     let mut values = HashMap::new();
 
@@ -946,12 +1015,12 @@ fn build_signal_table(
         );
     }
 
-    // Evaluate parameter defaults in declaration order so later parameters can
-    // reference earlier ones.
-    let empty_memories = HashMap::new();
     for param in &module.parameters {
-        let value = eval_expr(&param.default_value, module, &values, &empty_memories)?;
-        let coerced = value.coerced_to(param.width());
+        let coerced = parameter_values
+            .get(&param.name)
+            .cloned()
+            .unwrap_or_else(|| Value::zero(param.width()))
+            .coerced_to(param.width());
         values.insert(param.name.clone(), coerced);
     }
 
@@ -1667,6 +1736,28 @@ mod tests {
         let mut high_inputs = inputs(pairs);
         high_inputs.insert("clk".into(), bv(1));
         sim.step(high_inputs).expect("step high")
+    }
+
+    fn persisted_u64(state: &super::ModuleState, name: &str) -> u64 {
+        state
+            .persisted
+            .get(name)
+            .unwrap_or_else(|| panic!("missing persisted signal '{name}'"))
+            .normalized_bits()
+            .to_u64_checked()
+            .expect("persisted value fits in u64")
+    }
+
+    fn memory_u64(state: &super::ModuleState, name: &str, index: usize) -> u64 {
+        state
+            .memories
+            .get(name)
+            .unwrap_or_else(|| panic!("missing memory '{name}'"))
+            .read(index, name)
+            .expect("read memory")
+            .normalized_bits()
+            .to_u64_checked()
+            .expect("memory value fits in u64")
     }
 
     macro_rules! assert_signal_eq {
@@ -2482,6 +2573,87 @@ endmodule
                 .expect("read child rom"),
             bv(0x05)
         );
+    }
+
+    #[test]
+    fn instantiate_top_supports_picorv32_parameterized_wrapper() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .compile_file(repo.join("parts/picorv32/picorv32.v"))
+            .expect("compile picorv32");
+
+        let _sim = design.instantiate_top().expect("instantiate picorv32_wb");
+    }
+
+    #[test]
+    fn eval_once_applies_named_parameter_overrides_from_parent_modules() {
+        let design = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module leaf #(parameter [7:0] VALUE = 8'h11)(",
+                    "output logic [7:0] out",
+                    "); ",
+                    "assign out = VALUE; ",
+                    "endmodule\n",
+                    "module top #(parameter [7:0] VALUE = 8'h2a)(",
+                    "output logic [7:0] out",
+                    "); ",
+                    "leaf #(.VALUE(VALUE)) u_leaf(.out(out)); ",
+                    "endmodule\n"
+                ),
+            )
+            .expect("compile virtual design");
+        let mut sim = design.instantiate_top().expect("instantiate");
+        let outputs = sim.eval_once(BTreeMap::new()).expect("eval");
+
+        assert_signal_eq!(outputs, "out", 0x2a);
+    }
+
+    #[test]
+    fn step_runs_picorv32_smoke_store_sequence() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .add_search_path(repo.join("parts/picorv32"))
+            .compile_file(repo.join("parts/picorv32/picorv32_smoke.sv"))
+            .expect("compile picorv32 smoke harness");
+        let mut sim = design.instantiate_top().expect("instantiate");
+        sim.load_memory_file(
+            &[],
+            "rom",
+            repo.join("parts/picorv32/picorv32_smoke_rom.txt"),
+        )
+        .expect("load smoke rom");
+
+        step_posedge(&mut sim, [("resetn".into(), 0)]);
+
+        for _ in 0..9 {
+            step_posedge(&mut sim, [("resetn".into(), 1)]);
+        }
+
+        let core = sim
+            .state
+            .children
+            .first()
+            .expect("child instance")
+            .state
+            .as_ref();
+        assert_eq!(memory_u64(core, "cpuregs", 1), 1);
+        assert_eq!(persisted_u64(core, "mem_do_wdata"), 1);
+        assert_eq!(persisted_u64(core, "reg_op1"), 8);
+        assert_eq!(persisted_u64(core, "reg_op2"), 1);
+
+        let outputs = step_posedge(&mut sim, [("resetn".into(), 1)]);
+        assert_signal_eq!(outputs, "trap", 0);
+        assert_signal_eq!(outputs, "mem_valid", 1);
+        assert_signal_eq!(outputs, "mem_instr", 0);
+        assert_signal_eq!(outputs, "mem_addr", 8);
+        assert_signal_eq!(outputs, "store_seen", 0);
+
+        let outputs = step_posedge(&mut sim, [("resetn".into(), 1)]);
+        assert_signal_eq!(outputs, "store_seen", 1);
+        assert_signal_eq!(outputs, "store_addr", 8);
+        assert_signal_eq!(outputs, "store_data", 1);
     }
 
     #[test]

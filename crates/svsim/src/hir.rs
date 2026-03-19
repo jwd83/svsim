@@ -260,10 +260,18 @@ pub struct NamedPortConnection {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct NamedParameterAssign {
+    pub parameter_name: String,
+    pub expr: Expr,
+    pub span: Option<SourceSpan>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ModuleInstanceSummary {
     pub module_name: String,
     pub instance_name: String,
     pub span: Option<SourceSpan>,
+    pub parameter_overrides: Vec<NamedParameterAssign>,
     pub connections: Vec<NamedPortConnection>,
 }
 

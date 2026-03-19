@@ -19,7 +19,7 @@
   },
   "test_cases": [
     {
-      "name": "stores 1 to address 8 without trapping",
+      "name": "stores 1 to address 8",
       "sequence": [
         {
           "inputs": {
@@ -97,8 +97,29 @@
             "clk": 1,
             "resetn": 1
           },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "resetn": 1
+          },
           "expected": {
             "trap": 0,
+            "mem_valid": 1,
+            "mem_instr": 0,
+            "mem_addr": 8,
+            "store_seen": 0,
+            "store_addr": 0,
+            "store_data": 0
+          }
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "resetn": 1
+          },
+          "expected": {
             "store_seen": 1,
             "store_addr": 8,
             "store_data": 1

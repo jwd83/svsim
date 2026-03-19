@@ -753,6 +753,40 @@ mod tests {
                 .iter()
                 .any(|diag| diag.message == "statement attributes are not supported yet")
         );
+
+        let picorv32_axi = design
+            .hir()
+            .module("picorv32_axi")
+            .expect("picorv32_axi module");
+        assert!(picorv32_axi.unsupported.is_empty());
+        assert_eq!(
+            picorv32_axi
+                .instantiations
+                .iter()
+                .map(|instance| instance.module_name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["picorv32_axi_adapter", "picorv32"]
+        );
+
+        let picorv32_wb = design
+            .hir()
+            .module("picorv32_wb")
+            .expect("picorv32_wb module");
+        assert!(picorv32_wb.unsupported.is_empty());
+        assert_eq!(
+            picorv32_wb
+                .instantiations
+                .iter()
+                .map(|instance| instance.module_name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["picorv32"]
+        );
+        assert!(
+            picorv32_wb.instantiations[0]
+                .parameter_overrides
+                .iter()
+                .any(|param| param.parameter_name == "PROGADDR_RESET")
+        );
     }
 
     #[test]

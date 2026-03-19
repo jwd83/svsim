@@ -18,7 +18,7 @@ pub use design::{CompiledDesign, DesignHierarchy, InstanceHierarchy};
 pub use diag::{Diagnostic, Error, Result, SourceSpan};
 pub use hir::{
     CaseStmtItem, HirDesign, MemoryDecl, ModuleDeclStyle, ModuleInstanceSummary, ModuleSummary,
-    ProcBlock, ProcBlockKind, SourceFile, Stmt,
+    NamedParameterAssign, ProcBlock, ProcBlockKind, SourceFile, Stmt,
 };
 pub use sim::SimulationSession;
 pub use test::{
