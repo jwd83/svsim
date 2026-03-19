@@ -27,6 +27,10 @@ use crate::hir::{
     NumericLiteral, PackedRange, ParameterDecl, PortDecl, PortDirection as HirPortDirection,
     ProcBlock, ProcBlockKind, SignalDecl, SourceFile, Stmt, UnaryOp,
 };
+use crate::width::{
+    arithmetic_shift_right_bits, mask, minimum_width, shift_left_bits, shift_right_bits,
+    sign_extend_bits,
+};
 
 type LowerResult<T> = std::result::Result<T, Diagnostic>;
 
@@ -579,13 +583,16 @@ fn lower_constant_primary_to_expr(
             })
         }
         sv_parser::ConstantPrimary::ConstantFunctionCall(call) => {
-            // sv-parser often parses bare identifier references (like parameter names)
-            // as ConstantFunctionCall with no arguments. Extract the identifier.
-            let (name, _) = identifier_name_from_node(syntax_tree, RefNode::from(call.as_ref()))
-                .ok_or_else(|| {
-                    unsupported("constant function calls are not supported yet", None)
-                })?;
-            Ok(Expr::Ident(name))
+            lower_function_subroutine_call(syntax_tree, &call.nodes.0, module, path).or_else(|_| {
+                // sv-parser often parses bare identifier references (like parameter names)
+                // as ConstantFunctionCall with no arguments. Extract the identifier.
+                let (name, _) =
+                    identifier_name_from_node(syntax_tree, RefNode::from(call.as_ref()))
+                        .ok_or_else(|| {
+                            unsupported("constant function calls are not supported yet", None)
+                        })?;
+                Ok(Expr::Ident(name))
+            })
         }
         _ => Err(unsupported(
             "constant primary expression is outside the supported subset",
@@ -737,9 +744,9 @@ fn lower_conditional_generate_construct(
                 module,
                 path,
             )
-            .and_then(|expr| const_eval_param_value(&expr, &module.parameters));
+            .and_then(|expr| const_eval_param_expr(&expr, &module.parameters));
             match cond {
-                Ok(value) if value != 0 => {
+                Ok(value) if value.truthy() => {
                     lower_generate_block(syntax_tree, &construct.nodes.2, path, module);
                 }
                 Ok(_) => {
@@ -1827,8 +1834,8 @@ fn lower_conditional_statement(
     }
 
     let cond = lower_cond_predicate(syntax_tree, &statement.nodes.2.nodes.1, module, path)?;
-    if let Ok(value) = const_eval_param_value(&cond, &module.parameters) {
-        return if value != 0 {
+    if let Ok(value) = const_eval_param_expr(&cond, &module.parameters) {
+        return if value.truthy() {
             lower_statement_or_null(syntax_tree, &statement.nodes.3, module, path)
         } else {
             lower_conditional_else_chain(
@@ -1876,8 +1883,8 @@ fn lower_conditional_else_chain(
     };
 
     let cond = lower_cond_predicate(syntax_tree, &predicate.nodes.1, module, path)?;
-    if let Ok(value) = const_eval_param_value(&cond, &module.parameters) {
-        return if value != 0 {
+    if let Ok(value) = const_eval_param_expr(&cond, &module.parameters) {
+        return if value.truthy() {
             lower_statement_or_null(syntax_tree, branch, module, path)
         } else {
             lower_conditional_else_chain(syntax_tree, &else_ifs[1..], final_else, module, path)
@@ -2020,8 +2027,8 @@ fn lower_expression(
                 });
             }
             if matches!(op_text.as_str(), "&&" | "||") {
-                if let Ok(value) = const_eval_param_value(&left, &module.parameters) {
-                    match (op_text.as_str(), value != 0) {
+                if let Ok(value) = const_eval_param_expr(&left, &module.parameters) {
+                    match (op_text.as_str(), value.truthy()) {
                         ("&&", false) => return Ok(bool_literal(false)),
                         ("||", true) => return Ok(bool_literal(true)),
                         _ => {}
@@ -2739,131 +2746,78 @@ fn lower_usize_constant_expression_with_params(
     path: &Path,
     params: &[ParameterDecl],
 ) -> LowerResult<usize> {
-    match expr {
-        ConstantExpression::ConstantPrimary(primary) => match &**primary {
-            sv_parser::ConstantPrimary::PrimaryLiteral(literal) => {
-                let expr = lower_literal(syntax_tree, literal)?;
-                let Expr::Literal(literal) = expr else {
-                    unreachable!();
-                };
-                literal
-                    .bits
-                    .to_usize_checked()
-                    .ok_or_else(|| unsupported("constant index exceeds host limits", None))
-            }
-            sv_parser::ConstantPrimary::MintypmaxExpression(expr) => {
-                lower_usize_constant_mintypmax_expression(
-                    syntax_tree,
-                    &expr.nodes.0.nodes.1,
-                    path,
-                    params,
-                )
-            }
-            sv_parser::ConstantPrimary::PsParameter(ps_param) => {
-                let (name, _) =
-                    identifier_name_from_node(syntax_tree, RefNode::from(&ps_param.nodes.0))
-                        .ok_or_else(|| unsupported("failed to read parameter name", None))?;
-                let param = params.iter().find(|p| p.name == name).ok_or_else(|| {
-                    unsupported(
-                        format!("parameter '{name}' not found for constant evaluation"),
-                        None,
-                    )
-                })?;
-                const_eval_param_value(&param.default_value, params)
-            }
-            // sv-parser parses bare identifiers in constant expressions as
-            // ConstantFunctionCall (a TfCall with no arguments). When the
-            // identifier matches a known parameter, treat it as a parameter
-            // reference.
-            sv_parser::ConstantPrimary::ConstantFunctionCall(call) => {
-                let (name, _) =
-                    identifier_name_from_node(syntax_tree, RefNode::from(&call.nodes.0))
-                        .ok_or_else(|| {
-                            unsupported("failed to read identifier in constant expression", None)
-                        })?;
-                let param = params.iter().find(|p| p.name == name).ok_or_else(|| {
-                    unsupported(
-                        format!(
-                            "identifier '{name}' is not a known parameter for constant evaluation"
-                        ),
-                        None,
-                    )
-                })?;
-                const_eval_param_value(&param.default_value, params)
-            }
-            _ => Err(unsupported(
-                "constant expression is outside the supported subset",
-                None,
-            )),
-        },
-        ConstantExpression::Binary(binary) => {
-            let left = lower_usize_constant_expression_with_params(
-                syntax_tree,
-                &binary.nodes.0,
-                path,
-                params,
-            )?;
-            let op_text = symbol_text(syntax_tree, &binary.nodes.1.nodes.0)?;
-            let right = lower_usize_constant_expression_with_params(
-                syntax_tree,
-                &binary.nodes.3,
-                path,
-                params,
-            )?;
-            match op_text.as_str() {
-                "+" => Ok(left.wrapping_add(right)),
-                "-" => Ok(left.wrapping_sub(right)),
-                "*" => Ok(left.wrapping_mul(right)),
-                "/" => {
-                    if right == 0 {
-                        Err(unsupported("division by zero in constant expression", None))
-                    } else {
-                        Ok(left / right)
-                    }
-                }
-                _ => Err(unsupported(
-                    format!("operator '{op_text}' is not supported in constant expressions"),
-                    None,
-                )),
-            }
+    let module = const_eval_module(params);
+    let lowered = lower_constant_expression_to_expr(syntax_tree, expr, &module, path)?;
+    const_eval_param_expr(&lowered, params)?
+        .to_usize_checked()
+        .ok_or_else(|| unsupported("constant index exceeds host limits", None))
+}
+
+#[derive(Debug, Clone)]
+struct ConstEvalValue {
+    bits: BitValue,
+    width: usize,
+    signed: bool,
+}
+
+impl ConstEvalValue {
+    fn new(bits: BitValue, width: usize) -> Self {
+        Self::new_with_signed(bits, width, false)
+    }
+
+    fn new_with_signed(bits: BitValue, width: usize, signed: bool) -> Self {
+        Self {
+            bits: bits.truncate(width),
+            width,
+            signed,
         }
-        ConstantExpression::Ternary(ternary) => {
-            let cond = lower_usize_constant_expression_with_params(
-                syntax_tree,
-                &ternary.nodes.0,
-                path,
-                params,
-            )?;
-            if cond != 0 {
-                lower_usize_constant_expression_with_params(
-                    syntax_tree,
-                    &ternary.nodes.3,
-                    path,
-                    params,
-                )
-            } else {
-                lower_usize_constant_expression_with_params(
-                    syntax_tree,
-                    &ternary.nodes.5,
-                    path,
-                    params,
-                )
-            }
+    }
+
+    fn normalized_bits(&self) -> BitValue {
+        self.bits.clone()
+    }
+
+    fn coerced_to(&self, width: usize) -> Self {
+        let width = width.max(1);
+        let bits = if self.signed {
+            sign_extend_bits(&self.normalized_bits(), self.width, width)
+        } else {
+            self.normalized_bits().truncate(width)
+        };
+        Self::new_with_signed(bits, width, self.signed)
+    }
+
+    fn truthy(&self) -> bool {
+        !self.bits.is_zero()
+    }
+
+    fn to_usize_checked(&self) -> Option<usize> {
+        let bits = self.normalized_bits();
+        if self.signed && self.width.max(1) > 0 && bits.get_bit(self.width.max(1) - 1) {
+            return None;
         }
-        ConstantExpression::Unary(_) => Err(unsupported(
-            "unary constant expressions in ranges are not supported yet",
-            None,
-        )),
+        bits.to_usize_checked()
     }
 }
 
-/// Evaluate an already-lowered HIR Expr to a usize, resolving parameter references.
-fn const_eval_param_value(expr: &Expr, params: &[ParameterDecl]) -> LowerResult<usize> {
+fn const_eval_module(params: &[ParameterDecl]) -> ModuleSummary {
+    ModuleSummary {
+        name: "<constant>".into(),
+        style: ModuleDeclStyle::Ansi,
+        span: None,
+        ports: Vec::new(),
+        parameters: params.to_vec(),
+        signals: Vec::new(),
+        memories: Vec::new(),
+        continuous_assignments: Vec::new(),
+        proc_blocks: Vec::new(),
+        instantiations: Vec::new(),
+        unsupported: Vec::new(),
+    }
+}
+
+fn const_eval_param_expr(expr: &Expr, params: &[ParameterDecl]) -> LowerResult<ConstEvalValue> {
     match expr {
-        Expr::Literal(literal) => literal
-            .bits
-            .to_usize_checked()
-            .ok_or_else(|| unsupported("constant value exceeds host limits", None)),
         Expr::Ident(name) => {
             let param = params.iter().find(|p| p.name == *name).ok_or_else(|| {
                 unsupported(
@@ -2871,77 +2825,301 @@ fn const_eval_param_value(expr: &Expr, params: &[ParameterDecl]) -> LowerResult<
                     None,
                 )
             })?;
-            const_eval_param_value(&param.default_value, params)
+            const_eval_param_expr(&param.default_value, params)
         }
-        Expr::Binary { left, op, right } => {
-            let l = const_eval_param_value(left, params)?;
-            let r = const_eval_param_value(right, params)?;
-            match op {
-                BinaryOp::Add => Ok(l.wrapping_add(r)),
-                BinaryOp::Sub => Ok(l.wrapping_sub(r)),
-                BinaryOp::Mul => Ok(l.wrapping_mul(r)),
-                BinaryOp::BitAnd => Ok(l & r),
-                BinaryOp::BitOr => Ok(l | r),
-                BinaryOp::BitXor => Ok(l ^ r),
-                BinaryOp::ShiftLeft => Ok(l << r),
-                BinaryOp::ShiftRight => Ok(l >> r),
-                BinaryOp::ArithmeticShiftRight => Ok(l >> r),
-                BinaryOp::Eq => Ok(usize::from(l == r)),
-                BinaryOp::NotEq => Ok(usize::from(l != r)),
-                BinaryOp::Lt => Ok(usize::from(l < r)),
-                BinaryOp::LtEq => Ok(usize::from(l <= r)),
-                BinaryOp::Gt => Ok(usize::from(l > r)),
-                BinaryOp::GtEq => Ok(usize::from(l >= r)),
-                BinaryOp::LogicalAnd => Ok(usize::from(l != 0 && r != 0)),
-                BinaryOp::LogicalOr => Ok(usize::from(l != 0 || r != 0)),
+        Expr::Literal(literal) => Ok(const_eval_value_from_literal(literal)),
+        Expr::Concat(exprs) => {
+            let mut parts = Vec::with_capacity(exprs.len());
+            for expr in exprs {
+                parts.push(const_eval_param_expr(expr, params)?);
             }
+            concat_const_eval_values(&parts)
+        }
+        Expr::Repeat { count, expr } => {
+            let value = const_eval_param_expr(expr, params)?;
+            let values = vec![value; *count];
+            concat_const_eval_values(&values)
+        }
+        Expr::BitSelect { expr, index } => {
+            let value = const_eval_param_expr(expr, params)?;
+            if *index >= value.width {
+                return Err(unsupported(
+                    "bit select is out of range in constant expression",
+                    None,
+                ));
+            }
+            Ok(ConstEvalValue::new(
+                BitValue::from(value.normalized_bits().get_bit(*index)),
+                1,
+            ))
+        }
+        Expr::PartSelect { expr, msb, lsb } => {
+            let value = const_eval_param_expr(expr, params)?;
+            let low = (*msb).min(*lsb);
+            let high = (*msb).max(*lsb);
+            if high >= value.width {
+                return Err(unsupported(
+                    "part select is out of range in constant expression",
+                    None,
+                ));
+            }
+            let width = high - low + 1;
+            Ok(ConstEvalValue::new(
+                value.normalized_bits().slice(low, width),
+                width,
+            ))
         }
         Expr::Ternary {
             cond,
             when_true,
             when_false,
         } => {
-            let c = const_eval_param_value(cond, params)?;
-            if c != 0 {
-                const_eval_param_value(when_true, params)
+            let cond = const_eval_param_expr(cond, params)?;
+            let when_true = const_eval_param_expr(when_true, params)?;
+            let when_false = const_eval_param_expr(when_false, params)?;
+            let result_width = when_true.width.max(when_false.width);
+            if cond.truthy() {
+                Ok(when_true.coerced_to(result_width))
             } else {
-                const_eval_param_value(when_false, params)
+                Ok(when_false.coerced_to(result_width))
             }
         }
         Expr::Unary { op, expr } => {
-            let v = const_eval_param_value(expr, params)?;
+            let value = const_eval_param_expr(expr, params)?;
             match op {
-                UnaryOp::LogicalNot => Ok(usize::from(v == 0)),
-                UnaryOp::BitNot => Ok(!v),
-                UnaryOp::Signed => Ok(v),
-                UnaryOp::Unsigned => Ok(v),
-                _ => Err(unsupported(
-                    "unsupported unary operator in constant parameter expression",
-                    None,
+                UnaryOp::BitNot => Ok(ConstEvalValue::new_with_signed(
+                    value.normalized_bits().bitnot_with_width(value.width),
+                    value.width,
+                    value.signed,
+                )),
+                UnaryOp::Negate => Ok(ConstEvalValue::new_with_signed(
+                    BitValue::zero().wrapping_sub(&value.normalized_bits(), value.width),
+                    value.width,
+                    value.signed,
+                )),
+                UnaryOp::LogicalNot => Ok(ConstEvalValue::new(
+                    BitValue::from(u64::from(!value.truthy())),
+                    1,
+                )),
+                UnaryOp::ReductionOr => Ok(ConstEvalValue::new(
+                    BitValue::from(u64::from(value.truthy())),
+                    1,
+                )),
+                UnaryOp::ReductionAnd => {
+                    let all_ones = mask(value.width);
+                    Ok(ConstEvalValue::new(
+                        BitValue::from(u64::from(
+                            value.normalized_bits().bitand(&all_ones) == all_ones,
+                        )),
+                        1,
+                    ))
+                }
+                UnaryOp::ReductionNand => {
+                    let all_ones = mask(value.width);
+                    Ok(ConstEvalValue::new(
+                        BitValue::from(u64::from(
+                            value.normalized_bits().bitand(&all_ones) != all_ones,
+                        )),
+                        1,
+                    ))
+                }
+                UnaryOp::ReductionXor => {
+                    let mut count = 0u32;
+                    let bits = value.normalized_bits();
+                    for index in 0..value.width {
+                        if !bits.slice(index, 1).is_zero() {
+                            count += 1;
+                        }
+                    }
+                    Ok(ConstEvalValue::new(
+                        BitValue::from(u64::from(count % 2 != 0)),
+                        1,
+                    ))
+                }
+                UnaryOp::Signed => Ok(ConstEvalValue::new_with_signed(
+                    value.normalized_bits(),
+                    value.width,
+                    true,
+                )),
+                UnaryOp::Unsigned => Ok(ConstEvalValue::new_with_signed(
+                    value.normalized_bits(),
+                    value.width,
+                    false,
                 )),
             }
         }
-        _ => Err(unsupported(
+        Expr::Binary { left, op, right } => {
+            let mut left = const_eval_param_expr(left, params)?;
+            let mut right = const_eval_param_expr(right, params)?;
+            let common_width = left.width.max(right.width);
+            left = left.coerced_to(common_width);
+            right = right.coerced_to(common_width);
+            let (bits, width, signed) = match op {
+                BinaryOp::BitAnd => (
+                    left.normalized_bits().bitand(&right.normalized_bits()),
+                    common_width,
+                    left.signed && right.signed,
+                ),
+                BinaryOp::BitOr => (
+                    left.normalized_bits().bitor(&right.normalized_bits()),
+                    common_width,
+                    left.signed && right.signed,
+                ),
+                BinaryOp::BitXor => (
+                    left.normalized_bits().bitxor(&right.normalized_bits()),
+                    common_width,
+                    left.signed && right.signed,
+                ),
+                BinaryOp::ShiftLeft => (
+                    shift_left_bits(
+                        &left.normalized_bits(),
+                        &right.normalized_bits(),
+                        left.width,
+                    ),
+                    left.width,
+                    left.signed,
+                ),
+                BinaryOp::ShiftRight => (
+                    shift_right_bits(
+                        &left.normalized_bits(),
+                        &right.normalized_bits(),
+                        left.width,
+                    ),
+                    left.width,
+                    left.signed,
+                ),
+                BinaryOp::ArithmeticShiftRight => (
+                    arithmetic_shift_right_bits(
+                        &left.normalized_bits(),
+                        &right.normalized_bits(),
+                        left.width,
+                    ),
+                    left.width,
+                    left.signed,
+                ),
+                BinaryOp::LogicalAnd => (BitValue::from(left.truthy() && right.truthy()), 1, false),
+                BinaryOp::LogicalOr => (BitValue::from(left.truthy() || right.truthy()), 1, false),
+                BinaryOp::Eq => (
+                    BitValue::from(left.normalized_bits() == right.normalized_bits()),
+                    1,
+                    false,
+                ),
+                BinaryOp::NotEq => (
+                    BitValue::from(left.normalized_bits() != right.normalized_bits()),
+                    1,
+                    false,
+                ),
+                BinaryOp::Lt => (
+                    BitValue::from(compare_const_eval_values(&left, &right).is_lt()),
+                    1,
+                    false,
+                ),
+                BinaryOp::LtEq => (
+                    BitValue::from(!compare_const_eval_values(&left, &right).is_gt()),
+                    1,
+                    false,
+                ),
+                BinaryOp::Gt => (
+                    BitValue::from(compare_const_eval_values(&left, &right).is_gt()),
+                    1,
+                    false,
+                ),
+                BinaryOp::GtEq => (
+                    BitValue::from(!compare_const_eval_values(&left, &right).is_lt()),
+                    1,
+                    false,
+                ),
+                BinaryOp::Add => (
+                    left.normalized_bits()
+                        .wrapping_add(&right.normalized_bits(), common_width),
+                    common_width,
+                    left.signed && right.signed,
+                ),
+                BinaryOp::Sub => (
+                    left.normalized_bits()
+                        .wrapping_sub(&right.normalized_bits(), common_width),
+                    common_width,
+                    left.signed && right.signed,
+                ),
+                BinaryOp::Mul => (
+                    left.normalized_bits()
+                        .wrapping_mul(&right.normalized_bits(), common_width),
+                    common_width,
+                    left.signed && right.signed,
+                ),
+            };
+            Ok(ConstEvalValue::new_with_signed(bits, width, signed))
+        }
+        Expr::MemoryRead { .. } => Err(unsupported(
             "expression is too complex for constant parameter evaluation",
             None,
         )),
     }
 }
 
-fn lower_usize_constant_mintypmax_expression(
-    syntax_tree: &SyntaxTree,
-    expr: &sv_parser::ConstantMintypmaxExpression,
-    path: &Path,
-    params: &[ParameterDecl],
-) -> LowerResult<usize> {
-    match expr {
-        sv_parser::ConstantMintypmaxExpression::Unary(expr) => {
-            lower_usize_constant_expression_with_params(syntax_tree, expr, path, params)
-        }
-        sv_parser::ConstantMintypmaxExpression::Ternary(_) => Err(unsupported(
-            "ternary constant ranges are not supported yet",
+/// Evaluate an already-lowered HIR Expr to a usize, resolving parameter references.
+fn const_eval_param_value(expr: &Expr, params: &[ParameterDecl]) -> LowerResult<usize> {
+    const_eval_param_expr(expr, params)?
+        .to_usize_checked()
+        .ok_or_else(|| unsupported("constant value exceeds host limits", None))
+}
+
+fn const_eval_value_from_literal(literal: &NumericLiteral) -> ConstEvalValue {
+    let width = literal
+        .width
+        .unwrap_or_else(|| minimum_width(&literal.bits));
+    ConstEvalValue::new(literal.bits.clone(), width)
+}
+
+fn concat_const_eval_values(parts: &[ConstEvalValue]) -> LowerResult<ConstEvalValue> {
+    let mut total_width = 0usize;
+    for part in parts {
+        total_width = total_width
+            .checked_add(part.width)
+            .ok_or_else(|| unsupported("constant value exceeds host limits", None))?;
+    }
+    if total_width == 0 {
+        return Err(unsupported(
+            "expression is too complex for constant parameter evaluation",
             None,
-        )),
+        ));
+    }
+
+    let mut bits = BitValue::zero();
+    let mut shift = total_width;
+    for part in parts {
+        shift -= part.width;
+        bits = bits.bitor(&part.normalized_bits().shift_left(shift));
+    }
+
+    Ok(ConstEvalValue::new(bits, total_width))
+}
+
+fn compare_const_eval_values(left: &ConstEvalValue, right: &ConstEvalValue) -> std::cmp::Ordering {
+    if left.signed && right.signed {
+        compare_signed_const_eval_bits(
+            &left.normalized_bits(),
+            &right.normalized_bits(),
+            left.width,
+        )
+    } else {
+        left.normalized_bits()
+            .cmp_unsigned(&right.normalized_bits())
+    }
+}
+
+fn compare_signed_const_eval_bits(
+    left: &BitValue,
+    right: &BitValue,
+    width: usize,
+) -> std::cmp::Ordering {
+    let width = width.max(1);
+    let left = left.truncate(width);
+    let right = right.truncate(width);
+    match left.get_bit(width - 1).cmp(&right.get_bit(width - 1)) {
+        std::cmp::Ordering::Less => std::cmp::Ordering::Greater,
+        std::cmp::Ordering::Greater => std::cmp::Ordering::Less,
+        std::cmp::Ordering::Equal => left.cmp_unsigned(&right),
     }
 }
 
@@ -3070,7 +3248,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::SvParserFrontend;
-    use crate::hir::{AssignmentKind, Expr, LValue, ProcBlockKind, Stmt};
+    use crate::hir::{AssignmentKind, Expr, LValue, NumericLiteral, ProcBlockKind, Stmt};
 
     fn repo_root() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -3375,6 +3553,68 @@ endmodule
         assert_eq!(module.instantiations[0].module_name, "leaf_b");
         assert_eq!(module.instantiations[0].instance_name, "u_leaf");
         assert!(module.continuous_assignments.is_empty());
+    }
+
+    #[test]
+    fn parse_str_prunes_generate_for_negated_localparam_condition() {
+        let frontend = SvParserFrontend::default();
+        let source = frontend
+            .parse_str(
+                PathBuf::from("/virtual/design/negated_generate.sv"),
+                r#"
+module top(output logic y);
+    localparam NEG = -1;
+    generate if (NEG) begin : gen_true
+        assign y = 1'b1;
+    end else begin : gen_false
+        assign y = 1'b0;
+    end endgenerate
+endmodule
+"#,
+            )
+            .expect("parse negated generate");
+
+        let module = &source.modules[0];
+        assert!(module.unsupported.is_empty());
+        assert_eq!(module.continuous_assignments.len(), 1);
+        match &module.continuous_assignments[0].expr {
+            Expr::Literal(NumericLiteral { bits, .. }) => {
+                assert_eq!(bits.to_u64_checked(), Some(1));
+            }
+            other => panic!("unexpected generated assignment: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_str_lowers_signedness_casts_in_constant_parameter_expressions() {
+        let frontend = SvParserFrontend::default();
+        let source = frontend
+            .parse_str(
+                PathBuf::from("/virtual/design/constant_signedness.sv"),
+                r#"
+module top(output logic y);
+    localparam SIGNED_LT = $signed(8'hff) < $signed(1'b0);
+    localparam UNSIGNED_EQ = $unsigned($signed(8'hff)) == 8'hff;
+    generate if (SIGNED_LT && UNSIGNED_EQ) begin : gen_true
+        assign y = 1'b1;
+    end else begin : gen_false
+        assign y = 1'b0;
+    end endgenerate
+endmodule
+"#,
+            )
+            .expect("parse constant signedness generate");
+
+        let module = &source.modules[0];
+        assert!(module.unsupported.is_empty());
+        assert_eq!(module.parameters.len(), 2);
+        assert_eq!(module.continuous_assignments.len(), 1);
+        match &module.continuous_assignments[0].expr {
+            Expr::Literal(NumericLiteral { bits, .. }) => {
+                assert_eq!(bits.to_u64_checked(), Some(1));
+            }
+            other => panic!("unexpected generated assignment: {other:?}"),
+        }
     }
 
     #[test]
