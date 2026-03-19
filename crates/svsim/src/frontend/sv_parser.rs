@@ -1922,6 +1922,27 @@ fn lower_expression(
         Expression::Binary(expr) => {
             let op_text = symbol_text(syntax_tree, &expr.nodes.1.nodes.0)?;
             let left = lower_expression(syntax_tree, &expr.nodes.0, module, path)?;
+            if let Expression::ConditionalExpression(rhs) = &expr.nodes.3 {
+                return Ok(Expr::Ternary {
+                    cond: Box::new(Expr::Binary {
+                        left: Box::new(left),
+                        op: lower_binary_operator(syntax_tree, &expr.nodes.1)?,
+                        right: Box::new(lower_cond_predicate(
+                            syntax_tree,
+                            &rhs.nodes.0,
+                            module,
+                            path,
+                        )?),
+                    }),
+                    when_true: Box::new(lower_expression(syntax_tree, &rhs.nodes.3, module, path)?),
+                    when_false: Box::new(lower_expression(
+                        syntax_tree,
+                        &rhs.nodes.5,
+                        module,
+                        path,
+                    )?),
+                });
+            }
             if matches!(op_text.as_str(), "&&" | "||") {
                 if let Ok(value) = const_eval_param_value(&left, &module.parameters) {
                     match (op_text.as_str(), value != 0) {
@@ -1940,13 +1961,6 @@ fn lower_expression(
         }
         Expression::ConditionalExpression(expr) => {
             let cond = lower_cond_predicate(syntax_tree, &expr.nodes.0, module, path)?;
-            if let Ok(value) = const_eval_param_value(&cond, &module.parameters) {
-                if value != 0 {
-                    return lower_expression(syntax_tree, &expr.nodes.3, module, path);
-                }
-                return lower_expression(syntax_tree, &expr.nodes.5, module, path);
-            }
-
             Ok(Expr::Ternary {
                 cond: Box::new(cond),
                 when_true: Box::new(lower_expression(syntax_tree, &expr.nodes.3, module, path)?),

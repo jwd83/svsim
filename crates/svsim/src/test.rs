@@ -75,6 +75,20 @@ pub struct JsonTestCaseReport {
     pub steps: usize,
     pub passed: bool,
     pub failures: Vec<JsonTestFailure>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trace: Option<JsonTestTrace>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct JsonTestTrace {
+    pub signals: Vec<String>,
+    pub steps: Vec<JsonTestTraceStep>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct JsonTestTraceStep {
+    pub step: usize,
+    pub values: BTreeMap<String, BitValue>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -106,7 +120,13 @@ struct CombinationalTestCase {
 struct SequentialTestSuite {
     base_dir: PathBuf,
     memory_bindings: Vec<MemoryBinding>,
+    trace: Option<SequentialTraceConfig>,
     cases: Vec<SequentialTestCase>,
+}
+
+#[derive(Debug, Clone)]
+struct SequentialTraceConfig {
+    signals: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -195,6 +215,7 @@ impl JsonTestSuite {
                 steps: 1,
                 passed: failures.is_empty(),
                 failures,
+                trace: None,
             });
         }
 
@@ -218,9 +239,16 @@ impl JsonTestSuite {
         let mut results = Vec::with_capacity(suite.cases.len());
         for case in &suite.cases {
             let mut failures = Vec::new();
+            let mut trace_steps = Vec::new();
 
             for (step_index, step) in case.steps.iter().enumerate() {
                 let actual = run_sequential_step(&mut sim, &step.inputs)?;
+                if let Some(trace) = &suite.trace {
+                    trace_steps.push(JsonTestTraceStep {
+                        step: step_index + 1,
+                        values: collect_trace_values(&actual, &trace.signals, sim.top_module())?,
+                    });
+                }
                 failures.extend(compare_outputs(
                     &actual,
                     &step.expected,
@@ -234,6 +262,10 @@ impl JsonTestSuite {
                 steps: case.steps.len(),
                 passed: failures.is_empty(),
                 failures,
+                trace: suite.trace.as_ref().map(|trace| JsonTestTrace {
+                    signals: trace.signals.clone(),
+                    steps: trace_steps,
+                }),
             });
         }
 
@@ -307,6 +339,7 @@ impl SequentialTestSuite {
         Self {
             base_dir: base_dir.to_path_buf(),
             memory_bindings,
+            trace: raw.trace.and_then(SequentialTraceConfig::from_raw),
             cases,
         }
     }
@@ -494,6 +527,24 @@ fn compare_outputs(
     failures
 }
 
+fn collect_trace_values(
+    actual: &BTreeMap<String, BitValue>,
+    signals: &[String],
+    top_module: &str,
+) -> Result<BTreeMap<String, BitValue>> {
+    let mut values = BTreeMap::new();
+    for signal in signals {
+        let value = actual.get(signal).cloned().ok_or_else(|| {
+            Error::Resolve(format!(
+                "trace signal '{}' is not a top-level output of '{}'",
+                signal, top_module
+            ))
+        })?;
+        values.insert(signal.clone(), value);
+    }
+    Ok(values)
+}
+
 fn build_report(cases: Vec<JsonTestCaseReport>, duration: std::time::Duration) -> JsonTestReport {
     let passed = cases.iter().filter(|case| case.passed).count();
     let total = cases.len();
@@ -563,6 +614,8 @@ struct RawSequentialTestSuite {
     #[serde(default)]
     test_cases: Vec<RawSequentialTestCase>,
     #[serde(default)]
+    trace: Option<RawTraceConfig>,
+    #[serde(default)]
     memory_files: Option<RawMemoryFileGroups>,
     #[serde(default)]
     memory_init: Option<Vec<RawMemoryEntry>>,
@@ -600,6 +653,29 @@ struct RawTestStep {
     inputs: BTreeMap<String, BitValue>,
     #[serde(default)]
     expected: BTreeMap<String, BitValue>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct RawTraceConfig {
+    #[serde(default)]
+    signals: Vec<String>,
+}
+
+impl SequentialTraceConfig {
+    fn from_raw(raw: RawTraceConfig) -> Option<Self> {
+        let mut signals = Vec::new();
+        for signal in raw.signals {
+            if !signal.is_empty() && !signals.iter().any(|existing| existing == &signal) {
+                signals.push(signal);
+            }
+        }
+
+        if signals.is_empty() {
+            None
+        } else {
+            Some(Self { signals })
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -739,8 +815,57 @@ mod tests {
             .run_json_file(repo.join("parts/picorv32/picorv32_smoke.json"))
             .expect("run picorv32 smoke json");
 
-        assert!(report.all_passed());
+        assert!(
+            report.all_passed(),
+            "picorv32 smoke report:\n{}",
+            serde_json::to_string_pretty(&report).expect("serialize report")
+        );
         assert_eq!(report.passed, report.total);
+    }
+
+    #[test]
+    fn run_json_file_includes_sequential_trace_rows() {
+        let temp_dir = unique_temp_dir("json-test-trace");
+        let design = Compiler::new()
+            .compile_str(
+                temp_dir.join("top.sv"),
+                concat!(
+                    "module top(input logic clk, input logic reset, output logic q);",
+                    "always_ff @(posedge clk) begin ",
+                    "if (reset) q <= 1'b0; else q <= ~q; ",
+                    "end ",
+                    "endmodule\n"
+                ),
+            )
+            .expect("compile top");
+        let json_path = temp_dir.join("top.json");
+        fs::write(
+            &json_path,
+            concat!(
+                "{",
+                "\"trace\":{\"signals\":[\"q\"]},",
+                "\"test_cases\":[{",
+                "\"name\":\"captures q trace\",",
+                "\"sequence\":[",
+                "{\"inputs\":{\"clk\":1,\"reset\":1},\"expected\":{\"q\":0}},",
+                "{\"inputs\":{\"clk\":1,\"reset\":0},\"expected\":{\"q\":1}},",
+                "{\"inputs\":{\"clk\":1,\"reset\":0},\"expected\":{\"q\":0}}",
+                "]",
+                "}]}",
+            ),
+        )
+        .expect("write json");
+
+        let report = design.run_json_file(&json_path).expect("run json tests");
+
+        assert!(report.all_passed());
+        let trace = report.cases[0].trace.as_ref().expect("trace");
+        assert_eq!(trace.signals, vec!["q"]);
+        assert_eq!(trace.steps.len(), 3);
+        assert_eq!(trace.steps[0].step, 1);
+        assert_eq!(trace.steps[0].values["q"], BitValue::from(0_u64));
+        assert_eq!(trace.steps[1].values["q"], BitValue::from(1_u64));
+        assert_eq!(trace.steps[2].values["q"], BitValue::from(0_u64));
     }
 
     #[test]

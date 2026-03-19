@@ -546,14 +546,18 @@ fn step_module(
                 if !previous_clock_value && current_clock_value {
                     let mut exec_values = pre_values.clone();
                     let mut exec_memories = state.memories.clone();
+                    let mut block_staged = staged.clone();
+                    let mut block_staged_memories = staged_memories.clone();
                     execute_sequential_stmt(
                         &block.body,
                         module,
                         &mut exec_values,
                         &mut exec_memories,
-                        &mut staged,
-                        &mut staged_memories,
+                        &mut block_staged,
+                        &mut block_staged_memories,
                     )?;
+                    staged = block_staged;
+                    staged_memories = block_staged_memories;
                 }
                 sampled_clocks.insert(clock.clone(), current_clock_value);
             }
@@ -685,7 +689,8 @@ fn execute_sequential_stmt(
             AssignmentKind::Blocking => {
                 let value = eval_expr(expr, module, current_values, memories)?;
                 let target = resolve_lvalue(target, module, current_values, memories)?;
-                apply_resolved_lvalue(&target, value, module, current_values, memories)?;
+                apply_resolved_lvalue(&target, value.clone(), module, current_values, memories)?;
+                apply_resolved_lvalue(&target, value, module, staged_values, staged_memories)?;
                 Ok(())
             }
         },
@@ -1785,6 +1790,56 @@ mod tests {
     }
 
     #[test]
+    fn eval_once_keeps_nested_ternary_false_branches_after_param_folding() {
+        let design = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module top(",
+                    "input logic [31:0] in, ",
+                    "output logic [31:0] out",
+                    "); ",
+                    "localparam logic A = 1'b0; ",
+                    "localparam logic B = 1'b0; ",
+                    "assign out = A ? 32'h11111111 : B ? 32'h22222222 : in; ",
+                    "endmodule\n"
+                ),
+            )
+            .expect("compile virtual design");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let outputs = sim
+            .eval_once(inputs([("in".into(), 0x0010_0093)]))
+            .expect("eval nested ternary");
+        assert_signal_eq!(outputs, "out", 0x0010_0093);
+    }
+
+    #[test]
+    fn eval_once_gives_conditional_lower_precedence_than_logical_and() {
+        let design = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module top(",
+                    "input logic gate, ",
+                    "input logic [31:0] in, ",
+                    "output logic [31:0] out",
+                    "); ",
+                    "localparam logic A = 1'b0; ",
+                    "assign out = A && gate ? 32'h11111111 : in; ",
+                    "endmodule\n"
+                ),
+            )
+            .expect("compile virtual design");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let outputs = sim
+            .eval_once(inputs([("gate".into(), 1), ("in".into(), 0x0010_0093)]))
+            .expect("eval conditional precedence");
+        assert_signal_eq!(outputs, "out", 0x0010_0093);
+    }
+
+    #[test]
     fn eval_once_coerces_assignment_and_instance_port_widths() {
         let design = Compiler::new()
             .compile_str(
@@ -2132,6 +2187,36 @@ endmodule
 
         let outputs = step_posedge(&mut sim, [("reset".into(), 0), ("enable".into(), 0)]);
         assert_signal_eq!(outputs, "count", 1);
+    }
+
+    #[test]
+    fn step_persists_blocking_assignments_in_clocked_blocks() {
+        let design = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module top(",
+                    "input logic clk, ",
+                    "input logic reset, ",
+                    "output logic [3:0] q",
+                    "); ",
+                    "always @(posedge clk) begin ",
+                    "if (reset) q = 4'd0; else q = q + 4'd1; ",
+                    "end ",
+                    "endmodule\n"
+                ),
+            )
+            .expect("compile virtual design");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let outputs = step_posedge(&mut sim, [("reset".into(), 1)]);
+        assert_signal_eq!(outputs, "q", 0);
+
+        let outputs = step_posedge(&mut sim, [("reset".into(), 0)]);
+        assert_signal_eq!(outputs, "q", 1);
+
+        let outputs = step_posedge(&mut sim, [("reset".into(), 0)]);
+        assert_signal_eq!(outputs, "q", 2);
     }
 
     #[test]

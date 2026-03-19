@@ -6,9 +6,20 @@
       "file": "picorv32_smoke_rom.txt"
     }
   ],
+  "trace": {
+    "signals": [
+      "trap",
+      "mem_valid",
+      "mem_instr",
+      "mem_addr",
+      "store_seen",
+      "store_addr",
+      "store_data"
+    ]
+  },
   "test_cases": [
     {
-      "name": "begins fetching from reset vector",
+      "name": "stores 1 to address 8 without trapping",
       "sequence": [
         {
           "inputs": {
@@ -37,6 +48,60 @@
             "store_seen": 0,
             "store_addr": 0,
             "store_data": 0
+          }
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "resetn": 1
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "resetn": 1
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "resetn": 1
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "resetn": 1
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "resetn": 1
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "resetn": 1
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "resetn": 1
+          },
+          "expected": {
+            "trap": 0,
+            "store_seen": 1,
+            "store_addr": 8,
+            "store_data": 1
           }
         }
       ]
