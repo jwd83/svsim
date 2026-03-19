@@ -26,6 +26,7 @@ struct ModuleState {
     module_name: String,
     persisted: HashMap<String, Value>,
     memories: HashMap<String, MemoryState>,
+    previous_clocks: HashMap<String, bool>,
     legacy_rom: Option<LegacyRomState>,
     children: Vec<ChildState>,
 }
@@ -413,6 +414,7 @@ fn instantiate_module_state(
         module_name: module_name.to_owned(),
         persisted: build_persisted_signal_table(module),
         memories: build_memory_table(module),
+        previous_clocks: build_clock_state_table(module),
         legacy_rom: build_legacy_rom_state(hir, module)?,
         children,
     })
@@ -527,6 +529,7 @@ fn step_module(
 
     let mut staged = state.persisted.clone();
     let mut staged_memories = state.memories.clone();
+    let mut sampled_clocks = state.previous_clocks.clone();
     for block in &module.proc_blocks {
         match &block.kind {
             ProcBlockKind::AlwaysComb => {}
@@ -537,7 +540,10 @@ fn step_module(
                         clock, module.name
                     ))
                 })?;
-                if clock_value.truthy() {
+                let previous_clock_value =
+                    state.previous_clocks.get(clock).copied().unwrap_or(false);
+                let current_clock_value = clock_value.truthy();
+                if !previous_clock_value && current_clock_value {
                     let mut exec_values = pre_values.clone();
                     let mut exec_memories = state.memories.clone();
                     execute_sequential_stmt(
@@ -549,12 +555,14 @@ fn step_module(
                         &mut staged_memories,
                     )?;
                 }
+                sampled_clocks.insert(clock.clone(), current_clock_value);
             }
         }
     }
 
     state.persisted = staged;
     state.memories = staged_memories;
+    state.previous_clocks = sampled_clocks;
     Ok(())
 }
 
@@ -779,6 +787,18 @@ fn build_memory_table(module: &ModuleSummary) -> HashMap<String, MemoryState> {
     }
 
     memories
+}
+
+fn build_clock_state_table(module: &ModuleSummary) -> HashMap<String, bool> {
+    let mut clocks = HashMap::new();
+
+    for block in &module.proc_blocks {
+        if let ProcBlockKind::AlwaysFf { clock } = &block.kind {
+            clocks.entry(clock.clone()).or_insert(false);
+        }
+    }
+
+    clocks
 }
 
 fn build_legacy_rom_state(
@@ -1613,6 +1633,7 @@ mod tests {
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    use super::SimulationSession;
     use crate::{BitValue, Compiler};
 
     fn bv(value: u64) -> BitValue {
@@ -1628,6 +1649,19 @@ mod tests {
 
     fn words<const N: usize>(values: [u64; N]) -> Vec<BitValue> {
         values.into_iter().map(bv).collect()
+    }
+
+    fn step_posedge<const N: usize>(
+        sim: &mut SimulationSession,
+        pairs: [(String, u64); N],
+    ) -> BTreeMap<String, BitValue> {
+        let mut low_inputs = inputs(pairs.clone());
+        low_inputs.insert("clk".into(), bv(0));
+        sim.step(low_inputs).expect("step low");
+
+        let mut high_inputs = inputs(pairs);
+        high_inputs.insert("clk".into(), bv(1));
+        sim.step(high_inputs).expect("step high")
     }
 
     macro_rules! assert_signal_eq {
@@ -2075,22 +2109,10 @@ endmodule
             .expect("compile register_8bit");
         let mut sim = design.instantiate_top().expect("instantiate");
 
-        let outputs = sim
-            .step(inputs([
-                ("clk".into(), 1),
-                ("enable".into(), 1),
-                ("data".into(), 0x5a),
-            ]))
-            .expect("step");
+        let outputs = step_posedge(&mut sim, [("enable".into(), 1), ("data".into(), 0x5a)]);
         assert_signal_eq!(outputs, "q", 0x5a);
 
-        let outputs = sim
-            .step(inputs([
-                ("clk".into(), 1),
-                ("enable".into(), 0),
-                ("data".into(), 0xff),
-            ]))
-            .expect("hold");
+        let outputs = step_posedge(&mut sim, [("enable".into(), 0), ("data".into(), 0xff)]);
         assert_signal_eq!(outputs, "q", 0x5a);
     }
 
@@ -2102,31 +2124,13 @@ endmodule
             .expect("compile counter8");
         let mut sim = design.instantiate_top().expect("instantiate");
 
-        let outputs = sim
-            .step(inputs([
-                ("clk".into(), 1),
-                ("reset".into(), 1),
-                ("enable".into(), 0),
-            ]))
-            .expect("reset");
+        let outputs = step_posedge(&mut sim, [("reset".into(), 1), ("enable".into(), 0)]);
         assert_signal_eq!(outputs, "count", 0);
 
-        let outputs = sim
-            .step(inputs([
-                ("clk".into(), 1),
-                ("reset".into(), 0),
-                ("enable".into(), 1),
-            ]))
-            .expect("increment");
+        let outputs = step_posedge(&mut sim, [("reset".into(), 0), ("enable".into(), 1)]);
         assert_signal_eq!(outputs, "count", 1);
 
-        let outputs = sim
-            .step(inputs([
-                ("clk".into(), 1),
-                ("reset".into(), 0),
-                ("enable".into(), 0),
-            ]))
-            .expect("hold");
+        let outputs = step_posedge(&mut sim, [("reset".into(), 0), ("enable".into(), 0)]);
         assert_signal_eq!(outputs, "count", 1);
     }
 
@@ -2138,28 +2142,28 @@ endmodule
             .expect("compile regfile_8x8");
         let mut sim = design.instantiate_top().expect("instantiate");
 
-        let outputs = sim
-            .step(inputs([
-                ("clk".into(), 1),
+        let outputs = step_posedge(
+            &mut sim,
+            [
                 ("write_en".into(), 1),
                 ("write_addr".into(), 3),
                 ("write_data".into(), 0x42),
                 ("read_addr1".into(), 3),
                 ("read_addr2".into(), 0),
-            ]))
-            .expect("write r3");
+            ],
+        );
         assert_signal_eq!(outputs, "read_data1", 0x42);
 
-        let outputs = sim
-            .step(inputs([
-                ("clk".into(), 1),
+        let outputs = step_posedge(
+            &mut sim,
+            [
                 ("write_en".into(), 1),
                 ("write_addr".into(), 1),
                 ("write_data".into(), 0x99),
                 ("read_addr1".into(), 1),
                 ("read_addr2".into(), 3),
-            ]))
-            .expect("write r1");
+            ],
+        );
         assert_signal_eq!(outputs, "read_data1", 0x99);
         assert_signal_eq!(outputs, "read_data2", 0x42);
     }
@@ -2172,37 +2176,37 @@ endmodule
             .expect("compile overture_pc_8bit");
         let mut sim = design.instantiate_top().expect("instantiate");
 
-        let outputs = sim
-            .step(inputs([
-                ("clk".into(), 1),
+        let outputs = step_posedge(
+            &mut sim,
+            [
                 ("reset".into(), 1),
                 ("run".into(), 0),
                 ("jump_en".into(), 0),
                 ("jump_addr".into(), 0),
-            ]))
-            .expect("reset");
+            ],
+        );
         assert_signal_eq!(outputs, "pc", 0);
 
-        let outputs = sim
-            .step(inputs([
-                ("clk".into(), 1),
+        let outputs = step_posedge(
+            &mut sim,
+            [
                 ("reset".into(), 0),
                 ("run".into(), 1),
                 ("jump_en".into(), 0),
                 ("jump_addr".into(), 0),
-            ]))
-            .expect("increment");
+            ],
+        );
         assert_signal_eq!(outputs, "pc", 1);
 
-        let outputs = sim
-            .step(inputs([
-                ("clk".into(), 1),
+        let outputs = step_posedge(
+            &mut sim,
+            [
                 ("reset".into(), 0),
                 ("run".into(), 1),
                 ("jump_en".into(), 1),
                 ("jump_addr".into(), 10),
-            ]))
-            .expect("jump");
+            ],
+        );
         assert_signal_eq!(outputs, "pc", 10);
     }
 
@@ -2299,46 +2303,22 @@ endmodule
         sim.load_memory_words(&[], "rom", &words([0x03, 0x42, 0x80, 0xc0]))
             .expect("load rom");
 
-        let outputs = sim
-            .step(inputs([
-                ("clk".into(), 1),
-                ("reset".into(), 1),
-                ("run".into(), 0),
-            ]))
-            .expect("reset");
+        let outputs = step_posedge(&mut sim, [("reset".into(), 1), ("run".into(), 0)]);
         assert_signal_eq!(outputs, "pc", 0);
         assert_signal_eq!(outputs, "acc", 0);
         assert_signal_eq!(outputs, "ram_out", 0);
 
-        let outputs = sim
-            .step(inputs([
-                ("clk".into(), 1),
-                ("reset".into(), 0),
-                ("run".into(), 1),
-            ]))
-            .expect("load immediate");
+        let outputs = step_posedge(&mut sim, [("reset".into(), 0), ("run".into(), 1)]);
         assert_signal_eq!(outputs, "pc", 1);
         assert_signal_eq!(outputs, "acc", 3);
         assert_signal_eq!(outputs, "ram_out", 0);
 
-        let outputs = sim
-            .step(inputs([
-                ("clk".into(), 1),
-                ("reset".into(), 0),
-                ("run".into(), 1),
-            ]))
-            .expect("add immediate");
+        let outputs = step_posedge(&mut sim, [("reset".into(), 0), ("run".into(), 1)]);
         assert_signal_eq!(outputs, "pc", 2);
         assert_signal_eq!(outputs, "acc", 5);
         assert_signal_eq!(outputs, "ram_out", 0);
 
-        let outputs = sim
-            .step(inputs([
-                ("clk".into(), 1),
-                ("reset".into(), 0),
-                ("run".into(), 1),
-            ]))
-            .expect("store acc");
+        let outputs = step_posedge(&mut sim, [("reset".into(), 0), ("run".into(), 1)]);
         assert_signal_eq!(outputs, "pc", 3);
         assert_signal_eq!(outputs, "acc", 5);
         assert_signal_eq!(outputs, "ram_out", 5);
@@ -2359,24 +2339,24 @@ endmodule
         sim.load_memory_words(&["fetch_unit"], "rom", &words([0x05]))
             .expect("load child rom");
 
-        let outputs = sim
-            .step(inputs([
-                ("clk".into(), 1),
+        let outputs = step_posedge(
+            &mut sim,
+            [
                 ("reset".into(), 1),
                 ("run".into(), 0),
                 ("in_port".into(), 0),
-            ]))
-            .expect("reset");
+            ],
+        );
         assert_signal_eq!(outputs, "pc", 0);
 
-        let outputs = sim
-            .step(inputs([
-                ("clk".into(), 1),
+        let outputs = step_posedge(
+            &mut sim,
+            [
                 ("reset".into(), 0),
                 ("run".into(), 1),
                 ("in_port".into(), 0),
-            ]))
-            .expect("execute immediate");
+            ],
+        );
         assert_signal_eq!(outputs, "pc", 1);
         assert_signal_eq!(outputs, "instr_debug", 0x05);
         assert_signal_eq!(outputs, "r0_out", 0x05);
@@ -2385,6 +2365,43 @@ endmodule
                 .expect("read child rom"),
             bv(0x05)
         );
+    }
+
+    #[test]
+    fn step_runs_always_ff_only_on_rising_edges() {
+        let temp_dir = unique_temp_dir("always-ff-rising-edge");
+        let design = Compiler::new()
+            .compile_str(
+                temp_dir.join("edge_counter.sv"),
+                r#"
+module edge_counter(
+    input  logic clk,
+    output logic [7:0] count
+);
+    always_ff @(posedge clk)
+        count <= count + 1'b1;
+endmodule
+"#,
+            )
+            .expect("compile edge_counter");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let outputs = sim.step(inputs([("clk".into(), 0)])).expect("step low");
+        assert_signal_eq!(outputs, "count", 0);
+
+        let outputs = sim.step(inputs([("clk".into(), 1)])).expect("step rise");
+        assert_signal_eq!(outputs, "count", 1);
+
+        let outputs = sim.step(inputs([("clk".into(), 1)])).expect("step high");
+        assert_signal_eq!(outputs, "count", 1);
+
+        let outputs = sim.step(inputs([("clk".into(), 0)])).expect("step fall");
+        assert_signal_eq!(outputs, "count", 1);
+
+        let outputs = sim
+            .step(inputs([("clk".into(), 1)]))
+            .expect("step rise again");
+        assert_signal_eq!(outputs, "count", 2);
     }
 
     #[test]

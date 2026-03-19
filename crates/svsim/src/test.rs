@@ -220,7 +220,7 @@ impl JsonTestSuite {
             let mut failures = Vec::new();
 
             for (step_index, step) in case.steps.iter().enumerate() {
-                let actual = sim.step(step.inputs.clone())?;
+                let actual = run_sequential_step(&mut sim, &step.inputs)?;
                 failures.extend(compare_outputs(
                     &actual,
                     &step.expected,
@@ -239,6 +239,21 @@ impl JsonTestSuite {
 
         Ok(build_report(results, started_at.elapsed()))
     }
+}
+
+fn run_sequential_step(
+    sim: &mut crate::sim::SimulationSession,
+    inputs: &BTreeMap<String, BitValue>,
+) -> Result<BTreeMap<String, BitValue>> {
+    // The JSON corpus records one logical cycle per step and historically
+    // represented that by sampling `clk=1` on each step.
+    if inputs.get("clk").is_some_and(|clock| !clock.is_zero()) {
+        let mut low_inputs = inputs.clone();
+        low_inputs.insert("clk".into(), BitValue::zero());
+        sim.step(low_inputs)?;
+    }
+
+    sim.step(inputs.clone())
 }
 
 impl SequentialTestSuite {
