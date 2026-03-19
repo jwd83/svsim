@@ -2,6 +2,14 @@
 
 This directory now contains a small executable PicoRV32 corpus in addition to the upstream `picorv32.v` source and the original smoke harness.
 
+## Compile Coverage
+
+- `cargo run -p svsim-cli -- --compile-dir parts/picorv32` now measures all three checked-in source files here:
+  - `picorv32.v`
+  - `picorv32_program_harness.sv`
+  - `picorv32_smoke.sv`
+- The compile-only status is currently `3/3` clean files.
+
 ## Included Harness
 
 - `picorv32_program_harness.sv`: wraps `picorv32` with:
@@ -19,7 +27,12 @@ This directory now contains a small executable PicoRV32 corpus in addition to th
 
 Each JSON suite preloads a different ROM text file and then clocks the harness until the post-store `trap` state is visible.
 
-The current executable subset is narrower than compile coverage: straight-line PicoRV32 programs that end in a single final store are stable here today, while multi-access data programs and taken-branch loops are not yet part of the checked-in green corpus.
+The executable subset is intentionally narrower than compile coverage. The checked-in green PicoRV32 runtime corpus is currently:
+
+- the original smoke harness
+- straight-line sample programs that end in a single final store
+
+Local scratch runs still show multi-access data programs and taken-branch loops as the next runtime gaps, so those behaviors are not yet claimed by the checked-in green corpus.
 
 ## Run
 

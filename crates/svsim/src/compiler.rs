@@ -255,9 +255,11 @@ impl Compiler {
 
     fn resolve_module_path(&self, module_name: &str, current_dir: &Path) -> Result<PathBuf> {
         let mut candidates = Vec::new();
-        candidates.push(current_dir.join(format!("{module_name}.sv")));
-        for search_path in &self.search_paths {
-            candidates.push(search_path.join(format!("{module_name}.sv")));
+        for extension in ["sv", "v"] {
+            candidates.push(current_dir.join(format!("{module_name}.{extension}")));
+            for search_path in &self.search_paths {
+                candidates.push(search_path.join(format!("{module_name}.{extension}")));
+            }
         }
 
         for candidate in candidates {
@@ -267,7 +269,7 @@ impl Compiler {
         }
 
         Err(Error::Resolve(format!(
-            "module '{}' was not found next to {} or in search paths [{}]",
+            "module '{}' was not found as .sv or .v next to {} or in search paths [{}]",
             module_name,
             current_dir.display(),
             self.search_paths
@@ -486,9 +488,16 @@ fn collect_systemverilog_sources_recursive(root: &Path, sources: &mut Vec<PathBu
 }
 
 fn collect_systemverilog_source_file(path: &Path, sources: &mut Vec<PathBuf>) {
-    if path.extension().and_then(|ext| ext.to_str()) == Some("sv") {
+    if is_compile_source_file(path) {
         sources.push(path.to_path_buf());
     }
+}
+
+fn is_compile_source_file(path: &Path) -> bool {
+    matches!(
+        path.extension().and_then(|ext| ext.to_str()),
+        Some("sv" | "v")
+    )
 }
 
 fn collect_json_test_suites(root: &Path) -> Result<Vec<JsonTestSuitePaths>> {
@@ -645,6 +654,38 @@ mod tests {
         fs::write(
             lib_dir.join("child.sv"),
             "module child(output logic outY); assign outY = 1'b1; endmodule\n",
+        )
+        .expect("write child");
+
+        let design = Compiler::new()
+            .add_search_path(&lib_dir)
+            .compile_file(temp_dir.join("top.sv"))
+            .expect("compile design");
+
+        assert_eq!(
+            design
+                .hir()
+                .module_names()
+                .into_iter()
+                .collect::<BTreeSet<_>>(),
+            BTreeSet::from(["child", "top"]),
+        );
+    }
+
+    #[test]
+    fn compile_file_uses_search_paths_for_verilog_dependencies() {
+        let temp_dir = unique_temp_dir("search-path-verilog");
+        let lib_dir = temp_dir.join("lib");
+        fs::create_dir_all(&lib_dir).expect("create lib dir");
+
+        fs::write(
+            temp_dir.join("top.sv"),
+            "module top(output logic outY); child u_child (.outY(outY)); endmodule\n",
+        )
+        .expect("write top");
+        fs::write(
+            lib_dir.join("child.v"),
+            "module child(output wire outY); assign outY = 1'b1; endmodule\n",
         )
         .expect("write child");
 
@@ -1473,6 +1514,11 @@ mod tests {
             "module pass(output logic one); assign one = 1'b1; endmodule\n",
         )
         .expect("write pass.sv");
+        fs::write(
+            temp_dir.join("verilog_pass.v"),
+            "module verilog_pass(output wire one); assign one = 1'b1; endmodule\n",
+        )
+        .expect("write verilog_pass.v");
 
         fs::write(
             nested_dir.join("unsupported.sv"),
@@ -1490,8 +1536,8 @@ mod tests {
             .run_compile_dir(&temp_dir)
             .expect("run compile-only batch");
 
-        assert_eq!(report.total, 2);
-        assert_eq!(report.passed, 1);
+        assert_eq!(report.total, 3);
+        assert_eq!(report.passed, 2);
         assert!(!report.all_passed());
         assert_eq!(
             report
@@ -1507,7 +1553,11 @@ mod tests {
                     )
                 })
                 .collect::<Vec<_>>(),
-            vec![("unsupported.sv", false), ("pass.sv", true)],
+            vec![
+                ("unsupported.sv", false),
+                ("pass.sv", true),
+                ("verilog_pass.v", true),
+            ],
         );
         assert!(report.files[0].error.is_none());
         assert!(

@@ -97,6 +97,11 @@ fn cli_runs_compile_directory() {
         "module pass(output logic one); assign one = 1'b1; endmodule\n",
     )
     .expect("write pass.sv");
+    fs::write(
+        temp_dir.join("verilog_pass.v"),
+        "module verilog_pass(output wire one); assign one = 1'b1; endmodule\n",
+    )
+    .expect("write verilog_pass.v");
 
     let output = Command::new(svsim_bin())
         .arg("--compile-dir")
@@ -112,12 +117,20 @@ fn cli_runs_compile_directory() {
 
     let json: Value = serde_json::from_slice(&output.stdout).expect("parse stdout json");
     assert!(json["report"]["duration_ms"].is_u64());
-    assert_eq!(json["report"]["passed"], 1);
-    assert_eq!(json["report"]["total"], 1);
+    assert_eq!(json["report"]["passed"], 2);
+    assert_eq!(json["report"]["total"], 2);
     assert_eq!(json["report"]["files"][0]["top_module"], "pass");
     assert_eq!(json["report"]["files"][0]["module_count"], 1);
     assert_eq!(
         json["report"]["files"][0]["diagnostics"]
+            .as_array()
+            .map(Vec::len),
+        Some(0)
+    );
+    assert_eq!(json["report"]["files"][1]["top_module"], "verilog_pass");
+    assert_eq!(json["report"]["files"][1]["module_count"], 1);
+    assert_eq!(
+        json["report"]["files"][1]["diagnostics"]
             .as_array()
             .map(Vec::len),
         Some(0)

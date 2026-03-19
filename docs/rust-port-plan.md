@@ -18,7 +18,7 @@ These product decisions are fixed for the first Rust pass:
 
 ## Current Status
 
-Current implementation status as of March 18, 2026:
+Current implementation status as of March 19, 2026:
 
 - Cargo workspace created with `svsim`, `svsim-cli`, and `svsim-render`
 - `sv-parser` integrated for file-based parsing and in-memory source parsing via virtual paths
@@ -26,7 +26,7 @@ Current implementation status as of March 18, 2026:
 - library API now exposes `Compiler`, `CompiledDesign`, and `SimulationSession`, including `compile_file` and `compile_str`
 - compilation now rejects duplicate module definitions during source registration and includes a semantic validation pass over lowered HIR, catching duplicate declarations, duplicate instance names, undeclared identifiers/memories, lowered select bounds, constant out-of-range memory indices, unsupported `inout` / `ref` ports, invalid named-port instance bindings including missing child input bindings, attempts to drive input ports, malformed legacy `rom_*` wrappers, missing legacy ROM backing files, and declarations or lowered value-shape constructs that fall outside the current supported `1..=64` bit runtime subset before simulation
 - `CompiledDesign::hierarchy()` now exposes an owned top-down instance tree so embedding callers can discover valid instance paths before using per-instance memory APIs
-- compile-only corpus reporting is now available through `Compiler::run_compile_dir` / `Compiler::run_compile_dirs`, and compile-only runs fail cleanly when source compilation errors or unsupported-feature diagnostics are present
+- compile-only corpus reporting is now available through `Compiler::run_compile_dir` / `Compiler::run_compile_dirs`, compile-only runs fail cleanly when source compilation errors or unsupported-feature diagnostics are present, and compile-directory discovery plus module-name dependency lookup now cover both `.sv` and `.v` sources
 - library-side JSON regression execution is now available through `CompiledDesign::run_json_file` / `svsim::JsonTestSuite` for combinational arrays, sequential `test_cases`, and relative memory-file preload
 - `Compiler::run_json_test_dir`, `Compiler::run_json_test_dirs`, and repeated CLI `--json-test-dir` flags now cover both per-directory and multi-directory corpus regressions, execute suites in parallel within each directory, emit deterministic structured reports, and can discover JSON-only suites that explicitly declare a shared source file
 - CLI can parse a SystemVerilog file and emit JSON describing discovered modules, or run compile-only and JSON batch regressions through repeated `--compile-dir` and `--json-test-dir` flags plus single-suite `--json-test`
@@ -314,7 +314,7 @@ Port the reference behavior before broadening scope.
 
 Treat the current `parts/` tree as the compatibility suite:
 
-- compile every `.sv` file
+- compile every `.sv` and `.v` file
 - run every matching `.json` test
 - compare pass/fail counts against the reference project
 - verify generated truth-table and waveform metadata before worrying about pixel-perfect images
@@ -362,7 +362,7 @@ Do not start with lock-heavy shared state or global caches. Embeddable code shou
 - emit diagnostics for unsupported constructs
 
 Exit criterion:
-- all `parts/**/*.sv` parse successfully or fail with explicit unsupported-feature diagnostics
+- all checked-in `parts/` Verilog and SystemVerilog sources parse successfully or fail with explicit unsupported-feature diagnostics
 
 ### Phase 1: Combinational Subset
 
@@ -383,7 +383,7 @@ Current progress:
 - compilation now rejects several design-shape errors before simulation, including duplicate module definitions, undeclared identifiers, duplicate declarations, duplicate instance names, constant out-of-range memory indices, unsupported `inout` / `ref` ports, input-port drive attempts, unknown named ports, duplicate named-port bindings, missing child input bindings, non-lvalue output bindings, malformed legacy `rom_*` wrappers, missing legacy ROM backing files, and overwide declarations or concatenation-style value shapes that exceed the current 64-bit runtime limit
 - callers can now inspect the compiled instance tree directly instead of reverse-engineering valid instance paths from raw HIR module summaries
 - library-side JSON-backed combinational regression execution is implemented
-- compile-only corpus coverage is now available for `*.sv` discovery even when runtime suites are not involved
+- compile-only corpus coverage is now available for `*.sv` and `*.v` discovery even when runtime suites are not involved
 - remaining work is continuing to grow compile-time validation into fuller elaboration and to replace iterative hot paths with more explicit evaluation order where it is justified
 
 Exit criterion:
@@ -403,8 +403,9 @@ Current progress:
 - blocking and nonblocking assignment semantics work for the supported subset
 - zero-initialized single-dimension memory reads, explicit memory preload/read APIs, text-file memory loading, and procedural single-element memory writes are implemented
 - library-side JSON regression execution now covers sequential `test_cases`, including memory-backed suites
-- picorv32.v (open-source RISC-V softcore, ~3000 lines) now compiles successfully through the full pipeline
-- remaining work is parameterized instantiations, non-constant selects, procedural local declarations, task declarations, `x` / `z` numeric literal digits, and the remaining primary-expression, statement, and module-item shapes still surfaced as `unsupported` in picorv32 HIR
+- `parts/picorv32/picorv32.v` (open-source RISC-V softcore, ~3000 lines) now compiles successfully through the full pipeline and is included in normal compile-directory reporting alongside the checked-in harness sources
+- measured `parts/picorv32` status is now `3/3` clean compile-only source files (`picorv32.v`, `picorv32_program_harness.sv`, `picorv32_smoke.sv`) and `4/4` passing JSON suites
+- remaining work is expanding PicoRV32 execution beyond the current checked-in straight-line single-store programs and smoke harness; local scratch runs still show taken-branch loops and multi-store programs as the next runtime gaps even though the HIR is now compile-clean
 
 Exit criterion:
 - parity for sequential register/counter tests and the math sequence stubs
@@ -416,9 +417,9 @@ Exit criterion:
 - batch regression entry points over the existing CLI regression mode
 
 Current progress:
-- library and CLI batch entry points now exist for both compile-only `*.sv` discovery and JSON regression discovery, runs stay sorted by source path, and JSON suites can explicitly reuse a shared source file through a `source` field
+- library and CLI batch entry points now exist for both compile-only `.sv` / `.v` discovery and JSON regression discovery, runs stay sorted by source path, and JSON suites can explicitly reuse a shared source file through a `source` field
 - legacy corpus compatibility for `rom_*` wrappers and `pgm_*` program harnesses now exists without reintroducing those naming conventions into the main library memory API, and malformed `rom_*` wrappers now fail at compile time instead of degrading into empty modules or late runtime errors
-- measured Overture status now includes `41/41` clean compile-only source files and `43/43` passing JSON suites, including the two explicit-source `overture_cpu` program variants; the full multi-directory corpus snapshot is `136/136` compile-only in about `2.7s` and `153/153` JSON regressions in about `26.0s`
+- measured Overture status now includes `41/41` clean compile-only source files and `43/43` passing JSON suites, including the two explicit-source `overture_cpu` program variants; the full multi-directory corpus snapshot including `parts/picorv32` is now `139/139` compile-only in about `5.2s` and `157/157` JSON regressions in about `57.2s`
 - shared helper functions (`mask`, shift primitives, `expr_to_lvalue`, `resolve_legacy_rom_data_path`) have been deduplicated between `sim.rs` and `validate.rs` and consolidated into `width.rs`, `hir.rs`, and `validate.rs` respectively, removing ~70 lines of cross-module duplication
 - remaining work is folding more in-range resolution and connection-shape checks into a single elaboration/validation layer now that the runtime coercion slices, constant memory-bounds checks, and shared helpers are explicit, and tightening unsupported-construct diagnostics where wider coverage finds gaps
 
