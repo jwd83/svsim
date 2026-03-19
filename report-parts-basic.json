@@ -1,7 +1,7 @@
 {
   "directory": "parts/basic",
   "report": {
-    "duration_ms": 2056,
+    "duration_ms": 2033,
     "passed": 44,
     "total": 44,
     "suites": [
@@ -12,7 +12,7 @@
         "duration_ms": 44,
         "passed": true,
         "report": {
-          "duration_ms": 13,
+          "duration_ms": 12,
           "passed": 8,
           "total": 8,
           "cases": [
@@ -80,10 +80,10 @@
         "source_path": "parts/basic/adder_32bit.sv",
         "json_path": "parts/basic/adder_32bit.json",
         "top_module": "adder_32bit",
-        "duration_ms": 39,
+        "duration_ms": 48,
         "passed": true,
         "report": {
-          "duration_ms": 18,
+          "duration_ms": 24,
           "passed": 8,
           "total": 8,
           "cases": [
@@ -151,10 +151,10 @@
         "source_path": "parts/basic/adder_4bit.sv",
         "json_path": "parts/basic/adder_4bit.json",
         "top_module": "adder_4bit",
-        "duration_ms": 19,
+        "duration_ms": 17,
         "passed": true,
         "report": {
-          "duration_ms": 3,
+          "duration_ms": 2,
           "passed": 10,
           "total": 10,
           "cases": [
@@ -236,10 +236,10 @@
         "source_path": "parts/basic/adder_64bit.sv",
         "json_path": "parts/basic/adder_64bit.json",
         "top_module": "adder_64bit",
-        "duration_ms": 83,
+        "duration_ms": 65,
         "passed": true,
         "report": {
-          "duration_ms": 54,
+          "duration_ms": 39,
           "passed": 8,
           "total": 8,
           "cases": [
@@ -307,10 +307,10 @@
         "source_path": "parts/basic/adder_8bit.sv",
         "json_path": "parts/basic/adder_8bit.json",
         "top_module": "adder_8bit",
-        "duration_ms": 16,
+        "duration_ms": 15,
         "passed": true,
         "report": {
-          "duration_ms": 5,
+          "duration_ms": 6,
           "passed": 10,
           "total": 10,
           "cases": [
@@ -392,10 +392,10 @@
         "source_path": "parts/basic/adder_cs_16bit.sv",
         "json_path": "parts/basic/adder_cs_16bit.json",
         "top_module": "adder_cs_16bit",
-        "duration_ms": 95,
+        "duration_ms": 100,
         "passed": true,
         "report": {
-          "duration_ms": 48,
+          "duration_ms": 44,
           "passed": 12,
           "total": 12,
           "cases": [
@@ -491,10 +491,10 @@
         "source_path": "parts/basic/adder_cs_32bit.sv",
         "json_path": "parts/basic/adder_cs_32bit.json",
         "top_module": "adder_cs_32bit",
-        "duration_ms": 140,
+        "duration_ms": 139,
         "passed": true,
         "report": {
-          "duration_ms": 97,
+          "duration_ms": 98,
           "passed": 12,
           "total": 12,
           "cases": [
@@ -590,10 +590,10 @@
         "source_path": "parts/basic/adder_cs_64bit.sv",
         "json_path": "parts/basic/adder_cs_64bit.json",
         "top_module": "adder_cs_64bit",
-        "duration_ms": 236,
+        "duration_ms": 233,
         "passed": true,
         "report": {
-          "duration_ms": 191,
+          "duration_ms": 189,
           "passed": 8,
           "total": 8,
           "cases": [
@@ -661,10 +661,10 @@
         "source_path": "parts/basic/adder_cs_8bit.sv",
         "json_path": "parts/basic/adder_cs_8bit.json",
         "top_module": "adder_cs_8bit",
-        "duration_ms": 39,
+        "duration_ms": 27,
         "passed": true,
         "report": {
-          "duration_ms": 17,
+          "duration_ms": 8,
           "passed": 10,
           "total": 10,
           "cases": [
@@ -888,7 +888,7 @@
         "source_path": "parts/basic/and_gate_8bit.sv",
         "json_path": "parts/basic/and_gate_8bit.json",
         "top_module": "and_gate_8bit",
-        "duration_ms": 11,
+        "duration_ms": 22,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -987,7 +987,7 @@
         "source_path": "parts/basic/counter8.sv",
         "json_path": "parts/basic/counter8.json",
         "top_module": "counter8",
-        "duration_ms": 4,
+        "duration_ms": 5,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -1079,10 +1079,10 @@
         "source_path": "parts/basic/decoder_3to8.sv",
         "json_path": "parts/basic/decoder_3to8.json",
         "top_module": "decoder_3to8",
-        "duration_ms": 16,
+        "duration_ms": 10,
         "passed": true,
         "report": {
-          "duration_ms": 0,
+          "duration_ms": 2,
           "passed": 8,
           "total": 8,
           "cases": [
@@ -1150,7 +1150,7 @@
         "source_path": "parts/basic/full_adder.sv",
         "json_path": "parts/basic/full_adder.json",
         "top_module": "full_adder",
-        "duration_ms": 7,
+        "duration_ms": 10,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -1264,10 +1264,10 @@
         "source_path": "parts/basic/mux_2to1_16bit.sv",
         "json_path": "parts/basic/mux_2to1_16bit.json",
         "top_module": "mux_2to1_16bit",
-        "duration_ms": 40,
+        "duration_ms": 43,
         "passed": true,
         "report": {
-          "duration_ms": 10,
+          "duration_ms": 11,
           "passed": 12,
           "total": 12,
           "cases": [
@@ -1363,7 +1363,7 @@
         "source_path": "parts/basic/mux_2to1_1bit.sv",
         "json_path": "parts/basic/mux_2to1_1bit.json",
         "top_module": "mux_2to1_1bit",
-        "duration_ms": 3,
+        "duration_ms": 6,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -1434,10 +1434,10 @@
         "source_path": "parts/basic/mux_2to1_32bit.sv",
         "json_path": "parts/basic/mux_2to1_32bit.json",
         "top_module": "mux_2to1_32bit",
-        "duration_ms": 39,
+        "duration_ms": 41,
         "passed": true,
         "report": {
-          "duration_ms": 17,
+          "duration_ms": 11,
           "passed": 12,
           "total": 12,
           "cases": [
@@ -1533,7 +1533,7 @@
         "source_path": "parts/basic/mux_2to1_4bit.sv",
         "json_path": "parts/basic/mux_2to1_4bit.json",
         "top_module": "mux_2to1_4bit",
-        "duration_ms": 4,
+        "duration_ms": 7,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -1604,10 +1604,10 @@
         "source_path": "parts/basic/mux_2to1_8bit.sv",
         "json_path": "parts/basic/mux_2to1_8bit.json",
         "top_module": "mux_2to1_8bit",
-        "duration_ms": 10,
+        "duration_ms": 8,
         "passed": true,
         "report": {
-          "duration_ms": 4,
+          "duration_ms": 2,
           "passed": 12,
           "total": 12,
           "cases": [
@@ -1703,7 +1703,7 @@
         "source_path": "parts/basic/mux_4to1_8bit.sv",
         "json_path": "parts/basic/mux_4to1_8bit.json",
         "top_module": "mux_4to1_8bit",
-        "duration_ms": 27,
+        "duration_ms": 24,
         "passed": true,
         "report": {
           "duration_ms": 15,
@@ -1886,7 +1886,7 @@
         "source_path": "parts/basic/mux_4to1_comb.sv",
         "json_path": "parts/basic/mux_4to1_comb.json",
         "top_module": "mux_4to1_comb",
-        "duration_ms": 12,
+        "duration_ms": 13,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -1957,10 +1957,10 @@
         "source_path": "parts/basic/mux_8to1_8bit.sv",
         "json_path": "parts/basic/mux_8to1_8bit.json",
         "top_module": "mux_8to1_8bit",
-        "duration_ms": 79,
+        "duration_ms": 83,
         "passed": true,
         "report": {
-          "duration_ms": 59,
+          "duration_ms": 66,
           "passed": 28,
           "total": 28,
           "cases": [
@@ -2211,7 +2211,7 @@
         "source_path": "parts/basic/nand_gate_8bit.sv",
         "json_path": "parts/basic/nand_gate_8bit.json",
         "top_module": "nand_gate_8bit",
-        "duration_ms": 5,
+        "duration_ms": 6,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -2353,7 +2353,7 @@
         "source_path": "parts/basic/nor_gate_8bit.sv",
         "json_path": "parts/basic/nor_gate_8bit.json",
         "top_module": "nor_gate_8bit",
-        "duration_ms": 8,
+        "duration_ms": 12,
         "passed": true,
         "report": {
           "duration_ms": 1,
@@ -2552,7 +2552,7 @@
         "source_path": "parts/basic/or_gate.sv",
         "json_path": "parts/basic/or_gate.json",
         "top_module": "or_gate",
-        "duration_ms": 1,
+        "duration_ms": 3,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -2595,7 +2595,7 @@
         "source_path": "parts/basic/or_gate_8bit.sv",
         "json_path": "parts/basic/or_gate_8bit.json",
         "top_module": "or_gate_8bit",
-        "duration_ms": 10,
+        "duration_ms": 9,
         "passed": true,
         "report": {
           "duration_ms": 1,
@@ -2694,10 +2694,10 @@
         "source_path": "parts/basic/regfile_8x8.sv",
         "json_path": "parts/basic/regfile_8x8.json",
         "top_module": "regfile_8x8",
-        "duration_ms": 2002,
+        "duration_ms": 1981,
         "passed": true,
         "report": {
-          "duration_ms": 1972,
+          "duration_ms": 1945,
           "passed": 8,
           "total": 8,
           "cases": [
@@ -2765,10 +2765,10 @@
         "source_path": "parts/basic/register_16bit.sv",
         "json_path": "parts/basic/register_16bit.json",
         "top_module": "register_16bit",
-        "duration_ms": 7,
+        "duration_ms": 12,
         "passed": true,
         "report": {
-          "duration_ms": 1,
+          "duration_ms": 0,
           "passed": 10,
           "total": 10,
           "cases": [
@@ -2850,7 +2850,7 @@
         "source_path": "parts/basic/register_1bit.sv",
         "json_path": "parts/basic/register_1bit.json",
         "top_module": "register_1bit",
-        "duration_ms": 1,
+        "duration_ms": 2,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -2914,7 +2914,7 @@
         "source_path": "parts/basic/register_32bit.sv",
         "json_path": "parts/basic/register_32bit.json",
         "top_module": "register_32bit",
-        "duration_ms": 4,
+        "duration_ms": 3,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -3006,7 +3006,7 @@
         "source_path": "parts/basic/register_64bit.sv",
         "json_path": "parts/basic/register_64bit.json",
         "top_module": "register_64bit",
-        "duration_ms": 2,
+        "duration_ms": 4,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -3098,7 +3098,7 @@
         "source_path": "parts/basic/register_8bit.sv",
         "json_path": "parts/basic/register_8bit.json",
         "top_module": "register_8bit",
-        "duration_ms": 2,
+        "duration_ms": 3,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -3183,7 +3183,7 @@
         "source_path": "parts/basic/rom_deadbeef.sv",
         "json_path": "parts/basic/rom_deadbeef.json",
         "top_module": "rom_deadbeef",
-        "duration_ms": 6,
+        "duration_ms": 3,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -3226,7 +3226,7 @@
         "source_path": "parts/basic/ternary_mux.sv",
         "json_path": "parts/basic/ternary_mux.json",
         "top_module": "ternary_mux",
-        "duration_ms": 2,
+        "duration_ms": 1,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -3297,7 +3297,7 @@
         "source_path": "parts/basic/xnor_gate.sv",
         "json_path": "parts/basic/xnor_gate.json",
         "top_module": "xnor_gate",
-        "duration_ms": 5,
+        "duration_ms": 3,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -3340,7 +3340,7 @@
         "source_path": "parts/basic/xnor_gate_8bit.sv",
         "json_path": "parts/basic/xnor_gate_8bit.json",
         "top_module": "xnor_gate_8bit",
-        "duration_ms": 23,
+        "duration_ms": 20,
         "passed": true,
         "report": {
           "duration_ms": 2,
@@ -3439,7 +3439,7 @@
         "source_path": "parts/basic/xor_gate.sv",
         "json_path": "parts/basic/xor_gate.json",
         "top_module": "xor_gate",
-        "duration_ms": 3,
+        "duration_ms": 2,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -3482,7 +3482,7 @@
         "source_path": "parts/basic/xor_gate_8bit.sv",
         "json_path": "parts/basic/xor_gate_8bit.json",
         "top_module": "xor_gate_8bit",
-        "duration_ms": 7,
+        "duration_ms": 8,
         "passed": true,
         "report": {
           "duration_ms": 1,

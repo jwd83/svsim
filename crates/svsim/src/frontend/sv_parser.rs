@@ -33,6 +33,7 @@ use crate::width::{
 };
 
 type LowerResult<T> = std::result::Result<T, Diagnostic>;
+const PROCEDURAL_FOR_UNROLL_LIMIT: usize = 16_384;
 
 #[derive(Debug, Default)]
 struct LoweredDeclarations {
@@ -1551,6 +1552,9 @@ fn lower_statement(
         StatementItem::CaseStatement(statement) => {
             lower_case_statement(syntax_tree, statement, module, path)
         }
+        StatementItem::LoopStatement(statement) => {
+            lower_loop_statement(syntax_tree, statement, module, path)
+        }
         StatementItem::SubroutineCallStatement(statement) => {
             lower_subroutine_call_statement(syntax_tree, statement)
         }
@@ -1572,6 +1576,451 @@ fn lower_statement_or_null(
             lower_statement(syntax_tree, statement, module, path)
         }
         StatementOrNull::Attribute(_) => Ok(Stmt::Empty),
+    }
+}
+
+fn lower_loop_statement(
+    syntax_tree: &SyntaxTree,
+    statement: &sv_parser::LoopStatement,
+    module: &ModuleSummary,
+    path: &Path,
+) -> LowerResult<Stmt> {
+    match statement {
+        sv_parser::LoopStatement::For(statement) => {
+            lower_for_loop_statement(syntax_tree, statement, module, path)
+        }
+        _ => Err(unsupported(
+            "loop statement is outside the current executable subset",
+            None,
+        )),
+    }
+}
+
+fn lower_for_loop_statement(
+    syntax_tree: &SyntaxTree,
+    statement: &sv_parser::LoopStatementFor,
+    module: &ModuleSummary,
+    path: &Path,
+) -> LowerResult<Stmt> {
+    let controls = &statement.nodes.1.nodes.1;
+    let Some(init) = controls.0.as_ref() else {
+        return Err(unsupported(
+            "procedural `for` loops require an initialization assignment",
+            None,
+        ));
+    };
+    let Some(cond_expr) = controls.2.as_ref() else {
+        return Err(unsupported(
+            "procedural `for` loops require a constant-bounded condition",
+            None,
+        ));
+    };
+    let Some(step) = controls.4.as_ref() else {
+        return Err(unsupported(
+            "procedural `for` loops require a step assignment",
+            None,
+        ));
+    };
+
+    let (loop_var, mut loop_value) =
+        lower_for_loop_initialization(syntax_tree, init, module, path)?;
+    let mut statements = Vec::new();
+
+    for _ in 0..PROCEDURAL_FOR_UNROLL_LIMIT {
+        let iteration_module = module_with_const_binding(module, &loop_var, &loop_value);
+        let cond = lower_expression(syntax_tree, cond_expr, &iteration_module, path)?;
+        if !const_eval_param_expr(&cond, &iteration_module.parameters)?.truthy() {
+            return Ok(fold_loop_statements(statements));
+        }
+
+        let body =
+            lower_statement_or_null(syntax_tree, &statement.nodes.2, &iteration_module, path)?;
+        let body =
+            substitute_stmt_ident(&body, &loop_var, &expr_from_const_eval_value(&loop_value));
+        if !matches!(body, Stmt::Empty) {
+            statements.push(body);
+        }
+
+        loop_value = lower_for_loop_step(
+            syntax_tree,
+            step,
+            &iteration_module,
+            path,
+            &loop_var,
+            &loop_value,
+        )?;
+    }
+
+    Err(unsupported(
+        "procedural `for` loop exceeds the supported unrolling limit",
+        None,
+    ))
+}
+
+fn lower_for_loop_initialization(
+    syntax_tree: &SyntaxTree,
+    init: &sv_parser::ForInitialization,
+    module: &ModuleSummary,
+    path: &Path,
+) -> LowerResult<(String, ConstEvalValue)> {
+    match init {
+        sv_parser::ForInitialization::ListOfVariableAssignments(assignments) => {
+            let assignments = assignments.nodes.0.contents();
+            let [assignment] = assignments.as_slice() else {
+                return Err(unsupported(
+                    "procedural `for` loops only support a single initialization assignment",
+                    None,
+                ));
+            };
+            lower_for_loop_variable_assignment(
+                syntax_tree,
+                assignment,
+                module,
+                path,
+                "procedural `for` loop initialization",
+            )
+        }
+        sv_parser::ForInitialization::Declaration(declaration) => {
+            let declarations = declaration.nodes.0.contents();
+            let [declaration] = declarations.as_slice() else {
+                return Err(unsupported(
+                    "procedural `for` loops only support a single initialization declaration",
+                    None,
+                ));
+            };
+            let assignments = declaration.nodes.2.contents();
+            let [(identifier, _, expr)] = assignments.as_slice() else {
+                return Err(unsupported(
+                    "procedural `for` loops only support a single initialized loop variable",
+                    None,
+                ));
+            };
+            let (name, _) = identifier_name_from_node(syntax_tree, RefNode::from(identifier))
+                .ok_or_else(|| unsupported("failed to determine loop variable name", None))?;
+            Ok((
+                name,
+                normalize_for_loop_value(lower_const_eval_expression(
+                    syntax_tree,
+                    expr,
+                    module,
+                    path,
+                )?),
+            ))
+        }
+    }
+}
+
+fn lower_for_loop_variable_assignment(
+    syntax_tree: &SyntaxTree,
+    assignment: &VariableAssignment,
+    module: &ModuleSummary,
+    path: &Path,
+    context: &str,
+) -> LowerResult<(String, ConstEvalValue)> {
+    if symbol_text(syntax_tree, &assignment.nodes.1)? != "=" {
+        return Err(unsupported(format!("{context} must use `=`"), None));
+    }
+
+    let LValue::Signal(name) =
+        lower_variable_lvalue(syntax_tree, &assignment.nodes.0, module, path)?
+    else {
+        return Err(unsupported(
+            format!("{context} must target a plain loop variable"),
+            None,
+        ));
+    };
+
+    Ok((
+        name,
+        normalize_for_loop_value(lower_const_eval_expression(
+            syntax_tree,
+            &assignment.nodes.2,
+            module,
+            path,
+        )?),
+    ))
+}
+
+fn lower_for_loop_step(
+    syntax_tree: &SyntaxTree,
+    step: &sv_parser::ForStep,
+    module: &ModuleSummary,
+    path: &Path,
+    loop_var: &str,
+    loop_value: &ConstEvalValue,
+) -> LowerResult<ConstEvalValue> {
+    let assignments = step.nodes.0.contents();
+    let [assignment] = assignments.as_slice() else {
+        return Err(unsupported(
+            "procedural `for` loops only support a single step assignment",
+            None,
+        ));
+    };
+
+    match assignment {
+        sv_parser::ForStepAssignment::OperatorAssignment(assignment) => {
+            lower_for_loop_operator_step(syntax_tree, assignment, module, path, loop_var)
+        }
+        sv_parser::ForStepAssignment::IncOrDecExpression(assignment) => {
+            let (target, op) = match assignment.as_ref() {
+                sv_parser::IncOrDecExpression::Prefix(assignment) => {
+                    (&assignment.nodes.2, &assignment.nodes.0)
+                }
+                sv_parser::IncOrDecExpression::Suffix(assignment) => {
+                    (&assignment.nodes.0, &assignment.nodes.2)
+                }
+            };
+            let LValue::Signal(name) = lower_variable_lvalue(syntax_tree, target, module, path)?
+            else {
+                return Err(unsupported(
+                    "procedural `for` loop steps must target a plain loop variable",
+                    None,
+                ));
+            };
+            if name != loop_var {
+                return Err(unsupported(
+                    "procedural `for` loop step must update the initialized loop variable",
+                    None,
+                ));
+            }
+            match symbol_text(syntax_tree, &op.nodes.0)?.as_str() {
+                "++" => Ok(normalize_for_loop_value(ConstEvalValue::new_with_signed(
+                    loop_value
+                        .normalized_bits()
+                        .wrapping_add(&BitValue::from(1u64), loop_value.width),
+                    loop_value.width,
+                    loop_value.signed,
+                ))),
+                "--" => Ok(normalize_for_loop_value(ConstEvalValue::new_with_signed(
+                    loop_value
+                        .normalized_bits()
+                        .wrapping_sub(&BitValue::from(1u64), loop_value.width),
+                    loop_value.width,
+                    loop_value.signed,
+                ))),
+                _ => Err(unsupported(
+                    "procedural `for` loop step uses an unsupported increment operator",
+                    None,
+                )),
+            }
+        }
+        sv_parser::ForStepAssignment::FunctionSubroutineCall(_) => Err(unsupported(
+            "procedural `for` loop step must be an assignment",
+            None,
+        )),
+    }
+}
+
+fn lower_for_loop_operator_step(
+    syntax_tree: &SyntaxTree,
+    assignment: &sv_parser::OperatorAssignment,
+    module: &ModuleSummary,
+    path: &Path,
+    loop_var: &str,
+) -> LowerResult<ConstEvalValue> {
+    if symbol_text(syntax_tree, &assignment.nodes.1.nodes.0)? != "=" {
+        return Err(unsupported("procedural `for` loop step must use `=`", None));
+    }
+
+    let LValue::Signal(name) =
+        lower_variable_lvalue(syntax_tree, &assignment.nodes.0, module, path)?
+    else {
+        return Err(unsupported(
+            "procedural `for` loop step must target a plain loop variable",
+            None,
+        ));
+    };
+    if name != loop_var {
+        return Err(unsupported(
+            "procedural `for` loop step must update the initialized loop variable",
+            None,
+        ));
+    }
+
+    lower_const_eval_expression(syntax_tree, &assignment.nodes.2, module, path)
+        .map(normalize_for_loop_value)
+}
+
+fn lower_const_eval_expression(
+    syntax_tree: &SyntaxTree,
+    expr: &Expression,
+    module: &ModuleSummary,
+    path: &Path,
+) -> LowerResult<ConstEvalValue> {
+    let lowered = lower_expression(syntax_tree, expr, module, path)?;
+    const_eval_param_expr(&lowered, &module.parameters).map_err(|_| {
+        unsupported(
+            "procedural `for` loops require constant-bounded expressions",
+            None,
+        )
+    })
+}
+
+fn module_with_const_binding(
+    module: &ModuleSummary,
+    name: &str,
+    value: &ConstEvalValue,
+) -> ModuleSummary {
+    let mut module = module.clone();
+    module.parameters.insert(
+        0,
+        ParameterDecl {
+            name: name.into(),
+            range: None,
+            default_value: expr_from_const_eval_value(value),
+            span: None,
+        },
+    );
+    module
+}
+
+fn fold_loop_statements(statements: Vec<Stmt>) -> Stmt {
+    if statements.is_empty() {
+        Stmt::Empty
+    } else {
+        Stmt::Block(statements)
+    }
+}
+
+fn normalize_for_loop_value(value: ConstEvalValue) -> ConstEvalValue {
+    value.coerced_to(value.width.max(32))
+}
+
+fn substitute_stmt_ident(stmt: &Stmt, name: &str, replacement: &Expr) -> Stmt {
+    match stmt {
+        Stmt::Empty => Stmt::Empty,
+        Stmt::Block(statements) => Stmt::Block(
+            statements
+                .iter()
+                .map(|statement| substitute_stmt_ident(statement, name, replacement))
+                .collect(),
+        ),
+        Stmt::Assign { kind, target, expr } => Stmt::Assign {
+            kind: kind.clone(),
+            target: substitute_lvalue_ident(target, name, replacement),
+            expr: substitute_expr_ident(expr, name, replacement),
+        },
+        Stmt::If {
+            cond,
+            then_branch,
+            else_branch,
+        } => Stmt::If {
+            cond: substitute_expr_ident(cond, name, replacement),
+            then_branch: Box::new(substitute_stmt_ident(then_branch, name, replacement)),
+            else_branch: else_branch
+                .as_ref()
+                .map(|branch| Box::new(substitute_stmt_ident(branch, name, replacement))),
+        },
+        Stmt::Case {
+            expr,
+            items,
+            default,
+        } => Stmt::Case {
+            expr: substitute_expr_ident(expr, name, replacement),
+            items: items
+                .iter()
+                .map(|item| CaseStmtItem {
+                    patterns: item
+                        .patterns
+                        .iter()
+                        .map(|pattern| substitute_expr_ident(pattern, name, replacement))
+                        .collect(),
+                    body: substitute_stmt_ident(&item.body, name, replacement),
+                })
+                .collect(),
+            default: default
+                .as_ref()
+                .map(|stmt| Box::new(substitute_stmt_ident(stmt, name, replacement))),
+        },
+    }
+}
+
+fn substitute_lvalue_ident(lvalue: &LValue, name: &str, replacement: &Expr) -> LValue {
+    match lvalue {
+        LValue::Signal(signal) => LValue::Signal(signal.clone()),
+        LValue::Concat(items) => LValue::Concat(
+            items
+                .iter()
+                .map(|item| substitute_lvalue_ident(item, name, replacement))
+                .collect(),
+        ),
+        LValue::BitSelect { signal, index } => LValue::BitSelect {
+            signal: signal.clone(),
+            index: *index,
+        },
+        LValue::PartSelect { signal, msb, lsb } => LValue::PartSelect {
+            signal: signal.clone(),
+            msb: *msb,
+            lsb: *lsb,
+        },
+        LValue::MemoryElement { memory, index } => LValue::MemoryElement {
+            memory: memory.clone(),
+            index: Box::new(substitute_expr_ident(index, name, replacement)),
+        },
+    }
+}
+
+fn substitute_expr_ident(expr: &Expr, name: &str, replacement: &Expr) -> Expr {
+    match expr {
+        Expr::Ident(ident) if ident == name => replacement.clone(),
+        Expr::Ident(ident) => Expr::Ident(ident.clone()),
+        Expr::Literal(literal) => Expr::Literal(literal.clone()),
+        Expr::Concat(items) => Expr::Concat(
+            items
+                .iter()
+                .map(|item| substitute_expr_ident(item, name, replacement))
+                .collect(),
+        ),
+        Expr::Repeat { count, expr } => Expr::Repeat {
+            count: *count,
+            expr: Box::new(substitute_expr_ident(expr, name, replacement)),
+        },
+        Expr::MemoryRead { memory, index } => Expr::MemoryRead {
+            memory: memory.clone(),
+            index: Box::new(substitute_expr_ident(index, name, replacement)),
+        },
+        Expr::BitSelect { expr, index } => Expr::BitSelect {
+            expr: Box::new(substitute_expr_ident(expr, name, replacement)),
+            index: *index,
+        },
+        Expr::PartSelect { expr, msb, lsb } => Expr::PartSelect {
+            expr: Box::new(substitute_expr_ident(expr, name, replacement)),
+            msb: *msb,
+            lsb: *lsb,
+        },
+        Expr::Unary { op, expr } => Expr::Unary {
+            op: op.clone(),
+            expr: Box::new(substitute_expr_ident(expr, name, replacement)),
+        },
+        Expr::Binary { left, op, right } => Expr::Binary {
+            left: Box::new(substitute_expr_ident(left, name, replacement)),
+            op: op.clone(),
+            right: Box::new(substitute_expr_ident(right, name, replacement)),
+        },
+        Expr::Ternary {
+            cond,
+            when_true,
+            when_false,
+        } => Expr::Ternary {
+            cond: Box::new(substitute_expr_ident(cond, name, replacement)),
+            when_true: Box::new(substitute_expr_ident(when_true, name, replacement)),
+            when_false: Box::new(substitute_expr_ident(when_false, name, replacement)),
+        },
+    }
+}
+
+fn expr_from_const_eval_value(value: &ConstEvalValue) -> Expr {
+    let literal = Expr::Literal(NumericLiteral {
+        bits: value.normalized_bits(),
+        width: Some(value.width),
+    });
+    if value.signed {
+        Expr::Unary {
+            op: UnaryOp::Signed,
+            expr: Box::new(literal),
+        }
+    } else {
+        literal
     }
 }
 
@@ -2380,7 +2829,7 @@ fn lower_expr_select(
     }
 
     if let Some(range) = select.nodes.2.as_ref() {
-        let (msb, lsb) = lower_part_select_range(syntax_tree, &range.nodes.1, path)?;
+        let (msb, lsb) = lower_part_select_range(syntax_tree, &range.nodes.1, module, path)?;
         expr = Expr::PartSelect {
             expr: Box::new(expr),
             msb,
@@ -2536,7 +2985,7 @@ fn lower_select_lvalue(
     }
 
     if let Some(range) = select.nodes.2.as_ref() {
-        let (msb, lsb) = lower_part_select_range(syntax_tree, &range.nodes.1, path)?;
+        let (msb, lsb) = lower_part_select_range(syntax_tree, &range.nodes.1, module, path)?;
         Ok(LValue::PartSelect {
             signal: name,
             msb,
@@ -2702,6 +3151,7 @@ fn lower_constant_part_select_range(
 fn lower_part_select_range(
     syntax_tree: &SyntaxTree,
     range: &PartSelectRange,
+    module: &ModuleSummary,
     path: &Path,
 ) -> LowerResult<(usize, usize)> {
     match range {
@@ -2709,10 +3159,39 @@ fn lower_part_select_range(
             lower_usize_constant_expression(syntax_tree, &range.nodes.0, path)?,
             lower_usize_constant_expression(syntax_tree, &range.nodes.2, path)?,
         )),
-        PartSelectRange::IndexedRange(_) => Err(unsupported(
-            "indexed part selects are not supported yet",
-            None,
-        )),
+        PartSelectRange::IndexedRange(range) => {
+            let base = lower_usize_expression(syntax_tree, &range.nodes.0, module, path)?;
+            let width = lower_usize_constant_expression_with_params(
+                syntax_tree,
+                &range.nodes.2,
+                path,
+                &module.parameters,
+            )?;
+            if width == 0 {
+                return Err(unsupported(
+                    "indexed part selects must have a positive width",
+                    None,
+                ));
+            }
+            match symbol_text(syntax_tree, &range.nodes.1)?.as_str() {
+                "+:" => Ok((
+                    base.checked_add(width - 1).ok_or_else(|| {
+                        unsupported("indexed part select exceeds host limits", None)
+                    })?,
+                    base,
+                )),
+                "-:" => Ok((
+                    base,
+                    base.checked_sub(width - 1).ok_or_else(|| {
+                        unsupported("indexed part select exceeds host limits", None)
+                    })?,
+                )),
+                _ => Err(unsupported(
+                    "indexed part select uses an unsupported operator",
+                    None,
+                )),
+            }
+        }
     }
 }
 
@@ -3615,6 +4094,136 @@ endmodule
             }
             other => panic!("unexpected generated assignment: {other:?}"),
         }
+    }
+
+    #[test]
+    fn parse_str_unrolls_procedural_for_loops_with_constant_indexed_part_selects() {
+        fn collect_assignments<'a>(stmt: &'a Stmt, out: &mut Vec<&'a Stmt>) {
+            match stmt {
+                Stmt::Assign { .. } => out.push(stmt),
+                Stmt::Block(statements) => {
+                    for statement in statements {
+                        collect_assignments(statement, out);
+                    }
+                }
+                Stmt::If {
+                    then_branch,
+                    else_branch,
+                    ..
+                } => {
+                    collect_assignments(then_branch, out);
+                    if let Some(else_branch) = else_branch {
+                        collect_assignments(else_branch, out);
+                    }
+                }
+                Stmt::Case { items, default, .. } => {
+                    for item in items {
+                        collect_assignments(&item.body, out);
+                    }
+                    if let Some(default) = default {
+                        collect_assignments(default, out);
+                    }
+                }
+                Stmt::Empty => {}
+            }
+        }
+
+        fn expr_contains_ident(expr: &Expr, ident: &str) -> bool {
+            match expr {
+                Expr::Ident(name) => name == ident,
+                Expr::Literal(_) => false,
+                Expr::Concat(items) => items.iter().any(|item| expr_contains_ident(item, ident)),
+                Expr::Repeat { expr, .. } => expr_contains_ident(expr, ident),
+                Expr::MemoryRead { index, .. } => expr_contains_ident(index, ident),
+                Expr::BitSelect { expr, .. } => expr_contains_ident(expr, ident),
+                Expr::PartSelect { expr, .. } => expr_contains_ident(expr, ident),
+                Expr::Unary { expr, .. } => expr_contains_ident(expr, ident),
+                Expr::Binary { left, right, .. } => {
+                    expr_contains_ident(left, ident) || expr_contains_ident(right, ident)
+                }
+                Expr::Ternary {
+                    cond,
+                    when_true,
+                    when_false,
+                } => {
+                    expr_contains_ident(cond, ident)
+                        || expr_contains_ident(when_true, ident)
+                        || expr_contains_ident(when_false, ident)
+                }
+            }
+        }
+
+        let frontend = SvParserFrontend::default();
+        let source = frontend
+            .parse_str(
+                PathBuf::from("/virtual/design/procedural_for.sv"),
+                r#"
+module top #(parameter STRIDE = 2) (
+    input logic [7:0] in,
+    output logic [7:0] out
+);
+    integer i, j;
+
+    always @* begin
+        out = 8'h00;
+        for (i = 0; i < 2; i = i + 1) begin
+            for (j = 0; j < 4; j = j + STRIDE)
+                out[j + i * 4 +: STRIDE] = in[j + i * 4 +: STRIDE] + i;
+        end
+    end
+endmodule
+"#,
+            )
+            .expect("parse procedural for module");
+
+        let module = &source.modules[0];
+        assert!(
+            module.unsupported.is_empty(),
+            "unexpected unsupported entries: {:?}",
+            module.unsupported
+        );
+        assert_eq!(module.proc_blocks.len(), 1);
+
+        let mut assignments = Vec::new();
+        collect_assignments(&module.proc_blocks[0].body, &mut assignments);
+        assert_eq!(assignments.len(), 5);
+
+        let mut actual_ranges = Vec::new();
+        let mut actual_increments = Vec::new();
+        for assignment in &assignments[1..] {
+            let Stmt::Assign { target, expr, .. } = assignment else {
+                panic!("expected assignment");
+            };
+            let LValue::PartSelect { signal, msb, lsb } = target else {
+                panic!("expected constant part-select target: {assignment:?}");
+            };
+            assert_eq!(signal, "out");
+            actual_ranges.push((*msb, *lsb));
+            assert!(
+                !expr_contains_ident(expr, "i") && !expr_contains_ident(expr, "j"),
+                "loop variables should be substituted away: {expr:?}"
+            );
+            let Expr::Binary { right, .. } = expr else {
+                panic!("expected binary add expression: {expr:?}");
+            };
+            match right.as_ref() {
+                Expr::Literal(NumericLiteral { bits, .. }) => {
+                    actual_increments.push(bits.to_u64_checked().expect("literal increment"));
+                }
+                Expr::Unary { op, expr } if *op == crate::hir::UnaryOp::Signed => match expr
+                    .as_ref()
+                {
+                    Expr::Literal(NumericLiteral { bits, .. }) => {
+                        actual_increments.push(bits.to_u64_checked().expect("signed increment"));
+                    }
+                    other => panic!("unexpected signed increment expression: {other:?}"),
+                },
+                other => panic!("unexpected increment expression: {other:?}"),
+            }
+        }
+
+        assert_eq!(actual_ranges, vec![(1, 0), (3, 2), (5, 4), (7, 6)]);
+        assert_eq!(actual_increments, vec![0, 0, 1, 1]);
     }
 
     #[test]
