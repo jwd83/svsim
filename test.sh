@@ -2,10 +2,10 @@
 echo "Building..."
 cargo build -q -p svsim-cli --release
 echo "Testing..."
-./target/release/svsim --json-test-dir parts/basic > report-parts-basic.json
-./target/release/svsim --json-test-dir parts/overture > report-parts-overture.json
-./target/release/svsim --json-test-dir parts/picorv32 > report-parts-picorv32.json
-./target/release/svsim --json-test-dir parts/rv32i > report-parts-rv32i.json
-./target/release/svsim --json-test-dir parts/sap1 > report-parts-sap1.json
-./target/release/svsim --json-test-dir parts/testing > report-parts-testing.json
+./target/release/svsim --json-test-dir parts/basic > docs/tests/report-parts-basic.json
+./target/release/svsim --json-test-dir parts/overture > docs/tests/report-parts-overture.json
+./target/release/svsim --json-test-dir parts/picorv32 > docs/tests/report-parts-picorv32.json
+./target/release/svsim --json-test-dir parts/rv32i > docs/tests/report-parts-rv32i.json
+./target/release/svsim --json-test-dir parts/sap1 > docs/tests/report-parts-sap1.json
+./target/release/svsim --json-test-dir parts/testing > docs/tests/report-parts-testing.json
 echo "Done"
