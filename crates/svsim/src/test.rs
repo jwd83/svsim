@@ -713,6 +713,22 @@ mod tests {
     }
 
     #[test]
+    fn run_json_file_passes_picorv32_smoke_suite() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .add_search_path(repo.join("parts/picorv32"))
+            .compile_file(repo.join("parts/picorv32/picorv32_smoke.sv"))
+            .expect("compile picorv32 smoke harness");
+
+        let report = design
+            .run_json_file(repo.join("parts/picorv32/picorv32_smoke.json"))
+            .expect("run picorv32 smoke json");
+
+        assert!(report.all_passed());
+        assert_eq!(report.passed, report.total);
+    }
+
+    #[test]
     fn run_json_test_dir_passes_rv32i_corpus() {
         let repo = repo_root();
         let report = Compiler::new()

@@ -1,0 +1,45 @@
+{
+  "memory_init": [
+    {
+      "module": "picorv32_smoke",
+      "memory": "rom",
+      "file": "picorv32_smoke_rom.txt"
+    }
+  ],
+  "test_cases": [
+    {
+      "name": "begins fetching from reset vector",
+      "sequence": [
+        {
+          "inputs": {
+            "clk": 1,
+            "resetn": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "resetn": 1
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "resetn": 1
+          },
+          "expected": {
+            "trap": 0,
+            "mem_valid": 1,
+            "mem_instr": 1,
+            "mem_addr": 0,
+            "store_seen": 0,
+            "store_addr": 0,
+            "store_data": 0
+          }
+        }
+      ]
+    }
+  ]
+}

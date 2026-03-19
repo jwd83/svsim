@@ -8,7 +8,10 @@ use crate::hir::{
     ModuleInstanceSummary, ModuleSummary, NumericLiteral, PortDirection, ProcBlockKind, Stmt,
     UnaryOp, expr_to_lvalue,
 };
-use crate::width::{mask, minimum_width, shift_left_bits, shift_right_bits};
+use crate::width::{
+    arithmetic_shift_right_bits, mask, minimum_width, shift_left_bits, shift_right_bits,
+    sign_extend_bits,
+};
 
 pub(crate) fn validate_design(hir: &HirDesign) -> Result<()> {
     let mut validated = HashSet::new();
@@ -396,7 +399,20 @@ fn validate_expr(expr: &Expr, module: &ModuleSummary) -> Result<usize> {
             }
             ensure_runtime_width(high - (*msb).min(*lsb) + 1, "part-select expression")
         }
-        Expr::Unary { expr, .. } => validate_expr(expr, module),
+        Expr::Unary { op, expr } => {
+            let expr_width = validate_expr(expr, module)?;
+            ensure_runtime_width(
+                match op {
+                    UnaryOp::LogicalNot
+                    | UnaryOp::ReductionAnd
+                    | UnaryOp::ReductionNand
+                    | UnaryOp::ReductionOr
+                    | UnaryOp::ReductionXor => 1,
+                    UnaryOp::BitNot | UnaryOp::Signed => expr_width,
+                },
+                "unary expression",
+            )
+        }
         Expr::Binary { left, op, right } => {
             let left_width = validate_expr(left, module)?;
             let right_width = validate_expr(right, module)?;
@@ -410,7 +426,9 @@ fn validate_expr(expr: &Expr, module: &ModuleSummary) -> Result<usize> {
                     | BinaryOp::LtEq
                     | BinaryOp::Gt
                     | BinaryOp::GtEq => 1,
-                    BinaryOp::ShiftLeft | BinaryOp::ShiftRight => left_width,
+                    BinaryOp::ShiftLeft | BinaryOp::ShiftRight | BinaryOp::ArithmeticShiftRight => {
+                        left_width
+                    }
                     BinaryOp::BitAnd
                     | BinaryOp::BitOr
                     | BinaryOp::BitXor
@@ -567,18 +585,34 @@ fn validate_constant_memory_index(
 struct ConstValue {
     bits: BitValue,
     width: usize,
+    signed: bool,
 }
 
 impl ConstValue {
     fn new(bits: BitValue, width: usize) -> Self {
+        Self::new_with_signed(bits, width, false)
+    }
+
+    fn new_with_signed(bits: BitValue, width: usize, signed: bool) -> Self {
         Self {
             bits: bits.truncate(width),
             width,
+            signed,
         }
     }
 
     fn normalized_bits(&self) -> BitValue {
         self.bits.clone()
+    }
+
+    fn coerced_to(&self, width: usize) -> Self {
+        let width = width.max(1);
+        let bits = if self.signed {
+            sign_extend_bits(&self.normalized_bits(), self.width, width)
+        } else {
+            self.normalized_bits().truncate(width)
+        };
+        Self::new_with_signed(bits, width, self.signed)
     }
 
     fn truthy(&self) -> bool {
@@ -622,9 +656,10 @@ fn const_eval_expr(expr: &Expr) -> Option<ConstValue> {
         Expr::Unary { op, expr } => {
             let value = const_eval_expr(expr)?;
             match op {
-                UnaryOp::BitNot => Some(ConstValue::new(
+                UnaryOp::BitNot => Some(ConstValue::new_with_signed(
                     value.normalized_bits().bitnot_with_width(value.width),
                     value.width,
+                    value.signed,
                 )),
                 UnaryOp::LogicalNot => {
                     let is_zero = value.normalized_bits().is_zero();
@@ -637,6 +672,11 @@ fn const_eval_expr(expr: &Expr) -> Option<ConstValue> {
                 UnaryOp::ReductionAnd => {
                     let m = mask(value.width);
                     let result = value.normalized_bits().bitand(&m) == m;
+                    Some(ConstValue::new(BitValue::from(u64::from(result)), 1))
+                }
+                UnaryOp::ReductionNand => {
+                    let m = mask(value.width);
+                    let result = value.normalized_bits().bitand(&m) != m;
                     Some(ConstValue::new(BitValue::from(u64::from(result)), 1))
                 }
                 UnaryOp::ReductionXor => {
@@ -652,23 +692,31 @@ fn const_eval_expr(expr: &Expr) -> Option<ConstValue> {
                         1,
                     ))
                 }
+                UnaryOp::Signed => Some(ConstValue::new_with_signed(
+                    value.normalized_bits(),
+                    value.width,
+                    true,
+                )),
             }
         }
         Expr::Binary { left, op, right } => {
-            let left = const_eval_expr(left)?;
-            let right = const_eval_expr(right)?;
+            let mut left = const_eval_expr(left)?;
+            let mut right = const_eval_expr(right)?;
+            let common_width = left.width.max(right.width);
+            left = left.coerced_to(common_width);
+            right = right.coerced_to(common_width);
             let (bits, width) = match op {
                 BinaryOp::BitAnd => (
                     left.normalized_bits().bitand(&right.normalized_bits()),
-                    left.width.max(right.width),
+                    common_width,
                 ),
                 BinaryOp::BitOr => (
                     left.normalized_bits().bitor(&right.normalized_bits()),
-                    left.width.max(right.width),
+                    common_width,
                 ),
                 BinaryOp::BitXor => (
                     left.normalized_bits().bitxor(&right.normalized_bits()),
-                    left.width.max(right.width),
+                    common_width,
                 ),
                 BinaryOp::ShiftLeft => (
                     shift_left_bits(
@@ -686,6 +734,14 @@ fn const_eval_expr(expr: &Expr) -> Option<ConstValue> {
                     ),
                     left.width,
                 ),
+                BinaryOp::ArithmeticShiftRight => (
+                    arithmetic_shift_right_bits(
+                        &left.normalized_bits(),
+                        &right.normalized_bits(),
+                        left.width,
+                    ),
+                    left.width,
+                ),
                 BinaryOp::LogicalAnd => (BitValue::from(left.truthy() && right.truthy()), 1),
                 BinaryOp::LogicalOr => (BitValue::from(left.truthy() || right.truthy()), 1),
                 BinaryOp::Eq => (
@@ -697,38 +753,58 @@ fn const_eval_expr(expr: &Expr) -> Option<ConstValue> {
                     1,
                 ),
                 BinaryOp::Lt => (
-                    BitValue::from(left.normalized_bits() < right.normalized_bits()),
+                    BitValue::from(compare_const_values(&left, &right) == std::cmp::Ordering::Less),
                     1,
                 ),
                 BinaryOp::LtEq => (
-                    BitValue::from(left.normalized_bits() <= right.normalized_bits()),
+                    BitValue::from(
+                        compare_const_values(&left, &right) != std::cmp::Ordering::Greater,
+                    ),
                     1,
                 ),
                 BinaryOp::Gt => (
-                    BitValue::from(left.normalized_bits() > right.normalized_bits()),
+                    BitValue::from(
+                        compare_const_values(&left, &right) == std::cmp::Ordering::Greater,
+                    ),
                     1,
                 ),
                 BinaryOp::GtEq => (
-                    BitValue::from(left.normalized_bits() >= right.normalized_bits()),
+                    BitValue::from(compare_const_values(&left, &right) != std::cmp::Ordering::Less),
                     1,
                 ),
                 BinaryOp::Add => (
                     left.normalized_bits()
-                        .wrapping_add(&right.normalized_bits(), left.width.max(right.width)),
-                    left.width.max(right.width),
+                        .wrapping_add(&right.normalized_bits(), common_width),
+                    common_width,
                 ),
                 BinaryOp::Sub => (
                     left.normalized_bits()
-                        .wrapping_sub(&right.normalized_bits(), left.width.max(right.width)),
-                    left.width.max(right.width),
+                        .wrapping_sub(&right.normalized_bits(), common_width),
+                    common_width,
                 ),
                 BinaryOp::Mul => (
                     left.normalized_bits()
-                        .wrapping_mul(&right.normalized_bits(), left.width.max(right.width)),
-                    left.width.max(right.width),
+                        .wrapping_mul(&right.normalized_bits(), common_width),
+                    common_width,
                 ),
             };
-            Some(ConstValue::new(bits, width))
+            Some(ConstValue::new_with_signed(
+                bits,
+                width,
+                matches!(
+                    op,
+                    BinaryOp::BitAnd
+                        | BinaryOp::BitOr
+                        | BinaryOp::BitXor
+                        | BinaryOp::ShiftLeft
+                        | BinaryOp::ShiftRight
+                        | BinaryOp::ArithmeticShiftRight
+                        | BinaryOp::Add
+                        | BinaryOp::Sub
+                        | BinaryOp::Mul
+                ) && left.signed
+                    && right.signed,
+            ))
         }
         Expr::Ternary {
             cond,
@@ -740,11 +816,11 @@ fn const_eval_expr(expr: &Expr) -> Option<ConstValue> {
             let when_false = const_eval_expr(when_false)?;
             let result_width = when_true.width.max(when_false.width);
             let value = if cond.truthy() {
-                when_true.normalized_bits()
+                when_true.coerced_to(result_width)
             } else {
-                when_false.normalized_bits()
+                when_false.coerced_to(result_width)
             };
-            Some(ConstValue::new(value, result_width))
+            Some(value)
         }
     }
 }
@@ -754,6 +830,30 @@ fn const_value_from_literal(literal: &NumericLiteral) -> ConstValue {
         .width
         .unwrap_or_else(|| minimum_width(&literal.bits));
     ConstValue::new(literal.bits.clone(), width)
+}
+
+fn compare_const_values(left: &ConstValue, right: &ConstValue) -> std::cmp::Ordering {
+    if left.signed && right.signed {
+        compare_signed_bits(
+            &left.normalized_bits(),
+            &right.normalized_bits(),
+            left.width,
+        )
+    } else {
+        left.normalized_bits()
+            .cmp_unsigned(&right.normalized_bits())
+    }
+}
+
+fn compare_signed_bits(left: &BitValue, right: &BitValue, width: usize) -> std::cmp::Ordering {
+    let width = width.max(1);
+    let left = left.truncate(width);
+    let right = right.truncate(width);
+    match left.get_bit(width - 1).cmp(&right.get_bit(width - 1)) {
+        std::cmp::Ordering::Less => std::cmp::Ordering::Greater,
+        std::cmp::Ordering::Greater => std::cmp::Ordering::Less,
+        std::cmp::Ordering::Equal => left.cmp_unsigned(&right),
+    }
 }
 
 fn concat_const_values(parts: &[ConstValue]) -> Option<ConstValue> {

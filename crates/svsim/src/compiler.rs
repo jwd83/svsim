@@ -740,6 +740,7 @@ mod tests {
 
         let picorv32 = design.hir().module("picorv32").expect("picorv32 module");
         assert!(picorv32.instantiations.is_empty());
+        assert!(picorv32.unsupported.is_empty());
         assert!(
             !picorv32
                 .unsupported

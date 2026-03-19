@@ -54,9 +54,10 @@ pub(crate) fn expr_width(expr: &Expr, module: &ModuleSummary) -> Result<usize> {
         Expr::Unary { op, expr } => match op {
             UnaryOp::LogicalNot
             | UnaryOp::ReductionAnd
+            | UnaryOp::ReductionNand
             | UnaryOp::ReductionOr
             | UnaryOp::ReductionXor => Ok(1),
-            UnaryOp::BitNot => expr_width(expr, module),
+            UnaryOp::BitNot | UnaryOp::Signed => expr_width(expr, module),
         },
         Expr::Binary { left, op, right } => {
             let left_width = expr_width(left, module)?;
@@ -70,7 +71,9 @@ pub(crate) fn expr_width(expr: &Expr, module: &ModuleSummary) -> Result<usize> {
                 | BinaryOp::LtEq
                 | BinaryOp::Gt
                 | BinaryOp::GtEq => 1,
-                BinaryOp::ShiftLeft | BinaryOp::ShiftRight => left_width,
+                BinaryOp::ShiftLeft | BinaryOp::ShiftRight | BinaryOp::ArithmeticShiftRight => {
+                    left_width
+                }
                 BinaryOp::BitAnd
                 | BinaryOp::BitOr
                 | BinaryOp::BitXor
@@ -131,4 +134,49 @@ pub(crate) fn shift_left_bits(bits: &BitValue, amount_bits: &BitValue, width: us
 
 pub(crate) fn shift_right_bits(bits: &BitValue, amount_bits: &BitValue, width: usize) -> BitValue {
     shift_bits(bits, amount_bits, width, ShiftDirection::Right)
+}
+
+pub(crate) fn sign_extend_bits(bits: &BitValue, from_width: usize, to_width: usize) -> BitValue {
+    let from_width = from_width.max(1);
+    let to_width = to_width.max(1);
+    let mut value = bits.truncate(from_width);
+    if to_width <= from_width {
+        return value.truncate(to_width);
+    }
+
+    if value.get_bit(from_width - 1) {
+        for index in from_width..to_width {
+            value.set_bit(index, true);
+        }
+    }
+
+    value.truncate(to_width)
+}
+
+pub(crate) fn arithmetic_shift_right_bits(
+    bits: &BitValue,
+    amount_bits: &BitValue,
+    width: usize,
+) -> BitValue {
+    let width = width.max(1);
+    let normalized = bits.truncate(width);
+    let Some(amount) = amount_bits.to_usize_checked() else {
+        return BitValue::zero();
+    };
+
+    if amount >= width {
+        return if normalized.get_bit(width - 1) {
+            BitValue::mask(width)
+        } else {
+            BitValue::zero()
+        };
+    }
+
+    let mut shifted = normalized.shift_right(amount);
+    if normalized.get_bit(width - 1) {
+        for index in (width - amount)..width {
+            shifted.set_bit(index, true);
+        }
+    }
+    shifted.truncate(width)
 }

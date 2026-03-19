@@ -5,12 +5,13 @@ use sv_parser::{
     AlwaysConstruct, AlwaysKeyword, AnsiPortDeclaration, BinaryOperator, CaseItem as SvCaseItem,
     CaseStatement, CondPredicate, ConditionalStatement, ConstantExpression,
     ConstantPartSelectRange, ConstantRange, ConstantSelect, ContinuousAssign, DataDeclaration,
-    DataType, DataTypeOrImplicit, Define, Defines, Expression, HierarchicalIdentifier,
-    ImplicitDataType, ListOfPortConnections, LocalParameterDeclaration, Locate,
-    ModuleDeclarationAnsi, ModuleDeclarationNonansi, ModuleInstantiation, ModuleOrGenerateItem,
-    ModuleOrGenerateItemDeclaration, NamedPortConnection, NetDeclaration, NetLvalue,
-    NonPortModuleItem, PackageOrGenerateItemDeclaration, ParameterDeclaration,
-    ParameterPortDeclaration, ParameterPortList, PartSelectRange, PortDirection, Primary,
+    DataType, DataTypeOrImplicit, Define, Defines, Expression, FunctionSubroutineCall,
+    HierarchicalIdentifier, ImplicitDataType, InitialConstruct, Keyword, ListOfPortConnections,
+    LocalParameterDeclaration, Locate, ModuleDeclarationAnsi, ModuleDeclarationNonansi,
+    ModuleInstantiation, ModuleOrGenerateItem, ModuleOrGenerateItemDeclaration,
+    NamedPortConnection, NetDeclaration, NetLvalue, NonPortModuleItem,
+    PackageOrGenerateItemDeclaration, ParameterDeclaration, ParameterPortDeclaration,
+    ParameterPortList, Paren, PartSelectRange, PortDirection, Primary,
     PsOrHierarchicalNetIdentifier, RefNode, Select, SeqBlock, Statement, StatementItem,
     StatementOrNull, SyntaxTree, UnaryOperator, UnpackedDimension, VariableAssignment,
     VariableDeclAssignment, VariableDimension, VariableLvalue, VariablePortType, parse_sv,
@@ -135,7 +136,13 @@ fn lower_ansi_module(
         let mut context = None;
         if let Some(list) = port_decls.nodes.0.nodes.1.as_ref() {
             for port_decl in list.contents() {
-                match lower_ansi_port_declaration(syntax_tree, &port_decl.1, path, context, &module.parameters) {
+                match lower_ansi_port_declaration(
+                    syntax_tree,
+                    &port_decl.1,
+                    path,
+                    context,
+                    &module.parameters,
+                ) {
                     Ok((port, next_context)) => {
                         module.ports.push(port);
                         context = Some(next_context);
@@ -224,14 +231,14 @@ fn lower_parameter_port_list(
     match list {
         ParameterPortList::Assignment(list) => {
             // First: the initial ListOfParamAssignments (bare assignments inheriting `parameter`)
-            for assignment in list.nodes.1.nodes.1 .0.nodes.0.contents() {
+            for assignment in list.nodes.1.nodes.1.0.nodes.0.contents() {
                 match lower_param_assignment(syntax_tree, assignment, None, module, path) {
                     Ok(param) => module.parameters.push(param),
                     Err(diag) => module.unsupported.push(diag),
                 }
             }
             // Then: subsequent ParameterPortDeclaration entries
-            for (_, decl) in &list.nodes.1.nodes.1 .1 {
+            for (_, decl) in &list.nodes.1.nodes.1.1 {
                 lower_parameter_port_declaration(syntax_tree, decl, path, module);
             }
         }
@@ -299,13 +306,14 @@ fn lower_parameter_or_localparam_body(
     path: &Path,
     module: &mut ModuleSummary,
 ) {
-    let range = match lower_data_type_or_implicit_range(syntax_tree, data_type, path, &module.parameters) {
-        Ok(r) => r,
-        Err(diag) => {
-            module.unsupported.push(diag);
-            return;
-        }
-    };
+    let range =
+        match lower_data_type_or_implicit_range(syntax_tree, data_type, path, &module.parameters) {
+            Ok(r) => r,
+            Err(diag) => {
+                module.unsupported.push(diag);
+                return;
+            }
+        };
     for assignment in assignments.nodes.0.contents() {
         match lower_param_assignment(syntax_tree, assignment, range, module, path) {
             Ok(param) => module.parameters.push(param),
@@ -325,9 +333,7 @@ fn lower_parameter_or_localparam_declaration_into(
             data_type,
             assignments,
         } => {
-            lower_parameter_or_localparam_body(
-                syntax_tree, data_type, assignments, path, module,
-            );
+            lower_parameter_or_localparam_body(syntax_tree, data_type, assignments, path, module);
         }
         ParameterOrLocal::TypeParam => {
             module.unsupported.push(Diagnostic {
@@ -376,9 +382,8 @@ fn lower_param_assignment(
     module: &ModuleSummary,
     path: &Path,
 ) -> LowerResult<ParameterDecl> {
-    let (name, locate) =
-        identifier_name_from_node(syntax_tree, RefNode::from(&assignment.nodes.0))
-            .ok_or_else(|| unsupported("failed to determine parameter name", None))?;
+    let (name, locate) = identifier_name_from_node(syntax_tree, RefNode::from(&assignment.nodes.0))
+        .ok_or_else(|| unsupported("failed to determine parameter name", None))?;
 
     if !assignment.nodes.1.is_empty() {
         return Err(unsupported(
@@ -394,7 +399,8 @@ fn lower_param_assignment(
         )
     })?;
 
-    let default_value = lower_constant_param_expression(syntax_tree, const_param_expr, module, path)?;
+    let default_value =
+        lower_constant_param_expression(syntax_tree, const_param_expr, module, path)?;
 
     Ok(ParameterDecl {
         name,
@@ -514,11 +520,8 @@ fn lower_constant_primary_to_expr(
     match primary {
         sv_parser::ConstantPrimary::PrimaryLiteral(lit) => lower_literal(syntax_tree, lit),
         sv_parser::ConstantPrimary::PsParameter(ps) => {
-            let (name, _) = identifier_name_from_node(
-                syntax_tree,
-                RefNode::from(&ps.nodes.0),
-            )
-            .ok_or_else(|| unsupported("failed to determine parameter reference name", None))?;
+            let (name, _) = identifier_name_from_node(syntax_tree, RefNode::from(&ps.nodes.0))
+                .ok_or_else(|| unsupported("failed to determine parameter reference name", None))?;
             Ok(Expr::Ident(name))
         }
         sv_parser::ConstantPrimary::MintypmaxExpression(expr) => {
@@ -528,7 +531,10 @@ fn lower_constant_primary_to_expr(
             let mut exprs = Vec::new();
             for expr in concat.nodes.0.nodes.0.nodes.1.contents() {
                 exprs.push(lower_constant_expression_to_expr(
-                    syntax_tree, expr, module, path,
+                    syntax_tree,
+                    expr,
+                    module,
+                    path,
                 )?);
             }
             Ok(Expr::Concat(exprs))
@@ -536,7 +542,7 @@ fn lower_constant_primary_to_expr(
         sv_parser::ConstantPrimary::MultipleConcatenation(concat) => {
             let inner = &concat.nodes.0.nodes.0;
             let count_expr =
-                lower_constant_expression_to_expr(syntax_tree, &inner.nodes.1 .0, module, path)?;
+                lower_constant_expression_to_expr(syntax_tree, &inner.nodes.1.0, module, path)?;
             let Expr::Literal(count_lit) = &count_expr else {
                 return Err(unsupported(
                     "replication count must be a literal in parameter expressions",
@@ -548,9 +554,12 @@ fn lower_constant_primary_to_expr(
                 .to_usize_checked()
                 .ok_or_else(|| unsupported("replication count exceeds host limits", None))?;
             let mut exprs = Vec::new();
-            for expr in inner.nodes.1 .1.nodes.0.nodes.1.contents() {
+            for expr in inner.nodes.1.1.nodes.0.nodes.1.contents() {
                 exprs.push(lower_constant_expression_to_expr(
-                    syntax_tree, expr, module, path,
+                    syntax_tree,
+                    expr,
+                    module,
+                    path,
                 )?);
             }
             Ok(Expr::Repeat {
@@ -561,13 +570,10 @@ fn lower_constant_primary_to_expr(
         sv_parser::ConstantPrimary::ConstantFunctionCall(call) => {
             // sv-parser often parses bare identifier references (like parameter names)
             // as ConstantFunctionCall with no arguments. Extract the identifier.
-            let (name, _) = identifier_name_from_node(
-                syntax_tree,
-                RefNode::from(call.as_ref()),
-            )
-            .ok_or_else(|| {
-                unsupported("constant function calls are not supported yet", None)
-            })?;
+            let (name, _) = identifier_name_from_node(syntax_tree, RefNode::from(call.as_ref()))
+                .ok_or_else(|| {
+                    unsupported("constant function calls are not supported yet", None)
+                })?;
             Ok(Expr::Ident(name))
         }
         _ => Err(unsupported(
@@ -606,6 +612,11 @@ fn lower_module_or_generate_item(
                     Err(diag) => module.unsupported.push(diag),
                 }
             }
+            sv_parser::ModuleCommonItem::InitialConstruct(construct) => {
+                if let Err(diag) = lower_initial_construct(syntax_tree, construct, module, path) {
+                    module.unsupported.push(diag);
+                }
+            }
             sv_parser::ModuleCommonItem::ConditionalGenerateConstruct(construct) => {
                 lower_conditional_generate_construct(syntax_tree, construct, path, module);
             }
@@ -618,6 +629,40 @@ fn lower_module_or_generate_item(
             message: "generate item is outside the current executable subset".into(),
             span: module.span.clone(),
         }),
+    }
+}
+
+fn lower_initial_construct(
+    syntax_tree: &SyntaxTree,
+    construct: &InitialConstruct,
+    module: &ModuleSummary,
+    path: &Path,
+) -> LowerResult<()> {
+    let body = lower_statement_or_null(syntax_tree, &construct.nodes.1, module, path)?;
+    if stmt_is_inert(&body) {
+        Ok(())
+    } else {
+        Err(unsupported(
+            "initial constructs are not supported yet",
+            None,
+        ))
+    }
+}
+
+fn stmt_is_inert(stmt: &Stmt) -> bool {
+    match stmt {
+        Stmt::Empty => true,
+        Stmt::Block(statements) => statements.iter().all(stmt_is_inert),
+        Stmt::If {
+            then_branch,
+            else_branch,
+            ..
+        } => stmt_is_inert(then_branch) && else_branch.as_deref().is_none_or(stmt_is_inert),
+        Stmt::Case { items, default, .. } => {
+            items.iter().all(|item| stmt_is_inert(&item.body))
+                && default.as_deref().is_none_or(stmt_is_inert)
+        }
+        Stmt::Assign { .. } => false,
     }
 }
 
@@ -781,7 +826,12 @@ fn lower_ansi_port_declaration(
                     sv_parser::NetPortHeaderOrInterfacePortHeader::NetPortHeader(header) => {
                         AnsiPortContext {
                             direction: lower_port_direction(header.nodes.0.as_ref(), path)?,
-                            range: lower_net_port_range(syntax_tree, &header.nodes.1, path, params)?,
+                            range: lower_net_port_range(
+                                syntax_tree,
+                                &header.nodes.1,
+                                path,
+                                params,
+                            )?,
                         }
                     }
                     sv_parser::NetPortHeaderOrInterfacePortHeader::InterfacePortHeader(_) => {
@@ -1068,14 +1118,12 @@ fn lower_variable_dimensions(
 ) -> LowerResult<Option<PackedRange>> {
     match dimensions {
         [] => Ok(None),
-        [VariableDimension::UnpackedDimension(dimension)] => {
-            lower_unpacked_dimensions(
-                syntax_tree,
-                std::slice::from_ref(dimension.as_ref()),
-                path,
-                params,
-            )
-        }
+        [VariableDimension::UnpackedDimension(dimension)] => lower_unpacked_dimensions(
+            syntax_tree,
+            std::slice::from_ref(dimension.as_ref()),
+            path,
+            params,
+        ),
         [VariableDimension::UnsizedDimension(_)]
         | [VariableDimension::AssociativeDimension(_)]
         | [VariableDimension::QueueDimension(_)] => Err(unsupported(
@@ -1281,8 +1329,7 @@ fn lower_always_generic(
     match control.as_ref() {
         // always @* or always @(*)  →  AlwaysComb
         sv_parser::EventControl::Asterisk(_) | sv_parser::EventControl::ParenAsterisk(_) => {
-            let body =
-                lower_statement_or_null(syntax_tree, &timing_stmt.nodes.1, module, path)?;
+            let body = lower_statement_or_null(syntax_tree, &timing_stmt.nodes.1, module, path)?;
             Ok(ProcBlock {
                 kind: ProcBlockKind::AlwaysComb,
                 body,
@@ -1291,14 +1338,9 @@ fn lower_always_generic(
         }
         // always @(posedge clk)  →  AlwaysFf
         sv_parser::EventControl::EventExpression(expr) => {
-            let clock = lower_always_ff_event_expression(
-                syntax_tree,
-                &expr.nodes.1.nodes.1,
-                module,
-                path,
-            )?;
-            let body =
-                lower_statement_or_null(syntax_tree, &timing_stmt.nodes.1, module, path)?;
+            let clock =
+                lower_always_ff_event_expression(syntax_tree, &expr.nodes.1.nodes.1, module, path)?;
+            let body = lower_statement_or_null(syntax_tree, &timing_stmt.nodes.1, module, path)?;
             Ok(ProcBlock {
                 kind: ProcBlockKind::AlwaysFf { clock },
                 body,
@@ -1472,10 +1514,7 @@ fn lower_subroutine_call_statement(
     }
 }
 
-fn is_inert_subroutine_call(
-    syntax_tree: &SyntaxTree,
-    call: &sv_parser::SubroutineCall,
-) -> bool {
+fn is_inert_subroutine_call(syntax_tree: &SyntaxTree, call: &sv_parser::SubroutineCall) -> bool {
     match call {
         sv_parser::SubroutineCall::TfCall(call) => {
             inert_task_name(syntax_tree, &call.nodes.0).as_deref() == Some("empty_statement")
@@ -1516,10 +1555,7 @@ fn inert_system_tf_name(
     syntax_tree.get_str(&identifier.nodes.0).map(str::to_owned)
 }
 
-fn is_inert_task_declaration(
-    _syntax_tree: &SyntaxTree,
-    decl: &sv_parser::TaskDeclaration,
-) -> bool {
+fn is_inert_task_declaration(_syntax_tree: &SyntaxTree, decl: &sv_parser::TaskDeclaration) -> bool {
     match &decl.nodes.2 {
         sv_parser::TaskBodyDeclaration::WithoutPort(body) => {
             body.nodes.0.is_none()
@@ -1714,31 +1750,70 @@ fn lower_conditional_statement(
         ));
     }
 
-    let mut else_branch = statement
-        .nodes
-        .5
-        .as_ref()
-        .map(|(_, branch)| lower_statement_or_null(syntax_tree, branch, module, path))
-        .transpose()?
-        .map(Box::new);
-
-    for (_, _, predicate, branch) in statement.nodes.4.iter().rev() {
-        else_branch = Some(Box::new(Stmt::If {
-            cond: lower_cond_predicate(syntax_tree, &predicate.nodes.1, module, path)?,
-            then_branch: Box::new(lower_statement_or_null(syntax_tree, branch, module, path)?),
-            else_branch,
-        }));
+    let cond = lower_cond_predicate(syntax_tree, &statement.nodes.2.nodes.1, module, path)?;
+    if let Ok(value) = const_eval_param_value(&cond, &module.parameters) {
+        return if value != 0 {
+            lower_statement_or_null(syntax_tree, &statement.nodes.3, module, path)
+        } else {
+            lower_conditional_else_chain(
+                syntax_tree,
+                &statement.nodes.4,
+                statement.nodes.5.as_ref().map(|(_, branch)| branch),
+                module,
+                path,
+            )
+        };
     }
 
+    let else_branch = lower_conditional_else_chain(
+        syntax_tree,
+        &statement.nodes.4,
+        statement.nodes.5.as_ref().map(|(_, branch)| branch),
+        module,
+        path,
+    )?;
+
     Ok(Stmt::If {
-        cond: lower_cond_predicate(syntax_tree, &statement.nodes.2.nodes.1, module, path)?,
+        cond,
         then_branch: Box::new(lower_statement_or_null(
             syntax_tree,
             &statement.nodes.3,
             module,
             path,
         )?),
-        else_branch,
+        else_branch: (!stmt_is_inert(&else_branch)).then_some(Box::new(else_branch)),
+    })
+}
+
+fn lower_conditional_else_chain(
+    syntax_tree: &SyntaxTree,
+    else_ifs: &[(Keyword, Keyword, Paren<CondPredicate>, StatementOrNull)],
+    final_else: Option<&StatementOrNull>,
+    module: &ModuleSummary,
+    path: &Path,
+) -> LowerResult<Stmt> {
+    let Some((_, _, predicate, branch)) = else_ifs.first() else {
+        return final_else
+            .map(|branch| lower_statement_or_null(syntax_tree, branch, module, path))
+            .transpose()?
+            .map_or(Ok(Stmt::Empty), Ok);
+    };
+
+    let cond = lower_cond_predicate(syntax_tree, &predicate.nodes.1, module, path)?;
+    if let Ok(value) = const_eval_param_value(&cond, &module.parameters) {
+        return if value != 0 {
+            lower_statement_or_null(syntax_tree, branch, module, path)
+        } else {
+            lower_conditional_else_chain(syntax_tree, &else_ifs[1..], final_else, module, path)
+        };
+    }
+
+    let tail = lower_conditional_else_chain(syntax_tree, &else_ifs[1..], final_else, module, path)?;
+
+    Ok(Stmt::If {
+        cond,
+        then_branch: Box::new(lower_statement_or_null(syntax_tree, branch, module, path)?),
+        else_branch: (!stmt_is_inert(&tail)).then_some(Box::new(tail)),
     })
 }
 
@@ -1845,23 +1920,39 @@ fn lower_expression(
             })
         }
         Expression::Binary(expr) => {
+            let op_text = symbol_text(syntax_tree, &expr.nodes.1.nodes.0)?;
+            let left = lower_expression(syntax_tree, &expr.nodes.0, module, path)?;
+            if matches!(op_text.as_str(), "&&" | "||") {
+                if let Ok(value) = const_eval_param_value(&left, &module.parameters) {
+                    match (op_text.as_str(), value != 0) {
+                        ("&&", false) => return Ok(bool_literal(false)),
+                        ("||", true) => return Ok(bool_literal(true)),
+                        _ => {}
+                    }
+                }
+            }
             let op = lower_binary_operator(syntax_tree, &expr.nodes.1)?;
             Ok(Expr::Binary {
-                left: Box::new(lower_expression(syntax_tree, &expr.nodes.0, module, path)?),
+                left: Box::new(left),
                 op,
                 right: Box::new(lower_expression(syntax_tree, &expr.nodes.3, module, path)?),
             })
         }
-        Expression::ConditionalExpression(expr) => Ok(Expr::Ternary {
-            cond: Box::new(lower_cond_predicate(
-                syntax_tree,
-                &expr.nodes.0,
-                module,
-                path,
-            )?),
-            when_true: Box::new(lower_expression(syntax_tree, &expr.nodes.3, module, path)?),
-            when_false: Box::new(lower_expression(syntax_tree, &expr.nodes.5, module, path)?),
-        }),
+        Expression::ConditionalExpression(expr) => {
+            let cond = lower_cond_predicate(syntax_tree, &expr.nodes.0, module, path)?;
+            if let Ok(value) = const_eval_param_value(&cond, &module.parameters) {
+                if value != 0 {
+                    return lower_expression(syntax_tree, &expr.nodes.3, module, path);
+                }
+                return lower_expression(syntax_tree, &expr.nodes.5, module, path);
+            }
+
+            Ok(Expr::Ternary {
+                cond: Box::new(cond),
+                when_true: Box::new(lower_expression(syntax_tree, &expr.nodes.3, module, path)?),
+                when_false: Box::new(lower_expression(syntax_tree, &expr.nodes.5, module, path)?),
+            })
+        }
         _ => Err(unsupported(
             "expression is outside the current executable subset",
             None,
@@ -1912,8 +2003,52 @@ fn lower_primary(
         Primary::MintypmaxExpression(expr) => {
             lower_mintypmax_expression(syntax_tree, &expr.nodes.0.nodes.1, module, path)
         }
+        Primary::FunctionSubroutineCall(call) => {
+            lower_function_subroutine_call(syntax_tree, call, module, path)
+        }
         _ => Err(unsupported("primary expression is not supported yet", None)),
     }
+}
+
+fn lower_function_subroutine_call(
+    syntax_tree: &SyntaxTree,
+    call: &FunctionSubroutineCall,
+    module: &ModuleSummary,
+    path: &Path,
+) -> LowerResult<Expr> {
+    let sv_parser::SubroutineCall::SystemTfCall(call) = &call.nodes.0 else {
+        return Err(unsupported("primary expression is not supported yet", None));
+    };
+    let sv_parser::SystemTfCall::ArgExpression(call) = call.as_ref() else {
+        return Err(unsupported("primary expression is not supported yet", None));
+    };
+
+    let name = syntax_tree
+        .get_str(&call.nodes.0.nodes.0)
+        .ok_or_else(|| unsupported("failed to read system function name", None))?;
+    if name != "$signed" {
+        return Err(unsupported("primary expression is not supported yet", None));
+    }
+
+    if call.nodes.1.nodes.1.1.is_some() {
+        return Err(unsupported(
+            "`$signed` clocking event arguments are not supported",
+            None,
+        ));
+    }
+
+    let args = call.nodes.1.nodes.1.0.contents();
+    let [Some(arg)] = args.as_slice() else {
+        return Err(unsupported(
+            "`$signed` expects exactly one expression argument",
+            None,
+        ));
+    };
+
+    Ok(Expr::Unary {
+        op: UnaryOp::Signed,
+        expr: Box::new(lower_expression(syntax_tree, arg, module, path)?),
+    })
 }
 
 fn lower_concatenation(
@@ -1977,9 +2112,26 @@ fn lower_literal(
             let bits = match text.as_str() {
                 "'0" => BitValue::zero(),
                 "'1" => BitValue::one(),
+                "'x" | "'X" | "'z" | "'Z" => BitValue::zero(),
                 _ => return Err(unsupported("unsupported unbased unsized literal", None)),
             };
             Ok(Expr::Literal(NumericLiteral { bits, width: None }))
+        }
+        sv_parser::PrimaryLiteral::StringLiteral(literal) => {
+            let raw = syntax_tree
+                .get_str(&literal.nodes.0)
+                .ok_or_else(|| unsupported("failed to read string literal text", None))?;
+            let bytes = parse_string_literal_bytes(raw)?;
+            let width = (bytes.len() * 8).max(1);
+            let mut bits = BitValue::zero();
+            for byte in bytes {
+                bits = bits.shift_left(8);
+                bits = bits.bitor(&BitValue::from(byte as u64));
+            }
+            Ok(Expr::Literal(NumericLiteral {
+                bits,
+                width: Some(width),
+            }))
         }
         _ => Err(unsupported(
             "literal is outside the current executable subset",
@@ -2338,6 +2490,7 @@ fn lower_unary_operator(
         "~" => Ok(UnaryOp::BitNot),
         "!" => Ok(UnaryOp::LogicalNot),
         "&" => Ok(UnaryOp::ReductionAnd),
+        "~&" => Ok(UnaryOp::ReductionNand),
         "|" => Ok(UnaryOp::ReductionOr),
         "^" => Ok(UnaryOp::ReductionXor),
         _ => Err(unsupported("unary operator is not supported yet", None)),
@@ -2354,6 +2507,7 @@ fn lower_binary_operator(
         "^" => Ok(BinaryOp::BitXor),
         "<<" => Ok(BinaryOp::ShiftLeft),
         ">>" => Ok(BinaryOp::ShiftRight),
+        ">>>" => Ok(BinaryOp::ArithmeticShiftRight),
         "&&" => Ok(BinaryOp::LogicalAnd),
         "||" => Ok(BinaryOp::LogicalOr),
         "==" => Ok(BinaryOp::Eq),
@@ -2431,16 +2585,14 @@ fn lower_usize_expression(
     module: &ModuleSummary,
     path: &Path,
 ) -> LowerResult<usize> {
-    let Expr::Literal(literal) = lower_expression(syntax_tree, expr, module, path)? else {
-        return Err(unsupported(
+    let lowered = lower_expression(syntax_tree, expr, module, path)?;
+    match const_eval_param_value(&lowered, &module.parameters) {
+        Ok(value) => Ok(value),
+        Err(_) => Err(unsupported(
             "only constant bit and part select indices are supported",
             None,
-        ));
-    };
-    literal
-        .bits
-        .to_usize_checked()
-        .ok_or_else(|| unsupported("constant index exceeds host limits", None))
+        )),
+    }
 }
 
 fn lower_usize_constant_expression(
@@ -2478,20 +2630,15 @@ fn lower_usize_constant_expression_with_params(
                 )
             }
             sv_parser::ConstantPrimary::PsParameter(ps_param) => {
-                let (name, _) = identifier_name_from_node(
-                    syntax_tree,
-                    RefNode::from(&ps_param.nodes.0),
-                )
-                .ok_or_else(|| unsupported("failed to read parameter name", None))?;
-                let param = params
-                    .iter()
-                    .find(|p| p.name == name)
-                    .ok_or_else(|| {
-                        unsupported(
-                            format!("parameter '{name}' not found for constant evaluation"),
-                            None,
-                        )
-                    })?;
+                let (name, _) =
+                    identifier_name_from_node(syntax_tree, RefNode::from(&ps_param.nodes.0))
+                        .ok_or_else(|| unsupported("failed to read parameter name", None))?;
+                let param = params.iter().find(|p| p.name == name).ok_or_else(|| {
+                    unsupported(
+                        format!("parameter '{name}' not found for constant evaluation"),
+                        None,
+                    )
+                })?;
                 const_eval_param_value(&param.default_value, params)
             }
             // sv-parser parses bare identifiers in constant expressions as
@@ -2499,20 +2646,19 @@ fn lower_usize_constant_expression_with_params(
             // identifier matches a known parameter, treat it as a parameter
             // reference.
             sv_parser::ConstantPrimary::ConstantFunctionCall(call) => {
-                let (name, _) = identifier_name_from_node(
-                    syntax_tree,
-                    RefNode::from(&call.nodes.0),
-                )
-                .ok_or_else(|| unsupported("failed to read identifier in constant expression", None))?;
-                let param = params
-                    .iter()
-                    .find(|p| p.name == name)
-                    .ok_or_else(|| {
-                        unsupported(
-                            format!("identifier '{name}' is not a known parameter for constant evaluation"),
-                            None,
-                        )
-                    })?;
+                let (name, _) =
+                    identifier_name_from_node(syntax_tree, RefNode::from(&call.nodes.0))
+                        .ok_or_else(|| {
+                            unsupported("failed to read identifier in constant expression", None)
+                        })?;
+                let param = params.iter().find(|p| p.name == name).ok_or_else(|| {
+                    unsupported(
+                        format!(
+                            "identifier '{name}' is not a known parameter for constant evaluation"
+                        ),
+                        None,
+                    )
+                })?;
                 const_eval_param_value(&param.default_value, params)
             }
             _ => Err(unsupported(
@@ -2589,15 +2735,12 @@ fn const_eval_param_value(expr: &Expr, params: &[ParameterDecl]) -> LowerResult<
             .to_usize_checked()
             .ok_or_else(|| unsupported("constant value exceeds host limits", None)),
         Expr::Ident(name) => {
-            let param = params
-                .iter()
-                .find(|p| p.name == *name)
-                .ok_or_else(|| {
-                    unsupported(
-                        format!("parameter '{name}' not found for constant evaluation"),
-                        None,
-                    )
-                })?;
+            let param = params.iter().find(|p| p.name == *name).ok_or_else(|| {
+                unsupported(
+                    format!("parameter '{name}' not found for constant evaluation"),
+                    None,
+                )
+            })?;
             const_eval_param_value(&param.default_value, params)
         }
         Expr::Binary { left, op, right } => {
@@ -2612,6 +2755,7 @@ fn const_eval_param_value(expr: &Expr, params: &[ParameterDecl]) -> LowerResult<
                 BinaryOp::BitXor => Ok(l ^ r),
                 BinaryOp::ShiftLeft => Ok(l << r),
                 BinaryOp::ShiftRight => Ok(l >> r),
+                BinaryOp::ArithmeticShiftRight => Ok(l >> r),
                 BinaryOp::Eq => Ok(usize::from(l == r)),
                 BinaryOp::NotEq => Ok(usize::from(l != r)),
                 BinaryOp::Lt => Ok(usize::from(l < r)),
@@ -2639,6 +2783,7 @@ fn const_eval_param_value(expr: &Expr, params: &[ParameterDecl]) -> LowerResult<
             match op {
                 UnaryOp::LogicalNot => Ok(usize::from(v == 0)),
                 UnaryOp::BitNot => Ok(!v),
+                UnaryOp::Signed => Ok(v),
                 _ => Err(unsupported(
                     "unsupported unary operator in constant parameter expression",
                     None,
@@ -2677,15 +2822,68 @@ fn parse_based_value(
     let text = syntax_tree
         .get_str(locate)
         .ok_or_else(|| unsupported("failed to read numeric literal text", None))?;
-    let cleaned = text.replace('_', "");
-    if cleaned.contains(['x', 'X', 'z', 'Z', '?']) {
-        return Err(unsupported(
-            "x/z numeric literal digits are not supported yet",
-            None,
-        ));
-    }
+    let cleaned = coerce_unknown_digits_to_zero(&text.replace('_', ""));
     BitValue::from_str_radix(&cleaned, radix)
         .map_err(|_| unsupported("failed to parse numeric literal", None))
+}
+
+fn bool_literal(value: bool) -> Expr {
+    Expr::Literal(NumericLiteral {
+        bits: BitValue::from(u64::from(value)),
+        width: Some(1),
+    })
+}
+
+fn coerce_unknown_digits_to_zero(text: &str) -> String {
+    text.chars()
+        .map(|ch| match ch {
+            'x' | 'X' | 'z' | 'Z' | '?' => '0',
+            other => other,
+        })
+        .collect()
+}
+
+fn parse_string_literal_bytes(text: &str) -> LowerResult<Vec<u8>> {
+    if !(text.starts_with('"') && text.ends_with('"')) {
+        return Err(unsupported("string literal is malformed", None));
+    }
+
+    let mut bytes = Vec::new();
+    let mut chars = text[1..text.len() - 1].chars();
+    while let Some(ch) = chars.next() {
+        if ch != '\\' {
+            if !ch.is_ascii() {
+                return Err(unsupported(
+                    "non-ASCII string literals are not supported yet",
+                    None,
+                ));
+            }
+            bytes.push(ch as u8);
+            continue;
+        }
+
+        let escaped = chars
+            .next()
+            .ok_or_else(|| unsupported("string literal ends with a dangling escape", None))?;
+        let byte = match escaped {
+            'n' => b'\n',
+            'r' => b'\r',
+            't' => b'\t',
+            '\\' => b'\\',
+            '"' => b'"',
+            '0' => b'\0',
+            other if other.is_ascii() => other as u8,
+            _ => {
+                return Err(unsupported(
+                    "non-ASCII string literals are not supported yet",
+                    None,
+                ));
+            }
+        };
+        bytes.push(byte);
+    }
+
+    Ok(bytes)
 }
 
 fn locate_usize(syntax_tree: &SyntaxTree, locate: &Locate) -> LowerResult<usize> {

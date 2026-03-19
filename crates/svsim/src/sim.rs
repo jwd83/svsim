@@ -10,7 +10,10 @@ use crate::hir::{
     NumericLiteral, PackedRange, PortDirection, ProcBlockKind, Stmt, UnaryOp, expr_to_lvalue,
 };
 use crate::validate::resolve_legacy_rom_data_path;
-use crate::width::{expr_width, mask, minimum_width, shift_left_bits, shift_right_bits};
+use crate::width::{
+    arithmetic_shift_right_bits, expr_width, mask, minimum_width, shift_left_bits,
+    shift_right_bits, sign_extend_bits,
+};
 
 #[derive(Debug, Clone)]
 pub struct SimulationSession {
@@ -338,19 +341,31 @@ fn parse_prefixed_value(raw: &str) -> std::result::Result<BitValue, ParseBitValu
 struct Value {
     bits: BitValue,
     width: usize,
+    signed: bool,
 }
 
 impl Value {
     fn new(bits: BitValue, width: usize) -> Self {
+        Self::new_with_signed(bits, width, false)
+    }
+
+    fn new_with_signed(bits: BitValue, width: usize, signed: bool) -> Self {
         let width = width.max(1);
         Self {
             bits: bits.truncate(width),
             width,
+            signed,
         }
     }
 
     fn coerced_to(&self, width: usize) -> Self {
-        Self::new(self.normalized_bits(), width)
+        let width = width.max(1);
+        let bits = if self.signed {
+            sign_extend_bits(&self.normalized_bits(), self.width, width)
+        } else {
+            self.normalized_bits().truncate(width)
+        };
+        Self::new_with_signed(bits, width, self.signed)
     }
 
     fn zero(width: usize) -> Self {
@@ -1150,9 +1165,10 @@ fn eval_expr(
         Expr::Unary { op, expr } => {
             let value = eval_expr(expr, module, values, memories)?;
             match op {
-                UnaryOp::BitNot => Ok(Value::new(
+                UnaryOp::BitNot => Ok(Value::new_with_signed(
                     value.normalized_bits().bitnot_with_width(value.width),
                     value.width,
+                    value.signed,
                 )),
                 UnaryOp::LogicalNot => {
                     let is_zero = value.normalized_bits().is_zero();
@@ -1167,6 +1183,11 @@ fn eval_expr(
                     let result = value.normalized_bits().bitand(&mask) == mask;
                     Ok(Value::new(BitValue::from(u64::from(result)), 1))
                 }
+                UnaryOp::ReductionNand => {
+                    let mask = mask(value.width);
+                    let result = value.normalized_bits().bitand(&mask) != mask;
+                    Ok(Value::new(BitValue::from(u64::from(result)), 1))
+                }
                 UnaryOp::ReductionXor => {
                     let mut count = 0u32;
                     let bits = value.normalized_bits();
@@ -1177,23 +1198,31 @@ fn eval_expr(
                     }
                     Ok(Value::new(BitValue::from(u64::from(count % 2 != 0)), 1))
                 }
+                UnaryOp::Signed => Ok(Value::new_with_signed(
+                    value.normalized_bits(),
+                    value.width,
+                    true,
+                )),
             }
         }
         Expr::Binary { left, op, right } => {
-            let left = eval_expr(left, module, values, memories)?;
-            let right = eval_expr(right, module, values, memories)?;
+            let mut left = eval_expr(left, module, values, memories)?;
+            let mut right = eval_expr(right, module, values, memories)?;
+            let common_width = left.width.max(right.width);
+            left = left.coerced_to(common_width);
+            right = right.coerced_to(common_width);
             let (bits, width) = match op {
                 BinaryOp::BitAnd => (
                     left.normalized_bits().bitand(&right.normalized_bits()),
-                    left.width.max(right.width),
+                    common_width,
                 ),
                 BinaryOp::BitOr => (
                     left.normalized_bits().bitor(&right.normalized_bits()),
-                    left.width.max(right.width),
+                    common_width,
                 ),
                 BinaryOp::BitXor => (
                     left.normalized_bits().bitxor(&right.normalized_bits()),
-                    left.width.max(right.width),
+                    common_width,
                 ),
                 BinaryOp::ShiftLeft => (
                     shift_left_bits(
@@ -1211,43 +1240,56 @@ fn eval_expr(
                     ),
                     left.width,
                 ),
+                BinaryOp::ArithmeticShiftRight => (
+                    arithmetic_shift_right_bits(
+                        &left.normalized_bits(),
+                        &right.normalized_bits(),
+                        left.width,
+                    ),
+                    left.width,
+                ),
                 BinaryOp::LogicalAnd => (BitValue::from(left.truthy() && right.truthy()), 1),
                 BinaryOp::LogicalOr => (BitValue::from(left.truthy() || right.truthy()), 1),
                 BinaryOp::Eq => (BitValue::from(values_equal(&left, &right)), 1),
                 BinaryOp::NotEq => (BitValue::from(!values_equal(&left, &right)), 1),
-                BinaryOp::Lt => (
-                    BitValue::from(left.normalized_bits() < right.normalized_bits()),
-                    1,
-                ),
-                BinaryOp::LtEq => (
-                    BitValue::from(left.normalized_bits() <= right.normalized_bits()),
-                    1,
-                ),
-                BinaryOp::Gt => (
-                    BitValue::from(left.normalized_bits() > right.normalized_bits()),
-                    1,
-                ),
-                BinaryOp::GtEq => (
-                    BitValue::from(left.normalized_bits() >= right.normalized_bits()),
-                    1,
-                ),
+                BinaryOp::Lt => (BitValue::from(compare_values(&left, &right).is_lt()), 1),
+                BinaryOp::LtEq => (BitValue::from(!compare_values(&left, &right).is_gt()), 1),
+                BinaryOp::Gt => (BitValue::from(compare_values(&left, &right).is_gt()), 1),
+                BinaryOp::GtEq => (BitValue::from(!compare_values(&left, &right).is_lt()), 1),
                 BinaryOp::Add => (
                     left.normalized_bits()
-                        .wrapping_add(&right.normalized_bits(), left.width.max(right.width)),
-                    left.width.max(right.width),
+                        .wrapping_add(&right.normalized_bits(), common_width),
+                    common_width,
                 ),
                 BinaryOp::Sub => (
                     left.normalized_bits()
-                        .wrapping_sub(&right.normalized_bits(), left.width.max(right.width)),
-                    left.width.max(right.width),
+                        .wrapping_sub(&right.normalized_bits(), common_width),
+                    common_width,
                 ),
                 BinaryOp::Mul => (
                     left.normalized_bits()
-                        .wrapping_mul(&right.normalized_bits(), left.width.max(right.width)),
-                    left.width.max(right.width),
+                        .wrapping_mul(&right.normalized_bits(), common_width),
+                    common_width,
                 ),
             };
-            Ok(Value::new(bits, width))
+            Ok(Value::new_with_signed(
+                bits,
+                width,
+                matches!(
+                    op,
+                    BinaryOp::ShiftLeft | BinaryOp::ShiftRight | BinaryOp::ArithmeticShiftRight
+                ) && left.signed
+                    || matches!(
+                        op,
+                        BinaryOp::BitAnd
+                            | BinaryOp::BitOr
+                            | BinaryOp::BitXor
+                            | BinaryOp::Add
+                            | BinaryOp::Sub
+                            | BinaryOp::Mul
+                    ) && left.signed
+                        && right.signed,
+            ))
         }
         Expr::Ternary {
             cond,
@@ -1256,15 +1298,9 @@ fn eval_expr(
         } => {
             let result_width = expr_width(when_true, module)?.max(expr_width(when_false, module)?);
             if eval_expr(cond, module, values, memories)?.truthy() {
-                Ok(Value::new(
-                    eval_expr(when_true, module, values, memories)?.normalized_bits(),
-                    result_width,
-                ))
+                Ok(eval_expr(when_true, module, values, memories)?.coerced_to(result_width))
             } else {
-                Ok(Value::new(
-                    eval_expr(when_false, module, values, memories)?.normalized_bits(),
-                    result_width,
-                ))
+                Ok(eval_expr(when_false, module, values, memories)?.coerced_to(result_width))
             }
         }
     }
@@ -1295,7 +1331,32 @@ fn concat_values(parts: &[Value]) -> Result<Value> {
 }
 
 fn values_equal(left: &Value, right: &Value) -> bool {
-    left.normalized_bits() == right.normalized_bits()
+    let width = left.width.max(right.width);
+    left.coerced_to(width).normalized_bits() == right.coerced_to(width).normalized_bits()
+}
+
+fn compare_values(left: &Value, right: &Value) -> std::cmp::Ordering {
+    if left.signed && right.signed {
+        compare_signed_bits(
+            &left.normalized_bits(),
+            &right.normalized_bits(),
+            left.width,
+        )
+    } else {
+        left.normalized_bits()
+            .cmp_unsigned(&right.normalized_bits())
+    }
+}
+
+fn compare_signed_bits(left: &BitValue, right: &BitValue, width: usize) -> std::cmp::Ordering {
+    let width = width.max(1);
+    let left = left.truncate(width);
+    let right = right.truncate(width);
+    match left.get_bit(width - 1).cmp(&right.get_bit(width - 1)) {
+        std::cmp::Ordering::Less => std::cmp::Ordering::Greater,
+        std::cmp::Ordering::Greater => std::cmp::Ordering::Less,
+        std::cmp::Ordering::Equal => left.cmp_unsigned(&right),
+    }
 }
 
 fn resolve_lvalue(
@@ -1952,6 +2013,40 @@ endmodule
         assert_signal_eq!(outputs, "le", 1);
         assert_signal_eq!(outputs, "gt", 0);
         assert_signal_eq!(outputs, "ge", 1);
+    }
+
+    #[test]
+    fn eval_once_supports_signed_cast_compare_and_shift() {
+        let temp_dir = unique_temp_dir("signed-cast-ops");
+        let source = r#"
+module signed_ops (
+    input  logic [7:0] a,
+    input  logic [7:0] b,
+    input  logic [2:0] sh,
+    output logic       lt,
+    output logic [7:0] sra
+);
+    assign lt = $signed(a) < $signed(b);
+    assign sra = $signed(a) >>> sh;
+endmodule
+"#;
+        fs::write(temp_dir.join("signed_ops.sv"), source).expect("write signed_ops");
+
+        let design = Compiler::new()
+            .compile_file(temp_dir.join("signed_ops.sv"))
+            .expect("compile signed_ops");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let outputs = sim
+            .eval_once(inputs([
+                ("a".into(), 0xf0),
+                ("b".into(), 0x01),
+                ("sh".into(), 2),
+            ]))
+            .expect("eval signed ops");
+
+        assert_signal_eq!(outputs, "lt", 1);
+        assert_signal_eq!(outputs, "sra", 0xfc);
     }
 
     #[test]

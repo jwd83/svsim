@@ -115,8 +115,10 @@ pub enum UnaryOp {
     BitNot,
     LogicalNot,
     ReductionAnd,
+    ReductionNand,
     ReductionOr,
     ReductionXor,
+    Signed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -126,6 +128,7 @@ pub enum BinaryOp {
     BitXor,
     ShiftLeft,
     ShiftRight,
+    ArithmeticShiftRight,
     LogicalAnd,
     LogicalOr,
     Eq,
