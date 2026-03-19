@@ -1953,11 +1953,8 @@ fn lower_expression(
                 }
             }
             let op = lower_binary_operator(syntax_tree, &expr.nodes.1)?;
-            Ok(Expr::Binary {
-                left: Box::new(left),
-                op,
-                right: Box::new(lower_expression(syntax_tree, &expr.nodes.3, module, path)?),
-            })
+            let right = lower_expression(syntax_tree, &expr.nodes.3, module, path)?;
+            Ok(rebalance_logical_rhs_binary(left, op, right))
         }
         Expression::ConditionalExpression(expr) => {
             let cond = lower_cond_predicate(syntax_tree, &expr.nodes.0, module, path)?;
@@ -1971,6 +1968,46 @@ fn lower_expression(
             "expression is outside the current executable subset",
             None,
         )),
+    }
+}
+
+fn rebalance_logical_rhs_binary(left: Expr, op: BinaryOp, right: Expr) -> Expr {
+    let should_rebalance = matches!(
+        op,
+        BinaryOp::Eq
+            | BinaryOp::NotEq
+            | BinaryOp::Lt
+            | BinaryOp::LtEq
+            | BinaryOp::Gt
+            | BinaryOp::GtEq
+    );
+    if !should_rebalance {
+        return Expr::Binary {
+            left: Box::new(left),
+            op,
+            right: Box::new(right),
+        };
+    }
+
+    match right {
+        Expr::Binary {
+            left: right_left,
+            op: right_op,
+            right: right_right,
+        } if matches!(right_op, BinaryOp::LogicalAnd | BinaryOp::LogicalOr) => Expr::Binary {
+            left: Box::new(Expr::Binary {
+                left: Box::new(left),
+                op,
+                right: right_left,
+            }),
+            op: right_op,
+            right: right_right,
+        },
+        other => Expr::Binary {
+            left: Box::new(left),
+            op,
+            right: Box::new(other),
+        },
     }
 }
 

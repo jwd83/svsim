@@ -1840,6 +1840,38 @@ mod tests {
     }
 
     #[test]
+    fn eval_once_gives_equality_higher_precedence_than_logical_and() {
+        let design = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module top(",
+                    "input logic [31:0] in, ",
+                    "output logic is_shift_imm",
+                    "); ",
+                    "assign is_shift_imm = |{",
+                    "in[14:12] == 3'b001 && in[31:25] == 7'b0000000, ",
+                    "in[14:12] == 3'b101 && in[31:25] == 7'b0000000, ",
+                    "in[14:12] == 3'b101 && in[31:25] == 7'b0100000",
+                    "}; ",
+                    "endmodule\n"
+                ),
+            )
+            .expect("compile virtual design");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let outputs = sim
+            .eval_once(inputs([("in".into(), 0x0010_0093)]))
+            .expect("eval addi helper");
+        assert_signal_eq!(outputs, "is_shift_imm", 0);
+
+        let outputs = sim
+            .eval_once(inputs([("in".into(), 0x0010_1093)]))
+            .expect("eval slli helper");
+        assert_signal_eq!(outputs, "is_shift_imm", 1);
+    }
+
+    #[test]
     fn eval_once_coerces_assignment_and_instance_port_widths() {
         let design = Compiler::new()
             .compile_str(
