@@ -12,6 +12,7 @@ use crate::diag::{Error, Result};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct JsonTestReport {
     pub duration_ms: u64,
+    pub step_hz: u64,
     pub passed: usize,
     pub total: usize,
     pub cases: Vec<JsonTestCaseReport>,
@@ -560,10 +561,16 @@ fn collect_trace_values(
 }
 
 fn build_report(cases: Vec<JsonTestCaseReport>, duration: std::time::Duration) -> JsonTestReport {
+    let duration_ms = duration_millis(duration);
+    let effective_duration_ms = duration_ms.max(1);
+    let total_steps: u128 = cases.iter().map(|case| case.steps as u128).sum();
+    let steps_per_second = total_steps.saturating_mul(1000) / u128::from(effective_duration_ms);
+    let step_hz = u64::try_from(steps_per_second).unwrap_or(u64::MAX);
     let passed = cases.iter().filter(|case| case.passed).count();
     let total = cases.len();
     JsonTestReport {
-        duration_ms: duration_millis(duration),
+        duration_ms,
+        step_hz,
         passed,
         total,
         cases,
@@ -730,9 +737,11 @@ impl<T> OneOrMany<T> {
 mod tests {
     use std::fs;
     use std::path::PathBuf;
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
     use crate::{BitValue, Compiler};
+
+    use super::{JsonTestCaseReport, build_report};
 
     fn repo_root() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -1093,6 +1102,48 @@ mod tests {
 
         assert!(report.all_passed());
         assert_eq!(report.passed, report.total);
+    }
+
+    #[test]
+    fn build_report_computes_step_hz_from_total_steps_and_duration() {
+        let cases = vec![
+            JsonTestCaseReport {
+                name: "a".to_owned(),
+                description: None,
+                steps: 2,
+                passed: true,
+                failures: Vec::new(),
+                trace: None,
+            },
+            JsonTestCaseReport {
+                name: "b".to_owned(),
+                description: None,
+                steps: 3,
+                passed: true,
+                failures: Vec::new(),
+                trace: None,
+            },
+        ];
+        let report = build_report(cases, Duration::from_millis(2000));
+
+        assert_eq!(report.duration_ms, 2000);
+        assert_eq!(report.step_hz, 2);
+    }
+
+    #[test]
+    fn build_report_clamps_zero_duration_to_one_millisecond_for_step_hz() {
+        let cases = vec![JsonTestCaseReport {
+            name: "single".to_owned(),
+            description: None,
+            steps: 5,
+            passed: true,
+            failures: Vec::new(),
+            trace: None,
+        }];
+        let report = build_report(cases, Duration::from_millis(0));
+
+        assert_eq!(report.duration_ms, 0);
+        assert_eq!(report.step_hz, 5000);
     }
 
     fn unique_temp_dir(name: &str) -> PathBuf {
