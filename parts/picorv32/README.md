@@ -23,8 +23,9 @@ This directory now contains a small executable PicoRV32 corpus in addition to th
 - `demo_add_chain.json`: straight-line `ADDI` chain that accumulates `1..10` and stores `55`
 - `demo_add_chain_long.json`: longer `ADDI` chain that accumulates `1..20` and stores `210`
 - `demo_shift_pack.json`: `SLLI` + `ADDI` chain that packs `0x01020304`
+- `demo_two_store.json`: back-to-back visible stores that write `1` then `2` before trapping
 - `picorv32_smoke.json`: original minimal store smoke test
-- `demo_two_store.txt`: manual two-store ROM probe that reproduces the current post-store continuation gap without being part of the green JSON corpus yet
+- `demo_two_store.txt`: ROM backing file for the checked-in two-store regression
 
 Each JSON suite preloads a different ROM text file and then clocks the harness until the post-store `trap` state is visible.
 
@@ -34,8 +35,9 @@ The executable subset is intentionally narrower than compile coverage. The check
 
 - the original smoke harness
 - straight-line sample programs that end in a single final store
+- a two-store continuation sample that writes consecutive RAM words before trapping
 
-Current scratch traces narrow the next runtime gap further: the simulator can reach the first visible store in small multi-store probes, but PicoRV32 post-store continuation and taken-branch loops are still not part of the checked-in green corpus. `demo_two_store.txt` is the checked-in manual repro for that first continuation bug.
+The checked-in runtime surface now covers post-store continuation through `demo_two_store.json`. The next bounded PicoRV32 runtime target is taken-branch control flow; that remains outside the checked-in green corpus.
 
 ## Run
 
