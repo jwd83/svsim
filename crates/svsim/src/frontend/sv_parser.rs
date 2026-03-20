@@ -2243,8 +2243,7 @@ fn lower_block_item_declaration_stmt(
         ));
     }
 
-    let (name, locate) =
-        identifier_name_from_node(syntax_tree, RefNode::from(&assignment.nodes.0))
+    let (name, locate) = identifier_name_from_node(syntax_tree, RefNode::from(&assignment.nodes.0))
         .ok_or_else(|| unsupported("failed to determine procedural declaration name", None))?;
     if name == "empty_statement" && assignment.nodes.2.is_none() {
         return Ok(Stmt::Empty);
@@ -2731,7 +2730,10 @@ fn lower_number(
                     .ok_or_else(|| unsupported("failed to read numeric literal text", None))?;
                 let bits = BitValue::from_str_radix(&text.replace('_', ""), 10)
                     .map_err(|_| unsupported("failed to parse numeric literal", None))?;
-                Ok(NumericLiteral { bits, width: None })
+                Ok(NumericLiteral {
+                    bits,
+                    width: Some(32),
+                })
             }
             sv_parser::DecimalNumber::BaseUnsigned(number) => Ok(NumericLiteral {
                 bits: parse_based_value(syntax_tree, &number.nodes.2.nodes.0, 10)?,
@@ -4269,7 +4271,10 @@ endmodule
             } => {
                 assert!(matches!(
                     left.as_ref(),
-                    Expr::Binary { op: BinaryOp::Eq, .. }
+                    Expr::Binary {
+                        op: BinaryOp::Eq,
+                        ..
+                    }
                 ));
                 assert!(matches!(
                     right.as_ref(),

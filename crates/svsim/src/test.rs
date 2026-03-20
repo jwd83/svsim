@@ -838,6 +838,26 @@ mod tests {
     }
 
     #[test]
+    fn run_json_file_passes_picorv32_taken_branch_suite() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .add_search_path(repo.join("parts/picorv32"))
+            .compile_file(repo.join("parts/picorv32/picorv32_program_harness.sv"))
+            .expect("compile picorv32 program harness");
+
+        let report = design
+            .run_json_file(repo.join("parts/picorv32/demo_branch_taken.json"))
+            .expect("run picorv32 taken-branch json");
+
+        assert!(
+            report.all_passed(),
+            "picorv32 taken-branch report:\n{}",
+            serde_json::to_string_pretty(&report).expect("serialize report")
+        );
+        assert_eq!(report.passed, report.total);
+    }
+
+    #[test]
     fn run_json_file_includes_sequential_trace_rows() {
         let temp_dir = unique_temp_dir("json-test-trace");
         let design = Compiler::new()

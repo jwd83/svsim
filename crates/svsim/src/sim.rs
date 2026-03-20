@@ -2149,6 +2149,29 @@ mod tests {
     }
 
     #[test]
+    fn eval_once_treats_unsized_decimal_literals_as_32_bit_values() {
+        let design = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module top(",
+                    "input logic [31:0] in, ",
+                    "output logic [31:0] out",
+                    "); ",
+                    "assign out = in & ~1; ",
+                    "endmodule\n"
+                ),
+            )
+            .expect("compile virtual design");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let outputs = sim
+            .eval_once(inputs([("in".into(), 21)]))
+            .expect("eval masked value");
+        assert_signal_eq!(outputs, "out", 20);
+    }
+
+    #[test]
     fn eval_once_runs_part_select_rewrites() {
         let repo = repo_root();
         let design = Compiler::new()
