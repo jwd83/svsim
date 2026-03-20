@@ -407,8 +407,8 @@ Current progress:
 - zero-initialized single-dimension memory reads, explicit memory preload/read APIs, text-file memory loading, and procedural single-element memory writes are implemented
 - library-side JSON regression execution now covers sequential `test_cases`, including memory-backed suites
 - `parts/picorv32/picorv32.v` (open-source RISC-V softcore, ~3000 lines) now compiles successfully through the full pipeline and is included in normal compile-directory reporting alongside the checked-in harness sources
-- measured `parts/picorv32` status is now `3/3` clean compile-only source files (`picorv32.v`, `picorv32_program_harness.sv`, `picorv32_smoke.sv`) and `7/7` passing JSON suites
-- remaining work is expanding PicoRV32 execution beyond the current checked-in straight-line, taken-branch, jump/link, multi-store, and smoke-harness programs; the next runtime gap is broader datapath coverage such as load-backed or compare-heavy programs even though the HIR is now compile-clean
+- measured `parts/picorv32` status is now `3/3` clean compile-only source files (`picorv32.v`, `picorv32_program_harness.sv`, `picorv32_smoke.sv`) and `9/9` passing JSON suites
+- remaining work is expanding PicoRV32 execution beyond the current checked-in straight-line, taken-branch, signed/unsigned-compare, jump/link, load-backed, multi-store, and smoke-harness programs; the next runtime gap is subword memory execution even though the HIR is now compile-clean
 
 Exit criterion:
 - parity for sequential register/counter tests and the math sequence stubs
@@ -422,7 +422,7 @@ Exit criterion:
 Current progress:
 - library and CLI batch entry points now exist for both compile-only `.sv` / `.v` discovery and JSON regression discovery, runs stay sorted by source path, and JSON suites can explicitly reuse a shared source file through a `source` field
 - legacy corpus compatibility for `rom_*` wrappers and `pgm_*` program harnesses now exists without reintroducing those naming conventions into the main library memory API, and malformed `rom_*` wrappers now fail at compile time instead of degrading into empty modules or late runtime errors
-- measured Overture status now includes `41/41` clean compile-only source files and `43/43` passing JSON suites, including the two explicit-source `overture_cpu` program variants; the full multi-directory corpus snapshot including `parts/picorv32` is now `139/139` compile-only in about `5.2s` and `160/160` JSON regressions in about `71.5s`
+- measured Overture status now includes `41/41` clean compile-only source files and `43/43` passing JSON suites, including the two explicit-source `overture_cpu` program variants; the full multi-directory corpus snapshot including `parts/picorv32` is now `139/139` compile-only in about `5.2s` and `162/162` JSON regressions in about `65.3s`
 - shared helper functions (`mask`, shift primitives, `expr_to_lvalue`, `resolve_legacy_rom_data_path`) have been deduplicated between `sim.rs` and `validate.rs` and consolidated into `width.rs`, `hir.rs`, and `validate.rs` respectively, removing ~70 lines of cross-module duplication
 - remaining work is folding more in-range resolution and connection-shape checks into a single elaboration/validation layer now that the runtime coercion slices, constant memory-bounds checks, and shared helpers are explicit, and tightening unsupported-construct diagnostics where wider coverage finds gaps
 

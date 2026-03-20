@@ -1,0 +1,48 @@
+{
+  "source": "picorv32_program_harness.sv",
+  "memory_init": [
+    {
+      "module": "picorv32_program_harness",
+      "memory": "rom",
+      "file": "demo_load_roundtrip.txt"
+    }
+  ],
+  "test_cases": [
+    {
+      "name": "store then lw feeds a second visible store before trapping",
+      "sequence": [
+        {"inputs": {"clk": 1, "resetn": 0}, "expected": {"trap": 0, "ram_word0": 0, "ram_word1": 0, "store_count": 0}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {"trap": 1, "ram_word0": 17, "ram_word1": 42, "ram_word2": 0, "ram_word3": 0, "store_count": 2, "last_store_addr": 260, "last_store_data": 42}}
+      ]
+    }
+  ]
+}
