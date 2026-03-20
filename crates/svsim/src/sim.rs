@@ -194,6 +194,26 @@ impl SimulationSession {
         Ok(memory_state.read(index, memory_name)?.normalized_bits())
     }
 
+    pub fn read_signal(
+        &self,
+        inputs: &BTreeMap<String, BitValue>,
+        instance_path: &[&str],
+        signal_name: &str,
+    ) -> Result<BitValue> {
+        let hir = self.design.hir();
+        let module = top_module(hir, self.top_module())?;
+        let mut stack = Vec::new();
+        read_signal_value(
+            hir,
+            module,
+            &self.state,
+            inputs,
+            instance_path,
+            signal_name,
+            &mut stack,
+        )
+    }
+
     pub fn eval_once(
         &mut self,
         inputs: BTreeMap<String, BitValue>,
@@ -593,6 +613,54 @@ fn step_module(
     state.memories = staged_memories;
     state.previous_clocks = sampled_clocks;
     Ok(())
+}
+
+fn read_signal_value(
+    hir: &HirDesign,
+    module: &ModuleSummary,
+    state: &ModuleState,
+    inputs: &BTreeMap<String, BitValue>,
+    instance_path: &[&str],
+    signal_name: &str,
+    stack: &mut Vec<String>,
+) -> Result<BitValue> {
+    let values = settle_module(hir, module, state, inputs, stack)?;
+    let Some((segment, rest)) = instance_path.split_first() else {
+        return values
+            .get(signal_name)
+            .cloned()
+            .map(|value| value.normalized_bits())
+            .ok_or_else(|| {
+                Error::Resolve(format!(
+                    "signal '{}' is not declared in '{}'",
+                    signal_name, module.name
+                ))
+            });
+    };
+
+    let child_index = module
+        .instantiations
+        .iter()
+        .position(|instance| instance.instance_name == *segment)
+        .ok_or_else(|| {
+            Error::Resolve(format!(
+                "instance path '{}' does not exist under module '{}'",
+                instance_path.join("."),
+                module.name
+            ))
+        })?;
+    let instance = &module.instantiations[child_index];
+    let child = resolve_supported_module(hir, &instance.module_name)?;
+    let child_inputs = build_child_inputs(module, child, instance, &values, &state.memories)?;
+    read_signal_value(
+        hir,
+        child,
+        state.children[child_index].state.as_ref(),
+        &child_inputs,
+        rest,
+        signal_name,
+        stack,
+    )
 }
 
 fn execute_proc_block(
@@ -2804,6 +2872,42 @@ endmodule
             .expect("eval");
 
         assert_signal_eq!(outputs, "out", 0b1100_1011);
+    }
+
+    #[test]
+    fn read_signal_reads_settled_child_signal_values() {
+        let temp_dir = unique_temp_dir("read-hier-signal");
+        let design = Compiler::new()
+            .compile_str(
+                temp_dir.join("top.sv"),
+                concat!(
+                    "module leaf(",
+                    "input logic [7:0] a, ",
+                    "output logic [7:0] out",
+                    "); ",
+                    "logic [7:0] mirrored; ",
+                    "assign mirrored = a + 8'd1; ",
+                    "assign out = mirrored; ",
+                    "endmodule\n",
+                    "module top(",
+                    "input logic [7:0] in, ",
+                    "output logic [7:0] out",
+                    "); ",
+                    "leaf u_leaf(.a(in), .out(out)); ",
+                    "endmodule\n"
+                ),
+            )
+            .expect("compile top");
+        let mut sim = design.instantiate_top().expect("instantiate");
+        let in_inputs = inputs([("in".into(), 5)]);
+        let outputs = sim.eval_once(in_inputs.clone()).expect("eval");
+
+        assert_signal_eq!(outputs, "out", 6);
+        assert_eq!(
+            sim.read_signal(&in_inputs, &["u_leaf"], "mirrored")
+                .expect("read child signal"),
+            BitValue::from(6_u64)
+        );
     }
 
     #[test]

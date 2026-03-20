@@ -2243,7 +2243,8 @@ fn lower_block_item_declaration_stmt(
         ));
     }
 
-    let (name, _) = identifier_name_from_node(syntax_tree, RefNode::from(&assignment.nodes.0))
+    let (name, locate) =
+        identifier_name_from_node(syntax_tree, RefNode::from(&assignment.nodes.0))
         .ok_or_else(|| unsupported("failed to determine procedural declaration name", None))?;
     if name == "empty_statement" && assignment.nodes.2.is_none() {
         return Ok(Stmt::Empty);
@@ -2251,7 +2252,7 @@ fn lower_block_item_declaration_stmt(
     if module.signal_width(&name).is_none() {
         return Err(unsupported(
             "procedural blocks with local declarations are not supported yet",
-            None,
+            Some(span_from_locate(path, locate)),
         ));
     }
 
@@ -2452,7 +2453,6 @@ fn lower_expression(
             })
         }
         Expression::Binary(expr) => {
-            let op_text = symbol_text(syntax_tree, &expr.nodes.1.nodes.0)?;
             let left = lower_expression(syntax_tree, &expr.nodes.0, module, path)?;
             if let Expression::ConditionalExpression(rhs) = &expr.nodes.3 {
                 return Ok(Expr::Ternary {
@@ -2474,15 +2474,6 @@ fn lower_expression(
                         path,
                     )?),
                 });
-            }
-            if matches!(op_text.as_str(), "&&" | "||") {
-                if let Ok(value) = const_eval_param_expr(&left, &module.parameters) {
-                    match (op_text.as_str(), value.truthy()) {
-                        ("&&", false) => return Ok(bool_literal(false)),
-                        ("||", true) => return Ok(bool_literal(true)),
-                        _ => {}
-                    }
-                }
             }
             let op = lower_binary_operator(syntax_tree, &expr.nodes.1)?;
             let right = lower_expression(syntax_tree, &expr.nodes.3, module, path)?;
@@ -3428,6 +3419,28 @@ fn const_eval_param_expr(expr: &Expr, params: &[ParameterDecl]) -> LowerResult<C
             }
         }
         Expr::Binary { left, op, right } => {
+            if matches!(op, BinaryOp::LogicalAnd) {
+                let left = const_eval_param_expr(left, params)?;
+                if !left.truthy() {
+                    return Ok(ConstEvalValue::new(BitValue::zero(), 1));
+                }
+                let right = const_eval_param_expr(right, params)?;
+                return Ok(ConstEvalValue::new(
+                    BitValue::from(u64::from(right.truthy())),
+                    1,
+                ));
+            }
+            if matches!(op, BinaryOp::LogicalOr) {
+                let left = const_eval_param_expr(left, params)?;
+                if left.truthy() {
+                    return Ok(ConstEvalValue::new(BitValue::from(1_u64), 1));
+                }
+                let right = const_eval_param_expr(right, params)?;
+                return Ok(ConstEvalValue::new(
+                    BitValue::from(u64::from(right.truthy())),
+                    1,
+                ));
+            }
             let mut left = const_eval_param_expr(left, params)?;
             let mut right = const_eval_param_expr(right, params)?;
             let common_width = left.width.max(right.width);
@@ -3476,8 +3489,8 @@ fn const_eval_param_expr(expr: &Expr, params: &[ParameterDecl]) -> LowerResult<C
                     left.width,
                     left.signed,
                 ),
-                BinaryOp::LogicalAnd => (BitValue::from(left.truthy() && right.truthy()), 1, false),
-                BinaryOp::LogicalOr => (BitValue::from(left.truthy() || right.truthy()), 1, false),
+                BinaryOp::LogicalAnd => unreachable!("handled before common-width coercion"),
+                BinaryOp::LogicalOr => unreachable!("handled before common-width coercion"),
                 BinaryOp::Eq => (
                     BitValue::from(left.normalized_bits() == right.normalized_bits()),
                     1,
@@ -3615,13 +3628,6 @@ fn parse_based_value(
         .map_err(|_| unsupported("failed to parse numeric literal", None))
 }
 
-fn bool_literal(value: bool) -> Expr {
-    Expr::Literal(NumericLiteral {
-        bits: BitValue::from(u64::from(value)),
-        width: Some(1),
-    })
-}
-
 fn coerce_unknown_digits_to_zero(text: &str) -> String {
     text.chars()
         .map(|ch| match ch {
@@ -3727,7 +3733,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::SvParserFrontend;
-    use crate::hir::{AssignmentKind, Expr, LValue, NumericLiteral, ProcBlockKind, Stmt};
+    use crate::hir::{AssignmentKind, BinaryOp, Expr, LValue, NumericLiteral, ProcBlockKind, Stmt};
 
     fn repo_root() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -4224,6 +4230,100 @@ endmodule
 
         assert_eq!(actual_ranges, vec![(1, 0), (3, 2), (5, 4), (7, 6)]);
         assert_eq!(actual_increments, vec![0, 0, 1, 1]);
+    }
+
+    #[test]
+    fn parse_str_preserves_comparison_operands_across_logical_and_rebalancing() {
+        let frontend = SvParserFrontend::default();
+        let source = frontend
+            .parse_str(
+                PathBuf::from("/virtual/design/precedence_if.sv"),
+                r#"
+module top(
+    input logic [1:0] mem_wordsize,
+    input logic [31:0] reg_op1,
+    output logic trapit
+);
+    always_comb begin
+        trapit = 1'b0;
+        if (mem_wordsize == 0 && reg_op1[1:0] != 0)
+            trapit = 1'b1;
+    end
+endmodule
+"#,
+            )
+            .expect("parse precedence_if");
+
+        let module = &source.modules[0];
+        let Stmt::Block(statements) = &module.proc_blocks[0].body else {
+            panic!("expected always_comb block");
+        };
+        let Stmt::If { cond, .. } = &statements[1] else {
+            panic!("expected conditional statement");
+        };
+        match cond {
+            Expr::Binary {
+                left,
+                op: BinaryOp::LogicalAnd,
+                right,
+            } => {
+                assert!(matches!(
+                    left.as_ref(),
+                    Expr::Binary { op: BinaryOp::Eq, .. }
+                ));
+                assert!(matches!(
+                    right.as_ref(),
+                    Expr::Binary {
+                        left: _,
+                        op: BinaryOp::NotEq,
+                        right: _
+                    }
+                ));
+            }
+            other => panic!("unexpected lowered condition: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_str_short_circuits_const_false_logical_and_during_pruning() {
+        let frontend = SvParserFrontend::default();
+        let source = frontend
+            .parse_str(
+                PathBuf::from("/virtual/design/short_circuit_prune.sv"),
+                r#"
+module top(
+    input logic irq_pending,
+    output logic seen
+);
+    localparam ENABLE_IRQ = 1'b0;
+    logic [7:0] next_irq_pending;
+    logic irq_active;
+    integer irq_buserror;
+
+    always_comb begin
+        seen = 1'b0;
+        if (ENABLE_IRQ && irq_pending && !irq_active) begin
+            next_irq_pending[irq_buserror] = 1'b1;
+            seen = 1'b1;
+        end
+    end
+endmodule
+"#,
+            )
+            .expect("parse short-circuit prune");
+
+        let module = &source.modules[0];
+        assert!(
+            module.unsupported.is_empty(),
+            "dead constant-false branch should be pruned before unsupported lowering: {:?}",
+            module.unsupported
+        );
+
+        let Stmt::Block(statements) = &module.proc_blocks[0].body else {
+            panic!("expected always_comb block");
+        };
+        assert_eq!(statements.len(), 2);
+        assert!(matches!(statements[1], Stmt::Empty));
     }
 
     #[test]

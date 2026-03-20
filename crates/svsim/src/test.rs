@@ -246,7 +246,12 @@ impl JsonTestSuite {
                 if let Some(trace) = &suite.trace {
                     trace_steps.push(JsonTestTraceStep {
                         step: step_index + 1,
-                        values: collect_trace_values(&actual, &trace.signals, sim.top_module())?,
+                        values: collect_trace_values(
+                            &mut sim,
+                            &step.inputs,
+                            &actual,
+                            &trace.signals,
+                        )?,
                     });
                 }
                 failures.extend(compare_outputs(
@@ -528,18 +533,27 @@ fn compare_outputs(
 }
 
 fn collect_trace_values(
+    sim: &mut crate::sim::SimulationSession,
+    inputs: &BTreeMap<String, BitValue>,
     actual: &BTreeMap<String, BitValue>,
     signals: &[String],
-    top_module: &str,
 ) -> Result<BTreeMap<String, BitValue>> {
     let mut values = BTreeMap::new();
     for signal in signals {
-        let value = actual.get(signal).cloned().ok_or_else(|| {
-            Error::Resolve(format!(
-                "trace signal '{}' is not a top-level output of '{}'",
-                signal, top_module
-            ))
-        })?;
+        let value = if let Some(value) = actual.get(signal).cloned() {
+            value
+        } else if let Some((path, signal_name)) = signal.rsplit_once('.') {
+            let instance_path = path
+                .split('.')
+                .filter(|segment| !segment.is_empty())
+                .collect::<Vec<_>>();
+            sim.read_signal(inputs, &instance_path, signal_name)?
+        } else {
+            return Err(Error::Resolve(format!(
+                "trace signal '{}' is not a top-level output; use '<instance>.<signal>' for hierarchical traces",
+                signal
+            )));
+        };
         values.insert(signal.clone(), value);
     }
     Ok(values)
@@ -866,6 +880,57 @@ mod tests {
         assert_eq!(trace.steps[0].values["q"], BitValue::from(0_u64));
         assert_eq!(trace.steps[1].values["q"], BitValue::from(1_u64));
         assert_eq!(trace.steps[2].values["q"], BitValue::from(0_u64));
+    }
+
+    #[test]
+    fn run_json_file_traces_hierarchical_signals() {
+        let temp_dir = unique_temp_dir("json-test-hier-trace");
+        let design = Compiler::new()
+            .compile_str(
+                temp_dir.join("top.sv"),
+                concat!(
+                    "module child(input logic clk, input logic reset, output logic out);",
+                    "logic q; ",
+                    "always_ff @(posedge clk) begin ",
+                    "if (reset) q <= 1'b0; else q <= ~q; ",
+                    "end ",
+                    "assign out = q; ",
+                    "endmodule\n",
+                    "module top(input logic clk, input logic reset, output logic out);",
+                    "child u_child(.clk(clk), .reset(reset), .out(out));",
+                    "endmodule\n"
+                ),
+            )
+            .expect("compile top");
+        let json_path = temp_dir.join("top.json");
+        fs::write(
+            &json_path,
+            concat!(
+                "{",
+                "\"trace\":{\"signals\":[\"out\",\"u_child.q\"]},",
+                "\"test_cases\":[{",
+                "\"name\":\"captures child q trace\",",
+                "\"sequence\":[",
+                "{\"inputs\":{\"clk\":1,\"reset\":1},\"expected\":{\"out\":0}},",
+                "{\"inputs\":{\"clk\":1,\"reset\":0},\"expected\":{\"out\":1}},",
+                "{\"inputs\":{\"clk\":1,\"reset\":0},\"expected\":{\"out\":0}}",
+                "]",
+                "}]}",
+            ),
+        )
+        .expect("write json");
+
+        let report = design.run_json_file(&json_path).expect("run json tests");
+
+        assert!(report.all_passed());
+        let trace = report.cases[0].trace.as_ref().expect("trace");
+        assert_eq!(trace.signals, vec!["out", "u_child.q"]);
+        assert_eq!(trace.steps[0].values["out"], BitValue::from(0_u64));
+        assert_eq!(trace.steps[0].values["u_child.q"], BitValue::from(0_u64));
+        assert_eq!(trace.steps[1].values["out"], BitValue::from(1_u64));
+        assert_eq!(trace.steps[1].values["u_child.q"], BitValue::from(1_u64));
+        assert_eq!(trace.steps[2].values["out"], BitValue::from(0_u64));
+        assert_eq!(trace.steps[2].values["u_child.q"], BitValue::from(0_u64));
     }
 
     #[test]

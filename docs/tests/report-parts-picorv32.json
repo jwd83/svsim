@@ -1,18 +1,18 @@
 {
   "directory": "parts/picorv32",
   "report": {
-    "duration_ms": 1056,
+    "duration_ms": 938,
     "passed": 4,
     "total": 4,
     "suites": [
       {
-        "source_path": "parts/picorv32\\picorv32_program_harness.sv",
-        "json_path": "parts/picorv32\\demo_add_chain.json",
+        "source_path": "parts/picorv32/picorv32_program_harness.sv",
+        "json_path": "parts/picorv32/demo_add_chain.json",
         "top_module": "picorv32_program_harness",
-        "duration_ms": 838,
+        "duration_ms": 775,
         "passed": true,
         "report": {
-          "duration_ms": 354,
+          "duration_ms": 283,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -28,13 +28,13 @@
         "error": null
       },
       {
-        "source_path": "parts/picorv32\\picorv32_program_harness.sv",
-        "json_path": "parts/picorv32\\demo_add_chain_long.json",
+        "source_path": "parts/picorv32/picorv32_program_harness.sv",
+        "json_path": "parts/picorv32/demo_add_chain_long.json",
         "top_module": "picorv32_program_harness",
-        "duration_ms": 1055,
+        "duration_ms": 937,
         "passed": true,
         "report": {
-          "duration_ms": 559,
+          "duration_ms": 445,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -50,13 +50,13 @@
         "error": null
       },
       {
-        "source_path": "parts/picorv32\\picorv32_program_harness.sv",
-        "json_path": "parts/picorv32\\demo_shift_pack.json",
+        "source_path": "parts/picorv32/picorv32_program_harness.sv",
+        "json_path": "parts/picorv32/demo_shift_pack.json",
         "top_module": "picorv32_program_harness",
-        "duration_ms": 869,
+        "duration_ms": 781,
         "passed": true,
         "report": {
-          "duration_ms": 366,
+          "duration_ms": 288,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -72,13 +72,13 @@
         "error": null
       },
       {
-        "source_path": "parts/picorv32\\picorv32_smoke.sv",
-        "json_path": "parts/picorv32\\picorv32_smoke.json",
+        "source_path": "parts/picorv32/picorv32_smoke.sv",
+        "json_path": "parts/picorv32/picorv32_smoke.json",
         "top_module": "picorv32_smoke",
-        "duration_ms": 568,
+        "duration_ms": 525,
         "passed": true,
         "report": {
-          "duration_ms": 65,
+          "duration_ms": 52,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -240,7 +240,7 @@
                       "store_addr": 8,
                       "store_data": 1,
                       "store_seen": 1,
-                      "trap": 1
+                      "trap": 0
                     }
                   }
                 ]
