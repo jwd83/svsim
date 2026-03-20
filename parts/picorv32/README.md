@@ -23,10 +23,12 @@ This directory now contains a small executable PicoRV32 corpus in addition to th
 - `demo_add_chain.json`: straight-line `ADDI` chain that accumulates `1..10` and stores `55`
 - `demo_add_chain_long.json`: longer `ADDI` chain that accumulates `1..20` and stores `210`
 - `demo_branch_taken.json`: taken `BEQ` skips an untaken `ADDI`, then stores `42` before trapping
+- `demo_jump_link.json`: `jal` and masked `jalr` both write their link registers, skip untaken work, and still store `42`
 - `demo_shift_pack.json`: `SLLI` + `ADDI` chain that packs `0x01020304`
 - `demo_two_store.json`: back-to-back visible stores that write `1` then `2` before trapping
 - `picorv32_smoke.json`: original minimal store smoke test
 - `demo_branch_taken.txt`: ROM backing file for the checked-in taken-branch regression
+- `demo_jump_link.txt`: ROM backing file for the checked-in jump/link regression
 - `demo_two_store.txt`: ROM backing file for the checked-in two-store regression
 
 Each JSON suite preloads a different ROM text file and then clocks the harness until the post-store `trap` state is visible.
@@ -38,9 +40,10 @@ The executable subset is intentionally narrower than compile coverage. The check
 - the original smoke harness
 - straight-line sample programs that end in a single final store
 - a taken conditional-branch sample that skips untaken work and lands on the correct masked target
+- a jump/link sample that proves both `jal` and masked `jalr` targets plus link-register writeback
 - a two-store continuation sample that writes consecutive RAM words before trapping
 
-The checked-in runtime surface now covers both post-store continuation and taken conditional-branch control flow through `demo_two_store.json` and `demo_branch_taken.json`. The next bounded PicoRV32 runtime target is jump/link control flow, especially `jalr`-style masked targets and link-register writeback in the checked-in corpus.
+The checked-in runtime surface now covers post-store continuation, taken conditional branches, and jump/link control flow through `demo_two_store.json`, `demo_branch_taken.json`, and `demo_jump_link.json`. The next bounded PicoRV32 runtime target is broadening beyond pure control flow into richer dataflow, especially load-backed or compare-heavy checked-in programs.
 
 ## Run
 
