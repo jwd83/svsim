@@ -16,6 +16,7 @@ This directory now contains a small executable PicoRV32 corpus in addition to th
   - a 64-word ROM at address range `0x0000_0000` to `0x0000_00ff`
   - a 4-word RAM window at address range `0x0000_0100` to `0x0000_010f`
   - byte-lane RAM writes using `mem_wstrb`
+  - one-cycle delayed visible store commits, so trap-on-store cases can suppress RAM mutation in the harness
   - visible outputs for `trap`, the native memory bus, the first four RAM words, and last-store metadata
 
 ## Sample Programs
@@ -26,6 +27,8 @@ This directory now contains a small executable PicoRV32 corpus in addition to th
 - `demo_compare_branch.json`: `SLT`, `SLTU`, `BLT`, and `BLTU` prove signed and unsigned ordering diverge as expected before three visible stores
 - `demo_jump_link.json`: `jal` and masked `jalr` both write their link registers, skip untaken work, and still store `42`
 - `demo_load_roundtrip.json`: `SW` followed by `LW` feeds a derived second store, proving load-backed dataflow through the RAM window
+- `demo_misaligned_load.json`: misaligned `LW` traps before any visible store can commit
+- `demo_misaligned_store.json`: misaligned `SW` traps without mutating the visible RAM window
 - `demo_subword_mem.json`: `LB` / `LBU` plus `LH` / `LHU` sign behavior and `SB` / `SH` lane writes through the PicoRV32 RAM window
 - `demo_shift_pack.json`: `SLLI` + `ADDI` chain that packs `0x01020304`
 - `demo_two_store.json`: back-to-back visible stores that write `1` then `2` before trapping
@@ -46,10 +49,11 @@ The executable subset is intentionally narrower than compile coverage. The check
 - a compare-heavy sample that proves `slt` / `sltu` and `blt` / `bltu` disagree in the expected signed-vs-unsigned way before trapping
 - a jump/link sample that proves both `jal` and masked `jalr` targets plus link-register writeback
 - a load-backed sample that stores `17`, reloads it with `lw`, derives `42`, and stores the result into the next RAM word
+- explicit misaligned `lw` and `sw` samples that trap before any visible RAM mutation reaches the harness
 - a subword-memory sample that mutates RAM with `sb` / `sh`, proves `lb` sign extension, proves `lbu` zero extension, and stores the signed-vs-unsigned halfword delta `0x00010000`
 - a two-store continuation sample that writes consecutive RAM words before trapping
 
-The checked-in runtime surface now covers post-store continuation, taken conditional branches, signed-vs-unsigned compare control flow, jump/link control flow, a load-backed datapath case, and checked-in subword memory execution through `demo_two_store.json`, `demo_branch_taken.json`, `demo_compare_branch.json`, `demo_jump_link.json`, `demo_load_roundtrip.json`, and `demo_subword_mem.json`. The next bounded PicoRV32 runtime target is explicit misaligned-access and trap behavior through the native memory bus, now that full-word and subword memory traffic are both represented in the executable corpus.
+The checked-in runtime surface now covers post-store continuation, taken conditional branches, signed-vs-unsigned compare control flow, jump/link control flow, a load-backed datapath case, subword memory execution, and explicit misaligned load/store traps through `demo_two_store.json`, `demo_branch_taken.json`, `demo_compare_branch.json`, `demo_jump_link.json`, `demo_load_roundtrip.json`, `demo_subword_mem.json`, `demo_misaligned_load.json`, and `demo_misaligned_store.json`. The next bounded PicoRV32 runtime target is instruction-path trap coverage, especially misaligned taken branch or `jalr` targets, now that data-side misaligned accesses are represented in the executable corpus too.
 
 ## Run
 

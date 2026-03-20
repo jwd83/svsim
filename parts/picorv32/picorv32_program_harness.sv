@@ -29,14 +29,21 @@ module picorv32_program_harness (
 
     wire rom_hit;
     wire ram_window_hit;
+    wire pending_store_window_hit;
 
     reg [31:0] store_count_reg;
     reg [31:0] last_store_addr_reg;
     reg [31:0] last_store_data_reg;
+    reg pending_store_valid_reg;
+    reg [31:0] pending_store_addr_reg;
+    reg [31:0] pending_store_data_reg;
+    reg [3:0] pending_store_wstrb_reg;
 
     assign mem_ready = 1'b1;
     assign rom_hit = mem_addr[31:8] == 24'h0;
     assign ram_window_hit = mem_addr[31:8] == 24'h1 && mem_addr[7:4] == 4'h0;
+    assign pending_store_window_hit =
+        pending_store_addr_reg[31:8] == 24'h1 && pending_store_addr_reg[7:4] == 4'h0;
 
     always @(*) begin
         if (rom_hit) begin
@@ -71,38 +78,49 @@ module picorv32_program_harness (
             store_count_reg <= 0;
             last_store_addr_reg <= 0;
             last_store_data_reg <= 0;
-        end else if (mem_valid && |mem_wstrb && ram_window_hit && mem_addr[3:2] == 2'd0) begin
-            if (mem_wstrb[0]) ram_word0_reg[7:0] <= mem_wdata[7:0];
-            if (mem_wstrb[1]) ram_word0_reg[15:8] <= mem_wdata[15:8];
-            if (mem_wstrb[2]) ram_word0_reg[23:16] <= mem_wdata[23:16];
-            if (mem_wstrb[3]) ram_word0_reg[31:24] <= mem_wdata[31:24];
-            store_count_reg <= store_count_reg + 1'b1;
-            last_store_addr_reg <= mem_addr;
-            last_store_data_reg <= mem_wdata;
-        end else if (mem_valid && |mem_wstrb && ram_window_hit && mem_addr[3:2] == 2'd1) begin
-            if (mem_wstrb[0]) ram_word1_reg[7:0] <= mem_wdata[7:0];
-            if (mem_wstrb[1]) ram_word1_reg[15:8] <= mem_wdata[15:8];
-            if (mem_wstrb[2]) ram_word1_reg[23:16] <= mem_wdata[23:16];
-            if (mem_wstrb[3]) ram_word1_reg[31:24] <= mem_wdata[31:24];
-            store_count_reg <= store_count_reg + 1'b1;
-            last_store_addr_reg <= mem_addr;
-            last_store_data_reg <= mem_wdata;
-        end else if (mem_valid && |mem_wstrb && ram_window_hit && mem_addr[3:2] == 2'd2) begin
-            if (mem_wstrb[0]) ram_word2_reg[7:0] <= mem_wdata[7:0];
-            if (mem_wstrb[1]) ram_word2_reg[15:8] <= mem_wdata[15:8];
-            if (mem_wstrb[2]) ram_word2_reg[23:16] <= mem_wdata[23:16];
-            if (mem_wstrb[3]) ram_word2_reg[31:24] <= mem_wdata[31:24];
-            store_count_reg <= store_count_reg + 1'b1;
-            last_store_addr_reg <= mem_addr;
-            last_store_data_reg <= mem_wdata;
-        end else if (mem_valid && |mem_wstrb && ram_window_hit && mem_addr[3:2] == 2'd3) begin
-            if (mem_wstrb[0]) ram_word3_reg[7:0] <= mem_wdata[7:0];
-            if (mem_wstrb[1]) ram_word3_reg[15:8] <= mem_wdata[15:8];
-            if (mem_wstrb[2]) ram_word3_reg[23:16] <= mem_wdata[23:16];
-            if (mem_wstrb[3]) ram_word3_reg[31:24] <= mem_wdata[31:24];
-            store_count_reg <= store_count_reg + 1'b1;
-            last_store_addr_reg <= mem_addr;
-            last_store_data_reg <= mem_wdata;
+            pending_store_valid_reg <= 1'b0;
+            pending_store_addr_reg <= 0;
+            pending_store_data_reg <= 0;
+            pending_store_wstrb_reg <= 4'b0;
+        end else begin
+            if (pending_store_valid_reg && !trap && pending_store_window_hit && pending_store_addr_reg[3:2] == 2'd0) begin
+                if (pending_store_wstrb_reg[0]) ram_word0_reg[7:0] <= pending_store_data_reg[7:0];
+                if (pending_store_wstrb_reg[1]) ram_word0_reg[15:8] <= pending_store_data_reg[15:8];
+                if (pending_store_wstrb_reg[2]) ram_word0_reg[23:16] <= pending_store_data_reg[23:16];
+                if (pending_store_wstrb_reg[3]) ram_word0_reg[31:24] <= pending_store_data_reg[31:24];
+                store_count_reg <= store_count_reg + 1'b1;
+                last_store_addr_reg <= pending_store_addr_reg;
+                last_store_data_reg <= pending_store_data_reg;
+            end else if (pending_store_valid_reg && !trap && pending_store_window_hit && pending_store_addr_reg[3:2] == 2'd1) begin
+                if (pending_store_wstrb_reg[0]) ram_word1_reg[7:0] <= pending_store_data_reg[7:0];
+                if (pending_store_wstrb_reg[1]) ram_word1_reg[15:8] <= pending_store_data_reg[15:8];
+                if (pending_store_wstrb_reg[2]) ram_word1_reg[23:16] <= pending_store_data_reg[23:16];
+                if (pending_store_wstrb_reg[3]) ram_word1_reg[31:24] <= pending_store_data_reg[31:24];
+                store_count_reg <= store_count_reg + 1'b1;
+                last_store_addr_reg <= pending_store_addr_reg;
+                last_store_data_reg <= pending_store_data_reg;
+            end else if (pending_store_valid_reg && !trap && pending_store_window_hit && pending_store_addr_reg[3:2] == 2'd2) begin
+                if (pending_store_wstrb_reg[0]) ram_word2_reg[7:0] <= pending_store_data_reg[7:0];
+                if (pending_store_wstrb_reg[1]) ram_word2_reg[15:8] <= pending_store_data_reg[15:8];
+                if (pending_store_wstrb_reg[2]) ram_word2_reg[23:16] <= pending_store_data_reg[23:16];
+                if (pending_store_wstrb_reg[3]) ram_word2_reg[31:24] <= pending_store_data_reg[31:24];
+                store_count_reg <= store_count_reg + 1'b1;
+                last_store_addr_reg <= pending_store_addr_reg;
+                last_store_data_reg <= pending_store_data_reg;
+            end else if (pending_store_valid_reg && !trap && pending_store_window_hit && pending_store_addr_reg[3:2] == 2'd3) begin
+                if (pending_store_wstrb_reg[0]) ram_word3_reg[7:0] <= pending_store_data_reg[7:0];
+                if (pending_store_wstrb_reg[1]) ram_word3_reg[15:8] <= pending_store_data_reg[15:8];
+                if (pending_store_wstrb_reg[2]) ram_word3_reg[23:16] <= pending_store_data_reg[23:16];
+                if (pending_store_wstrb_reg[3]) ram_word3_reg[31:24] <= pending_store_data_reg[31:24];
+                store_count_reg <= store_count_reg + 1'b1;
+                last_store_addr_reg <= pending_store_addr_reg;
+                last_store_data_reg <= pending_store_data_reg;
+            end
+
+            pending_store_valid_reg <= mem_valid && |mem_wstrb;
+            pending_store_addr_reg <= mem_addr;
+            pending_store_data_reg <= mem_wdata;
+            pending_store_wstrb_reg <= mem_wstrb;
         end
     end
 
