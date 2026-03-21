@@ -1,0 +1,82 @@
+{
+  "source": "simple8_programmable.sv",
+  "memory_init": [
+    {
+      "module": "simple8_programmable",
+      "memory": "instr_mem",
+      "file": "demo_countdown_branch.txt"
+    }
+  ],
+  "test_cases": [
+    {
+      "name": "Counts down to zero and takes the JZ branch",
+      "sequence": [
+        {
+          "inputs": {"clk": 1, "reset": 1},
+          "expected": {
+            "pc_out": 0,
+            "z_out": 0,
+            "r0_out": 0,
+            "r1_out": 0,
+            "r2_out": 0,
+            "r3_out": 0,
+            "out_port": 0,
+            "ram_10_out": 0
+          }
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 1, "r0_out": 3}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 2, "r1_out": 1}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 3, "r3_out": 0, "out_port": 0}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 4, "r0_out": 2, "z_out": 0}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 5}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 3}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 4, "r0_out": 1, "z_out": 0}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 5}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 3}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 4, "r0_out": 0, "z_out": 1}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 7}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 8, "ram_10_out": 0}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 9, "r2_out": 0, "z_out": 1}
+        }
+      ]
+    }
+  ]
+}
