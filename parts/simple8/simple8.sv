@@ -39,7 +39,15 @@
 
 module simple8_cpu (
     input  logic clk,
-    input  logic reset
+    input  logic reset,
+    output logic [4:0] pc_out,
+    output logic       z_out,
+    output logic [7:0] r0_out,
+    output logic [7:0] r1_out,
+    output logic [7:0] r2_out,
+    output logic [7:0] r3_out,
+    output logic [7:0] out_port,
+    output logic [7:0] ram_10_out
 );
 
     // ─── Architectural state ─────────────────────────────────────────────
@@ -97,6 +105,16 @@ module simple8_cpu (
 
     // Read data memory (always available; only used by LD)
     assign mem_read = data_mem[addr];
+
+    // Expose architectural state for the JSON regression harness.
+    assign pc_out    = pc;
+    assign z_out     = z_flag;
+    assign r0_out    = regfile[0];
+    assign r1_out    = regfile[1];
+    assign r2_out    = regfile[2];
+    assign r3_out    = regfile[3];
+    assign out_port  = regfile[3];
+    assign ram_10_out = data_mem[5'h10];
 
     // =====================================================================
     //  EXECUTE — figure out what this instruction does
@@ -189,7 +207,7 @@ module simple8_cpu (
     //  WRITE BACK — update state on the rising edge of the clock
     // =====================================================================
 
-    always_ff @(posedge clk or posedge reset) begin
+    always_ff @(posedge clk) begin
         if (reset) begin
             // Clear the processor state
             pc     <= 5'd0;
