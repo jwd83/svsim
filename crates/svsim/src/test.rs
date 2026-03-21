@@ -1052,6 +1052,45 @@ mod tests {
     }
 
     #[test]
+    fn run_json_file_handles_async_reset_always_ff() {
+        let temp_dir = unique_temp_dir("json-test-async-reset");
+        let design = Compiler::new()
+            .compile_str(
+                temp_dir.join("top.sv"),
+                concat!(
+                    "module top(input logic clk, input logic reset, output logic [7:0] q);",
+                    "always_ff @(posedge clk or posedge reset) begin ",
+                    "if (reset) q <= 8'd0; else q <= q + 8'd1; ",
+                    "end ",
+                    "endmodule\n"
+                ),
+            )
+            .expect("compile top");
+        let json_path = temp_dir.join("top.json");
+        fs::write(
+            &json_path,
+            concat!(
+                "{",
+                "\"test_cases\":[{",
+                "\"name\":\"async reset fires without clock edge\",",
+                "\"sequence\":[",
+                "{\"inputs\":{\"clk\":1,\"reset\":0},\"expected\":{\"q\":1}},",
+                "{\"inputs\":{\"clk\":0,\"reset\":1},\"expected\":{\"q\":0}},",
+                "{\"inputs\":{\"clk\":1,\"reset\":1},\"expected\":{\"q\":0}},",
+                "{\"inputs\":{\"clk\":0,\"reset\":0},\"expected\":{\"q\":0}},",
+                "{\"inputs\":{\"clk\":1,\"reset\":0},\"expected\":{\"q\":1}}",
+                "]",
+                "}]}",
+            ),
+        )
+        .expect("write json");
+
+        let report = design.run_json_file(&json_path).expect("run json tests");
+
+        assert!(report.all_passed());
+    }
+
+    #[test]
     fn run_json_file_traces_hierarchical_signals() {
         let temp_dir = unique_temp_dir("json-test-hier-trace");
         let design = Compiler::new()

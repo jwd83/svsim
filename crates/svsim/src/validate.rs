@@ -88,12 +88,20 @@ fn validate_module(hir: &HirDesign, module: &ModuleSummary) -> Result<()> {
     }
 
     for block in &module.proc_blocks {
-        if let ProcBlockKind::AlwaysFf { clock } = &block.kind {
+        if let ProcBlockKind::AlwaysFf { clock, async_reset } = &block.kind {
             if module.signal_width(clock).is_none() {
                 return Err(Error::Resolve(format!(
                     "clock '{}' is not declared in '{}'",
                     clock, module.name
                 )));
+            }
+            if let Some(async_reset) = async_reset {
+                if module.signal_width(async_reset).is_none() {
+                    return Err(Error::Resolve(format!(
+                        "async reset '{}' is not declared in '{}'",
+                        async_reset, module.name
+                    )));
+                }
             }
         }
         validate_stmt(&block.body, module, &block.kind)?;

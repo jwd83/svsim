@@ -210,7 +210,10 @@ pub enum AssignmentKind {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum ProcBlockKind {
     AlwaysComb,
-    AlwaysFf { clock: String },
+    AlwaysFf {
+        clock: String,
+        async_reset: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

@@ -578,7 +578,7 @@ fn step_module(
     for block in &module.proc_blocks {
         match &block.kind {
             ProcBlockKind::AlwaysComb => {}
-            ProcBlockKind::AlwaysFf { clock } => {
+            ProcBlockKind::AlwaysFf { clock, async_reset } => {
                 let clock_value = pre_values.get(clock).cloned().ok_or_else(|| {
                     Error::Resolve(format!(
                         "clock '{}' is not declared in '{}'",
@@ -588,7 +588,25 @@ fn step_module(
                 let previous_clock_value =
                     state.previous_clocks.get(clock).copied().unwrap_or(false);
                 let current_clock_value = clock_value.truthy();
-                if !previous_clock_value && current_clock_value {
+                let reset_edge = if let Some(async_reset) = async_reset {
+                    let reset_value = pre_values.get(async_reset).cloned().ok_or_else(|| {
+                        Error::Resolve(format!(
+                            "async reset '{}' is not declared in '{}'",
+                            async_reset, module.name
+                        ))
+                    })?;
+                    let previous_reset_value = state
+                        .previous_clocks
+                        .get(async_reset)
+                        .copied()
+                        .unwrap_or(false);
+                    let current_reset_value = reset_value.truthy();
+                    sampled_clocks.insert(async_reset.clone(), current_reset_value);
+                    !previous_reset_value && current_reset_value
+                } else {
+                    false
+                };
+                if (!previous_clock_value && current_clock_value) || reset_edge {
                     let mut exec_values = pre_values.clone();
                     let mut exec_memories = state.memories.clone();
                     let mut block_staged = staged.clone();
@@ -891,8 +909,11 @@ fn build_clock_state_table(module: &ModuleSummary) -> HashMap<String, bool> {
     let mut clocks = HashMap::new();
 
     for block in &module.proc_blocks {
-        if let ProcBlockKind::AlwaysFf { clock } = &block.kind {
+        if let ProcBlockKind::AlwaysFf { clock, async_reset } = &block.kind {
             clocks.entry(clock.clone()).or_insert(false);
+            if let Some(async_reset) = async_reset {
+                clocks.entry(async_reset.clone()).or_insert(false);
+            }
         }
     }
 
@@ -2825,6 +2846,55 @@ endmodule
             .step(inputs([("clk".into(), 1)]))
             .expect("step rise again");
         assert_signal_eq!(outputs, "count", 2);
+    }
+
+    #[test]
+    fn step_runs_always_ff_on_async_reset_edges() {
+        let temp_dir = unique_temp_dir("always-ff-async-reset");
+        let design = Compiler::new()
+            .compile_str(
+                temp_dir.join("async_reset_counter.sv"),
+                r#"
+module async_reset_counter(
+    input  logic clk,
+    input  logic reset,
+    output logic [7:0] count
+);
+    always_ff @(posedge clk or posedge reset)
+        if (reset)
+            count <= 8'd0;
+        else
+            count <= count + 1'b1;
+endmodule
+"#,
+            )
+            .expect("compile async_reset_counter");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let outputs = sim
+            .step(inputs([("clk".into(), 1), ("reset".into(), 0)]))
+            .expect("step rise");
+        assert_signal_eq!(outputs, "count", 1);
+
+        let outputs = sim
+            .step(inputs([("clk".into(), 0), ("reset".into(), 1)]))
+            .expect("step async reset rise");
+        assert_signal_eq!(outputs, "count", 0);
+
+        let outputs = sim
+            .step(inputs([("clk".into(), 1), ("reset".into(), 1)]))
+            .expect("step with reset held");
+        assert_signal_eq!(outputs, "count", 0);
+
+        let outputs = sim
+            .step(inputs([("clk".into(), 0), ("reset".into(), 0)]))
+            .expect("release reset");
+        assert_signal_eq!(outputs, "count", 0);
+
+        let outputs = sim
+            .step(inputs([("clk".into(), 1), ("reset".into(), 0)]))
+            .expect("step post-reset rise");
+        assert_signal_eq!(outputs, "count", 1);
     }
 
     #[test]

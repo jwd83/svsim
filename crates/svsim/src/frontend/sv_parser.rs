@@ -1369,10 +1369,10 @@ fn lower_always_construct(
             None,
         )),
         AlwaysKeyword::AlwaysFf(_) => {
-            let (clock, body) =
+            let (clock, async_reset, body) =
                 lower_always_ff_statement(syntax_tree, &construct.nodes.1, module, path)?;
             Ok(ProcBlock {
-                kind: ProcBlockKind::AlwaysFf { clock },
+                kind: ProcBlockKind::AlwaysFf { clock, async_reset },
                 body,
                 span: None,
             })
@@ -1382,7 +1382,8 @@ fn lower_always_construct(
 
 /// Lower a Verilog-2001 `always @(...)` block by inspecting the sensitivity list:
 /// - `@*` or `@(*)` → AlwaysComb
-/// - `@(posedge clk)` → AlwaysFf { clock }
+/// - `@(posedge clk)` → AlwaysFf { clock, async_reset: None }
+/// - `@(posedge clk or posedge reset)` → AlwaysFf { clock, async_reset: Some(reset) }
 fn lower_always_generic(
     syntax_tree: &SyntaxTree,
     statement: &Statement,
@@ -1422,17 +1423,17 @@ fn lower_always_generic(
         }
         // always @(posedge clk)  →  AlwaysFf
         sv_parser::EventControl::EventExpression(expr) => {
-            let clock =
+            let (clock, async_reset) =
                 lower_always_ff_event_expression(syntax_tree, &expr.nodes.1.nodes.1, module, path)?;
             let body = lower_statement_or_null(syntax_tree, &timing_stmt.nodes.1, module, path)?;
             Ok(ProcBlock {
-                kind: ProcBlockKind::AlwaysFf { clock },
+                kind: ProcBlockKind::AlwaysFf { clock, async_reset },
                 body,
                 span: None,
             })
         }
         _ => Err(unsupported(
-            "`always` blocks only support `@*` or `@(posedge <clock>)` sensitivity lists",
+            "`always` blocks only support `@*`, `@(posedge <clock>)`, or `@(posedge <clock> or posedge <reset>)` sensitivity lists",
             None,
         )),
     }
@@ -1443,7 +1444,7 @@ fn lower_always_ff_statement(
     statement: &Statement,
     module: &ModuleSummary,
     path: &Path,
-) -> LowerResult<(String, Stmt)> {
+) -> LowerResult<(String, Option<String>, Stmt)> {
     if statement.nodes.0.is_some() {
         return Err(unsupported(
             "named procedural blocks are not supported yet",
@@ -1458,7 +1459,7 @@ fn lower_always_ff_statement(
         ));
     };
 
-    let clock = match &statement.nodes.0 {
+    let (clock, async_reset) = match &statement.nodes.0 {
         sv_parser::ProceduralTimingControl::EventControl(control) => {
             lower_always_ff_event_control(syntax_tree, control, module, path)?
         }
@@ -1470,7 +1471,7 @@ fn lower_always_ff_statement(
         }
     };
     let body = lower_statement_or_null(syntax_tree, &statement.nodes.1, module, path)?;
-    Ok((clock, body))
+    Ok((clock, async_reset, body))
 }
 
 fn lower_always_ff_event_control(
@@ -1478,13 +1479,13 @@ fn lower_always_ff_event_control(
     control: &sv_parser::EventControl,
     module: &ModuleSummary,
     path: &Path,
-) -> LowerResult<String> {
+) -> LowerResult<(String, Option<String>)> {
     match control {
         sv_parser::EventControl::EventExpression(expr) => {
             lower_always_ff_event_expression(syntax_tree, &expr.nodes.1.nodes.1, module, path)
         }
         _ => Err(unsupported(
-            "`always_ff` blocks must use a single `@(posedge <clock>)` event",
+            "`always_ff` blocks must use `@(posedge <clock>)` or `@(posedge <clock> or posedge <reset>)`",
             None,
         )),
     }
@@ -1495,34 +1496,81 @@ fn lower_always_ff_event_expression(
     expr: &sv_parser::EventExpression,
     module: &ModuleSummary,
     path: &Path,
-) -> LowerResult<String> {
-    let sv_parser::EventExpression::Expression(expr) = expr else {
-        return Err(unsupported(
-            "`always_ff` blocks must use a single `posedge` clock expression",
-            None,
-        ));
-    };
+) -> LowerResult<(String, Option<String>)> {
+    let mut signals = Vec::new();
+    collect_always_ff_event_signals(syntax_tree, expr, module, path, &mut signals)?;
 
-    if !matches!(expr.nodes.0, Some(sv_parser::EdgeIdentifier::Posedge(_))) {
-        return Err(unsupported(
-            "`always_ff` blocks currently require `posedge` clocks",
+    match signals.len() {
+        1 => Ok((signals.remove(0), None)),
+        2 => {
+            let mut first = signals.remove(0);
+            let mut second = signals.remove(0);
+            if looks_like_reset_signal(&first) && !looks_like_reset_signal(&second) {
+                std::mem::swap(&mut first, &mut second);
+            }
+            Ok((first, Some(second)))
+        }
+        _ => Err(unsupported(
+            "`always_ff` blocks currently support one clock edge and an optional async reset edge",
             None,
-        ));
+        )),
     }
-    if expr.nodes.2.is_some() {
-        return Err(unsupported(
-            "`always_ff` event expressions with `iff` are not supported yet",
-            None,
-        ));
-    }
+}
 
-    let Expr::Ident(clock) = lower_expression(syntax_tree, &expr.nodes.1, module, path)? else {
-        return Err(unsupported(
-            "`always_ff` clock expressions must name a local signal",
+fn collect_always_ff_event_signals(
+    syntax_tree: &SyntaxTree,
+    expr: &sv_parser::EventExpression,
+    module: &ModuleSummary,
+    path: &Path,
+    out: &mut Vec<String>,
+) -> LowerResult<()> {
+    match expr {
+        sv_parser::EventExpression::Expression(expr) => {
+            if !matches!(expr.nodes.0, Some(sv_parser::EdgeIdentifier::Posedge(_))) {
+                return Err(unsupported(
+                    "`always_ff` blocks currently require `posedge` event controls",
+                    None,
+                ));
+            }
+            if expr.nodes.2.is_some() {
+                return Err(unsupported(
+                    "`always_ff` event expressions with `iff` are not supported yet",
+                    None,
+                ));
+            }
+
+            let Expr::Ident(signal) = lower_expression(syntax_tree, &expr.nodes.1, module, path)?
+            else {
+                return Err(unsupported(
+                    "`always_ff` event expressions must name local signals",
+                    None,
+                ));
+            };
+            out.push(signal);
+            Ok(())
+        }
+        sv_parser::EventExpression::Or(expr) => {
+            collect_always_ff_event_signals(syntax_tree, &expr.nodes.0, module, path, out)?;
+            collect_always_ff_event_signals(syntax_tree, &expr.nodes.2, module, path, out)
+        }
+        sv_parser::EventExpression::Comma(expr) => {
+            collect_always_ff_event_signals(syntax_tree, &expr.nodes.0, module, path, out)?;
+            collect_always_ff_event_signals(syntax_tree, &expr.nodes.2, module, path, out)
+        }
+        sv_parser::EventExpression::Paren(expr) => {
+            collect_always_ff_event_signals(syntax_tree, &expr.nodes.0.nodes.1, module, path, out)
+        }
+        _ => Err(unsupported(
+            "`always_ff` blocks only support edge-triggered signal event expressions",
             None,
-        ));
-    };
-    Ok(clock)
+        )),
+    }
+}
+
+fn looks_like_reset_signal(name: &str) -> bool {
+    matches!(name, "reset" | "rst" | "resetn" | "rst_n" | "rstn")
+        || name.starts_with("reset_")
+        || name.starts_with("rst_")
 }
 
 fn lower_statement(
@@ -3865,7 +3913,8 @@ mod tests {
         assert_eq!(
             module.proc_blocks[0].kind,
             ProcBlockKind::AlwaysFf {
-                clock: "clk".into()
+                clock: "clk".into(),
+                async_reset: None,
             }
         );
         match &module.proc_blocks[0].body {
@@ -3903,6 +3952,33 @@ mod tests {
             Expr::MemoryRead { memory, .. } => assert_eq!(memory, "rom"),
             other => panic!("unexpected memory read expression: {other:?}"),
         }
+    }
+
+    #[test]
+    fn parse_file_lowers_always_ff_with_async_reset() {
+        let frontend = SvParserFrontend::default();
+        let source = frontend
+            .parse_str(
+                "/virtual/top.sv",
+                concat!(
+                    "module top(input logic clk, input logic reset, output logic q);",
+                    "always_ff @(posedge clk or posedge reset) begin ",
+                    "if (reset) q <= 1'b0; else q <= ~q; ",
+                    "end ",
+                    "endmodule\n"
+                ),
+            )
+            .expect("parse async reset top");
+
+        let module = &source.modules[0];
+        assert!(module.unsupported.is_empty());
+        assert_eq!(
+            module.proc_blocks[0].kind,
+            ProcBlockKind::AlwaysFf {
+                clock: "clk".into(),
+                async_reset: Some("reset".into()),
+            }
+        );
     }
 
     #[test]

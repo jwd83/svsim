@@ -107,13 +107,13 @@ module simple8_cpu (
     assign mem_read = data_mem[addr];
 
     // Expose architectural state for the JSON regression harness.
-    assign pc_out    = pc;
-    assign z_out     = z_flag;
-    assign r0_out    = regfile[0];
-    assign r1_out    = regfile[1];
-    assign r2_out    = regfile[2];
-    assign r3_out    = regfile[3];
-    assign out_port  = regfile[3];
+    assign pc_out     = pc;
+    assign z_out      = z_flag;
+    assign r0_out     = regfile[0];
+    assign r1_out     = regfile[1];
+    assign r2_out     = regfile[2];
+    assign r3_out     = regfile[3];
+    assign out_port   = regfile[3];
     assign ram_10_out = data_mem[5'h10];
 
     // =====================================================================
@@ -207,7 +207,7 @@ module simple8_cpu (
     //  WRITE BACK — update state on the rising edge of the clock
     // =====================================================================
 
-    always_ff @(posedge clk) begin
+    always_ff @(posedge clk or posedge reset) begin
         if (reset) begin
             // Clear the processor state
             pc     <= 5'd0;
