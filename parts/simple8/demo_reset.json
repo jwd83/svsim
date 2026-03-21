@@ -1,0 +1,75 @@
+{
+  "source": "simple8_programmable.sv",
+  "memory_init": [
+    {
+      "module": "simple8_programmable",
+      "memory": "instr_mem",
+      "file": "demo_reset.txt"
+    }
+  ],
+  "test_cases": [
+    {
+      "name": "Reset clears all state mid-execution and program restarts cleanly",
+      "sequence": [
+        {
+          "inputs": {"clk": 1, "reset": 1},
+          "expected": {
+            "pc_out": 0,
+            "z_out": 0,
+            "r0_out": 0,
+            "r1_out": 0,
+            "r2_out": 0,
+            "r3_out": 0,
+            "out_port": 0,
+            "ram_10_out": 0
+          }
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 1, "r0_out": 42, "z_out": 0}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 2, "r1_out": 7}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 3, "r0_out": 49, "z_out": 0}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 4, "ram_10_out": 49}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 5, "r1_out": 49}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 6, "r0_out": 0, "z_out": 1}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 1},
+          "expected": {
+            "pc_out": 0,
+            "z_out": 0,
+            "r0_out": 0,
+            "r1_out": 0,
+            "r2_out": 0,
+            "r3_out": 0,
+            "out_port": 0,
+            "ram_10_out": 0
+          }
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 1, "r0_out": 42, "z_out": 0}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 2, "r1_out": 7}
+        }
+      ]
+    }
+  ]
+}

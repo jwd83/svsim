@@ -1,0 +1,102 @@
+{
+  "source": "simple8_programmable.sv",
+  "memory_init": [
+    {
+      "module": "simple8_programmable",
+      "memory": "instr_mem",
+      "file": "demo_fibonacci.txt"
+    }
+  ],
+  "test_cases": [
+    {
+      "name": "Computes Fibonacci to 233, stores and loads back from RAM",
+      "sequence": [
+        {
+          "inputs": {"clk": 1, "reset": 1},
+          "expected": {
+            "pc_out": 0,
+            "z_out": 0,
+            "r0_out": 0,
+            "r1_out": 0,
+            "r2_out": 0,
+            "r3_out": 0,
+            "out_port": 0,
+            "ram_10_out": 0
+          }
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 1, "r0_out": 0, "z_out": 1}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 2, "r1_out": 1, "z_out": 0}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 3, "r0_out": 1}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 4, "r1_out": 2}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 5, "r0_out": 3}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 6, "r1_out": 5}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 7, "r0_out": 8}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 8, "r1_out": 13}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 9, "r0_out": 21}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 10, "r1_out": 34}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 11, "r0_out": 55}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 12, "r1_out": 89}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 13, "r0_out": 144}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 14, "r1_out": 233}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 15, "ram_10_out": 233}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 16, "r2_out": 233}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 17}
+        },
+        {
+          "inputs": {"clk": 1, "reset": 0},
+          "expected": {"pc_out": 18, "r3_out": 144, "out_port": 144}
+        }
+      ]
+    }
+  ]
+}
