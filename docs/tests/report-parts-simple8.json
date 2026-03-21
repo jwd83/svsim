@@ -1,0 +1,79 @@
+{
+  "directory": "parts/simple8",
+  "report": {
+    "duration_ms": 24,
+    "passed": 3,
+    "total": 3,
+    "suites": [
+      {
+        "source_path": "parts/simple8/simple8.sv",
+        "json_path": "parts/simple8/simple8.json",
+        "top_module": "simple8_cpu",
+        "duration_ms": 24,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "step_hz": 11000,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Built-in demo program reaches the taken JZ path",
+              "description": null,
+              "steps": 11,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/simple8/simple8_programmable.sv",
+        "json_path": "parts/simple8/demo_add_store.json",
+        "top_module": "simple8_programmable",
+        "duration_ms": 21,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "step_hz": 7000,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Adds two immediates, stores to RAM, and loads back",
+              "description": null,
+              "steps": 7,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/simple8/simple8_programmable.sv",
+        "json_path": "parts/simple8/demo_countdown_branch.json",
+        "top_module": "simple8_programmable",
+        "duration_ms": 22,
+        "passed": true,
+        "report": {
+          "duration_ms": 1,
+          "step_hz": 14000,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Counts down to zero and takes the JZ branch",
+              "description": null,
+              "steps": 14,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      }
+    ]
+  }
+}
