@@ -25,7 +25,7 @@
 //   0x3     AND    rd = rd & rs            Z
 //   0x4     OR     rd = rd | rs            Z
 //   0x5     XOR    rd = rd ^ rs            Z
-//   0x6     LDI    rd = imm8              Z
+//   0x6     LDI    rd = imm8               Z
 //   0x7     LD     rd = RAM[imm8]          Z
 //   0x8     ST     RAM[imm8] = rd          —
 //   0x9     JMP    pc = imm8               —
