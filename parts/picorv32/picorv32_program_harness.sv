@@ -7,6 +7,7 @@ module picorv32_program_harness (
     output mem_valid,
     output mem_instr,
     output [31:0] mem_addr,
+    output [3:0] mem_wstrb,
     output [31:0] ram_word0,
     output [31:0] ram_word1,
     output [31:0] ram_word2,
@@ -25,7 +26,7 @@ module picorv32_program_harness (
     wire mem_ready;
     reg [31:0] mem_rdata;
     wire [31:0] mem_wdata;
-    wire [3:0] mem_wstrb;
+    wire [3:0] mem_wstrb_wire;
 
     wire rom_hit;
     wire ram_window_hit;
@@ -65,6 +66,7 @@ module picorv32_program_harness (
     assign ram_word1 = ram_word1_reg;
     assign ram_word2 = ram_word2_reg;
     assign ram_word3 = ram_word3_reg;
+    assign mem_wstrb = mem_wstrb_wire;
     assign store_count = store_count_reg;
     assign last_store_addr = last_store_addr_reg;
     assign last_store_data = last_store_data_reg;
@@ -117,10 +119,10 @@ module picorv32_program_harness (
                 last_store_data_reg <= pending_store_data_reg;
             end
 
-            pending_store_valid_reg <= mem_valid && |mem_wstrb;
+            pending_store_valid_reg <= mem_valid && |mem_wstrb_wire;
             pending_store_addr_reg <= mem_addr;
             pending_store_data_reg <= mem_wdata;
-            pending_store_wstrb_reg <= mem_wstrb;
+            pending_store_wstrb_reg <= mem_wstrb_wire;
         end
     end
 
@@ -133,7 +135,7 @@ module picorv32_program_harness (
         .mem_ready(mem_ready),
         .mem_addr(mem_addr),
         .mem_wdata(mem_wdata),
-        .mem_wstrb(mem_wstrb),
+        .mem_wstrb(mem_wstrb_wire),
         .mem_rdata(mem_rdata),
         .pcpi_wr(1'b0),
         .pcpi_rd(32'b0),

@@ -25,6 +25,7 @@ This directory now contains a small executable PicoRV32 corpus in addition to th
 - `demo_add_chain_long.json`: longer `ADDI` chain that accumulates `1..20` and stores `210`
 - `demo_branch_taken.json`: taken `BEQ` skips an untaken `ADDI`, then stores `42` before trapping
 - `demo_compare_branch.json`: `SLT`, `SLTU`, `BLT`, and `BLTU` prove signed and unsigned ordering diverge as expected before three visible stores
+- `demo_instr_misaligned_jalr.json`: `jalr` targets address `0x0000_0006`, proving PicoRV32 enters its instruction-misalignment trap path before any visible store commits
 - `demo_jump_link.json`: `jal` and masked `jalr` both write their link registers, skip untaken work, and still store `42`
 - `demo_load_roundtrip.json`: `SW` followed by `LW` feeds a derived second store, proving load-backed dataflow through the RAM window
 - `demo_misaligned_load.json`: misaligned `LW` traps before any visible store can commit
@@ -48,12 +49,13 @@ The executable subset is intentionally narrower than compile coverage. The check
 - a taken conditional-branch sample that skips untaken work and lands on the correct masked target
 - a compare-heavy sample that proves `slt` / `sltu` and `blt` / `bltu` disagree in the expected signed-vs-unsigned way before trapping
 - a jump/link sample that proves both `jal` and masked `jalr` targets plus link-register writeback
+- an instruction-misaligned `jalr` sample that enters PicoRV32 trap state before any visible store commits
 - a load-backed sample that stores `17`, reloads it with `lw`, derives `42`, and stores the result into the next RAM word
 - explicit misaligned `lw` and `sw` samples that trap before any visible RAM mutation reaches the harness
 - a subword-memory sample that mutates RAM with `sb` / `sh`, proves `lb` sign extension, proves `lbu` zero extension, and stores the signed-vs-unsigned halfword delta `0x00010000`
 - a two-store continuation sample that writes consecutive RAM words before trapping
 
-The checked-in runtime surface now covers post-store continuation, taken conditional branches, signed-vs-unsigned compare control flow, jump/link control flow, a load-backed datapath case, subword memory execution, and explicit misaligned load/store traps through `demo_two_store.json`, `demo_branch_taken.json`, `demo_compare_branch.json`, `demo_jump_link.json`, `demo_load_roundtrip.json`, `demo_subword_mem.json`, `demo_misaligned_load.json`, and `demo_misaligned_store.json`. The next bounded PicoRV32 runtime target is instruction-path trap coverage, especially misaligned taken branch or `jalr` targets, now that data-side misaligned accesses are represented in the executable corpus too.
+The checked-in runtime surface now covers post-store continuation, taken conditional branches, signed-vs-unsigned compare control flow, jump/link control flow, one instruction-path misalignment trap (`jalr`), a load-backed datapath case, subword memory execution, and explicit misaligned load/store traps through `demo_two_store.json`, `demo_branch_taken.json`, `demo_compare_branch.json`, `demo_jump_link.json`, `demo_instr_misaligned_jalr.json`, `demo_load_roundtrip.json`, `demo_subword_mem.json`, `demo_misaligned_load.json`, and `demo_misaligned_store.json`. The next bounded PicoRV32 runtime target is the remaining branch-side instruction-path trap case: a taken misaligned conditional branch target.
 
 ## Run
 

@@ -7,6 +7,17 @@
       "file": "demo_misaligned_store.txt"
     }
   ],
+  "trace": {
+    "signals": [
+      "trap",
+      "mem_valid",
+      "mem_instr",
+      "mem_addr",
+      "mem_wstrb",
+      "ram_word0",
+      "store_count"
+    ]
+  },
   "test_cases": [
     {
       "name": "misaligned sw traps without mutating the PicoRV32 RAM window",
@@ -24,13 +35,13 @@
         {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
         {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
         {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {"trap": 0, "mem_valid": 1, "mem_instr": 0, "mem_addr": 256, "mem_wstrb": 15, "ram_word0": 0, "store_count": 0}},
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {"trap": 1, "mem_valid": 0, "mem_instr": 0, "mem_addr": 256, "mem_wstrb": 15, "ram_word0": 0, "store_count": 0}},
         {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
         {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
         {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
         {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
-        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
-        {"inputs": {"clk": 1, "resetn": 1}, "expected": {}},
-        {"inputs": {"clk": 1, "resetn": 1}, "expected": {"trap": 1, "ram_word0": 0, "ram_word1": 0, "ram_word2": 0, "ram_word3": 0, "store_count": 0, "last_store_addr": 0, "last_store_data": 0}}
+        {"inputs": {"clk": 1, "resetn": 1}, "expected": {"trap": 1, "mem_valid": 0, "mem_instr": 0, "mem_addr": 256, "mem_wstrb": 15, "ram_word0": 0, "ram_word1": 0, "ram_word2": 0, "ram_word3": 0, "store_count": 0, "last_store_addr": 0, "last_store_data": 0}}
       ]
     }
   ]

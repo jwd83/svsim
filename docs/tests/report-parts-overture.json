@@ -1,7 +1,7 @@
 {
   "directory": "parts/overture",
   "report": {
-    "duration_ms": 22927,
+    "duration_ms": 2985,
     "passed": 43,
     "total": 43,
     "suites": [
@@ -9,11 +9,11 @@
         "source_path": "parts/overture/adder_4bit.sv",
         "json_path": "parts/overture/adder_4bit.json",
         "top_module": "adder_4bit",
-        "duration_ms": 153,
+        "duration_ms": 56,
         "passed": true,
         "report": {
-          "duration_ms": 37,
-          "step_hz": 270,
+          "duration_ms": 3,
+          "step_hz": 3333,
           "passed": 10,
           "total": 10,
           "cases": [
@@ -95,11 +95,11 @@
         "source_path": "parts/overture/adder_8bit.sv",
         "json_path": "parts/overture/adder_8bit.json",
         "top_module": "adder_8bit",
-        "duration_ms": 230,
+        "duration_ms": 19,
         "passed": true,
         "report": {
-          "duration_ms": 77,
-          "step_hz": 129,
+          "duration_ms": 9,
+          "step_hz": 1111,
           "passed": 10,
           "total": 10,
           "cases": [
@@ -181,7 +181,151 @@
         "source_path": "parts/overture/alu_1bit.sv",
         "json_path": "parts/overture/alu_1bit.json",
         "top_module": "alu_1bit",
-        "duration_ms": 38,
+        "duration_ms": 4,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "step_hz": 12000,
+          "passed": 12,
+          "total": 12,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 9",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 10",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 11",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 12",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/overture/and_gate.sv",
+        "json_path": "parts/overture/and_gate.json",
+        "top_module": "and_gate",
+        "duration_ms": 1,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "step_hz": 4000,
+          "passed": 4,
+          "total": 4,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/overture/and_gate_8bit.sv",
+        "json_path": "parts/overture/and_gate_8bit.json",
+        "top_module": "and_gate_8bit",
+        "duration_ms": 16,
         "passed": true,
         "report": {
           "duration_ms": 3,
@@ -278,158 +422,14 @@
         "error": null
       },
       {
-        "source_path": "parts/overture/and_gate.sv",
-        "json_path": "parts/overture/and_gate.json",
-        "top_module": "and_gate",
-        "duration_ms": 25,
-        "passed": true,
-        "report": {
-          "duration_ms": 0,
-          "step_hz": 4000,
-          "passed": 4,
-          "total": 4,
-          "cases": [
-            {
-              "name": "Test 1",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 2",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 3",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 4",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            }
-          ]
-        },
-        "error": null
-      },
-      {
-        "source_path": "parts/overture/and_gate_8bit.sv",
-        "json_path": "parts/overture/and_gate_8bit.json",
-        "top_module": "and_gate_8bit",
-        "duration_ms": 112,
-        "passed": true,
-        "report": {
-          "duration_ms": 13,
-          "step_hz": 923,
-          "passed": 12,
-          "total": 12,
-          "cases": [
-            {
-              "name": "Test 1",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 2",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 3",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 4",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 5",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 6",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 7",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 8",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 9",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 10",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 11",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 12",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            }
-          ]
-        },
-        "error": null
-      },
-      {
         "source_path": "parts/overture/counter8.sv",
         "json_path": "parts/overture/counter8.json",
         "top_module": "counter8",
-        "duration_ms": 43,
+        "duration_ms": 40,
         "passed": true,
         "report": {
-          "duration_ms": 5,
-          "step_hz": 17800,
+          "duration_ms": 1,
+          "step_hz": 89000,
           "passed": 11,
           "total": 11,
           "cases": [
@@ -518,11 +518,11 @@
         "source_path": "parts/overture/decoder_3to8.sv",
         "json_path": "parts/overture/decoder_3to8.json",
         "top_module": "decoder_3to8",
-        "duration_ms": 119,
+        "duration_ms": 17,
         "passed": true,
         "report": {
-          "duration_ms": 11,
-          "step_hz": 727,
+          "duration_ms": 2,
+          "step_hz": 4000,
           "passed": 8,
           "total": 8,
           "cases": [
@@ -590,11 +590,11 @@
         "source_path": "parts/overture/full_adder.sv",
         "json_path": "parts/overture/full_adder.json",
         "top_module": "full_adder",
-        "duration_ms": 87,
+        "duration_ms": 7,
         "passed": true,
         "report": {
-          "duration_ms": 6,
-          "step_hz": 1333,
+          "duration_ms": 0,
+          "step_hz": 8000,
           "passed": 8,
           "total": 8,
           "cases": [
@@ -662,11 +662,11 @@
         "source_path": "parts/overture/half_adder.sv",
         "json_path": "parts/overture/half_adder.json",
         "top_module": "half_adder",
-        "duration_ms": 47,
+        "duration_ms": 3,
         "passed": true,
         "report": {
-          "duration_ms": 2,
-          "step_hz": 2000,
+          "duration_ms": 0,
+          "step_hz": 4000,
           "passed": 4,
           "total": 4,
           "cases": [
@@ -706,11 +706,11 @@
         "source_path": "parts/overture/mux_2to1_1bit.sv",
         "json_path": "parts/overture/mux_2to1_1bit.json",
         "top_module": "mux_2to1_1bit",
-        "duration_ms": 71,
+        "duration_ms": 3,
         "passed": true,
         "report": {
-          "duration_ms": 6,
-          "step_hz": 1333,
+          "duration_ms": 0,
+          "step_hz": 8000,
           "passed": 8,
           "total": 8,
           "cases": [
@@ -778,11 +778,11 @@
         "source_path": "parts/overture/mux_2to1_4bit.sv",
         "json_path": "parts/overture/mux_2to1_4bit.json",
         "top_module": "mux_2to1_4bit",
-        "duration_ms": 105,
+        "duration_ms": 44,
         "passed": true,
         "report": {
-          "duration_ms": 15,
-          "step_hz": 533,
+          "duration_ms": 1,
+          "step_hz": 8000,
           "passed": 8,
           "total": 8,
           "cases": [
@@ -850,11 +850,11 @@
         "source_path": "parts/overture/mux_2to1_8bit.sv",
         "json_path": "parts/overture/mux_2to1_8bit.json",
         "top_module": "mux_2to1_8bit",
-        "duration_ms": 188,
+        "duration_ms": 16,
         "passed": true,
         "report": {
-          "duration_ms": 45,
-          "step_hz": 266,
+          "duration_ms": 4,
+          "step_hz": 3000,
           "passed": 12,
           "total": 12,
           "cases": [
@@ -950,11 +950,11 @@
         "source_path": "parts/overture/mux_4to1_8bit.sv",
         "json_path": "parts/overture/mux_4to1_8bit.json",
         "top_module": "mux_4to1_8bit",
-        "duration_ms": 593,
+        "duration_ms": 40,
         "passed": true,
         "report": {
-          "duration_ms": 300,
-          "step_hz": 80,
+          "duration_ms": 20,
+          "step_hz": 1200,
           "passed": 24,
           "total": 24,
           "cases": [
@@ -1134,11 +1134,11 @@
         "source_path": "parts/overture/mux_8to1_8bit.sv",
         "json_path": "parts/overture/mux_8to1_8bit.json",
         "top_module": "mux_8to1_8bit",
-        "duration_ms": 1078,
+        "duration_ms": 137,
         "passed": true,
         "report": {
-          "duration_ms": 807,
-          "step_hz": 34,
+          "duration_ms": 106,
+          "step_hz": 264,
           "passed": 28,
           "total": 28,
           "cases": [
@@ -1346,7 +1346,7 @@
         "source_path": "parts/overture/nand_gate.sv",
         "json_path": "parts/overture/nand_gate.json",
         "top_module": "nand_gate",
-        "duration_ms": 21,
+        "duration_ms": 2,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -1390,7 +1390,151 @@
         "source_path": "parts/overture/nand_gate_8bit.sv",
         "json_path": "parts/overture/nand_gate_8bit.json",
         "top_module": "nand_gate_8bit",
-        "duration_ms": 105,
+        "duration_ms": 5,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "step_hz": 12000,
+          "passed": 12,
+          "total": 12,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 9",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 10",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 11",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 12",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/overture/nor_gate.sv",
+        "json_path": "parts/overture/nor_gate.json",
+        "top_module": "nor_gate",
+        "duration_ms": 9,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "step_hz": 4000,
+          "passed": 4,
+          "total": 4,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/overture/nor_gate_8bit.sv",
+        "json_path": "parts/overture/nor_gate_8bit.json",
+        "top_module": "nor_gate_8bit",
+        "duration_ms": 18,
         "passed": true,
         "report": {
           "duration_ms": 2,
@@ -1487,158 +1631,14 @@
         "error": null
       },
       {
-        "source_path": "parts/overture/nor_gate.sv",
-        "json_path": "parts/overture/nor_gate.json",
-        "top_module": "nor_gate",
-        "duration_ms": 116,
-        "passed": true,
-        "report": {
-          "duration_ms": 0,
-          "step_hz": 4000,
-          "passed": 4,
-          "total": 4,
-          "cases": [
-            {
-              "name": "Test 1",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 2",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 3",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 4",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            }
-          ]
-        },
-        "error": null
-      },
-      {
-        "source_path": "parts/overture/nor_gate_8bit.sv",
-        "json_path": "parts/overture/nor_gate_8bit.json",
-        "top_module": "nor_gate_8bit",
-        "duration_ms": 184,
-        "passed": true,
-        "report": {
-          "duration_ms": 32,
-          "step_hz": 375,
-          "passed": 12,
-          "total": 12,
-          "cases": [
-            {
-              "name": "Test 1",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 2",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 3",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 4",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 5",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 6",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 7",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 8",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 9",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 10",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 11",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 12",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            }
-          ]
-        },
-        "error": null
-      },
-      {
         "source_path": "parts/overture/not_gate.sv",
         "json_path": "parts/overture/not_gate.json",
         "top_module": "not_gate",
-        "duration_ms": 47,
+        "duration_ms": 3,
         "passed": true,
         "report": {
-          "duration_ms": 5,
-          "step_hz": 400,
+          "duration_ms": 0,
+          "step_hz": 2000,
           "passed": 2,
           "total": 2,
           "cases": [
@@ -1664,7 +1664,7 @@
         "source_path": "parts/overture/or_gate.sv",
         "json_path": "parts/overture/or_gate.json",
         "top_module": "or_gate",
-        "duration_ms": 85,
+        "duration_ms": 4,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -1708,11 +1708,11 @@
         "source_path": "parts/overture/or_gate_8bit.sv",
         "json_path": "parts/overture/or_gate_8bit.json",
         "top_module": "or_gate_8bit",
-        "duration_ms": 95,
+        "duration_ms": 9,
         "passed": true,
         "report": {
-          "duration_ms": 9,
-          "step_hz": 1333,
+          "duration_ms": 2,
+          "step_hz": 6000,
           "passed": 12,
           "total": 12,
           "cases": [
@@ -1808,7 +1808,7 @@
         "source_path": "parts/overture/overture_alu_8bit.sv",
         "json_path": "parts/overture/overture_alu_8bit.json",
         "top_module": "overture_alu_8bit",
-        "duration_ms": 66,
+        "duration_ms": 40,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -1887,7 +1887,7 @@
         "source_path": "parts/overture/overture_condition.sv",
         "json_path": "parts/overture/overture_condition.json",
         "top_module": "overture_condition",
-        "duration_ms": 96,
+        "duration_ms": 8,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -2183,11 +2183,11 @@
         "source_path": "parts/overture/overture_cpu.sv",
         "json_path": "parts/overture/overture_cpu.json",
         "top_module": "overture_cpu",
-        "duration_ms": 7436,
+        "duration_ms": 777,
         "passed": true,
         "report": {
-          "duration_ms": 6540,
-          "step_hz": 2,
+          "duration_ms": 704,
+          "step_hz": 25,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -2206,11 +2206,11 @@
         "source_path": "parts/overture/overture_cpu.sv",
         "json_path": "parts/overture/overture_cpu_program_branch.json",
         "top_module": "overture_cpu",
-        "duration_ms": 6291,
+        "duration_ms": 642,
         "passed": true,
         "report": {
-          "duration_ms": 5600,
-          "step_hz": 2,
+          "duration_ms": 607,
+          "step_hz": 26,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -2229,11 +2229,11 @@
         "source_path": "parts/overture/overture_cpu.sv",
         "json_path": "parts/overture/overture_cpu_program_io.json",
         "top_module": "overture_cpu",
-        "duration_ms": 9958,
+        "duration_ms": 1420,
         "passed": true,
         "report": {
-          "duration_ms": 9432,
-          "step_hz": 4,
+          "duration_ms": 1364,
+          "step_hz": 27,
           "passed": 2,
           "total": 2,
           "cases": [
@@ -2259,11 +2259,11 @@
         "source_path": "parts/overture/overture_decoder_8bit.sv",
         "json_path": "parts/overture/overture_decoder_8bit.json",
         "top_module": "overture_decoder_8bit",
-        "duration_ms": 118,
+        "duration_ms": 50,
         "passed": true,
         "report": {
-          "duration_ms": 3,
-          "step_hz": 1333,
+          "duration_ms": 0,
+          "step_hz": 4000,
           "passed": 4,
           "total": 4,
           "cases": [
@@ -2303,7 +2303,7 @@
         "source_path": "parts/overture/overture_fetch.sv",
         "json_path": "parts/overture/overture_fetch.json",
         "top_module": "overture_fetch",
-        "duration_ms": 48,
+        "duration_ms": 4,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -2340,7 +2340,7 @@
         "source_path": "parts/overture/overture_pc_8bit.sv",
         "json_path": "parts/overture/overture_pc_8bit.json",
         "top_module": "overture_pc_8bit",
-        "duration_ms": 109,
+        "duration_ms": 8,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -2363,11 +2363,11 @@
         "source_path": "parts/overture/pgm_overture_add5.sv",
         "json_path": "parts/overture/pgm_overture_add5.json",
         "top_module": "pgm_overture_add5",
-        "duration_ms": 8290,
+        "duration_ms": 807,
         "passed": true,
         "report": {
-          "duration_ms": 7265,
-          "step_hz": 2,
+          "duration_ms": 683,
+          "step_hz": 26,
           "passed": 3,
           "total": 3,
           "cases": [
@@ -2400,11 +2400,11 @@
         "source_path": "parts/overture/pgm_overture_alu.sv",
         "json_path": "parts/overture/pgm_overture_alu.json",
         "top_module": "pgm_overture_alu",
-        "duration_ms": 7266,
+        "duration_ms": 895,
         "passed": true,
         "report": {
-          "duration_ms": 6654,
-          "step_hz": 2,
+          "duration_ms": 816,
+          "step_hz": 22,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -2423,11 +2423,11 @@
         "source_path": "parts/overture/pgm_overture_branch.sv",
         "json_path": "parts/overture/pgm_overture_branch.json",
         "top_module": "pgm_overture_branch",
-        "duration_ms": 6337,
+        "duration_ms": 610,
         "passed": true,
         "report": {
-          "duration_ms": 5663,
-          "step_hz": 2,
+          "duration_ms": 576,
+          "step_hz": 27,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -2446,11 +2446,11 @@
         "source_path": "parts/overture/pgm_overture_cracker.sv",
         "json_path": "parts/overture/pgm_overture_cracker.json",
         "top_module": "pgm_overture_cracker",
-        "duration_ms": 10007,
+        "duration_ms": 1065,
         "passed": true,
         "report": {
-          "duration_ms": 9042,
-          "step_hz": 2,
+          "duration_ms": 946,
+          "step_hz": 23,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -2469,11 +2469,11 @@
         "source_path": "parts/overture/pgm_overture_invasion.sv",
         "json_path": "parts/overture/pgm_overture_invasion.json",
         "top_module": "pgm_overture_invasion",
-        "duration_ms": 8166,
+        "duration_ms": 686,
         "passed": true,
         "report": {
-          "duration_ms": 7198,
-          "step_hz": 2,
+          "duration_ms": 635,
+          "step_hz": 28,
           "passed": 2,
           "total": 2,
           "cases": [
@@ -2499,11 +2499,11 @@
         "source_path": "parts/overture/pgm_overture_io.sv",
         "json_path": "parts/overture/pgm_overture_io.json",
         "top_module": "pgm_overture_io",
-        "duration_ms": 15760,
+        "duration_ms": 1362,
         "passed": true,
         "report": {
-          "duration_ms": 14740,
-          "step_hz": 2,
+          "duration_ms": 1320,
+          "step_hz": 28,
           "passed": 2,
           "total": 2,
           "cases": [
@@ -2529,11 +2529,11 @@
         "source_path": "parts/overture/pgm_overture_laser.sv",
         "json_path": "parts/overture/pgm_overture_laser.json",
         "top_module": "pgm_overture_laser",
-        "duration_ms": 12756,
+        "duration_ms": 1122,
         "passed": true,
         "report": {
-          "duration_ms": 11820,
-          "step_hz": 2,
+          "duration_ms": 1079,
+          "step_hz": 27,
           "passed": 3,
           "total": 3,
           "cases": [
@@ -2566,11 +2566,11 @@
         "source_path": "parts/overture/pgm_overture_masking.sv",
         "json_path": "parts/overture/pgm_overture_masking.json",
         "top_module": "pgm_overture_masking",
-        "duration_ms": 5474,
+        "duration_ms": 896,
         "passed": true,
         "report": {
-          "duration_ms": 4826,
-          "step_hz": 4,
+          "duration_ms": 849,
+          "step_hz": 28,
           "passed": 4,
           "total": 4,
           "cases": [
@@ -2610,11 +2610,11 @@
         "source_path": "parts/overture/pgm_overture_maze.sv",
         "json_path": "parts/overture/pgm_overture_maze.json",
         "top_module": "pgm_overture_maze",
-        "duration_ms": 17934,
+        "duration_ms": 2086,
         "passed": true,
         "report": {
-          "duration_ms": 16965,
-          "step_hz": 3,
+          "duration_ms": 1957,
+          "step_hz": 26,
           "passed": 3,
           "total": 3,
           "cases": [
@@ -2647,11 +2647,11 @@
         "source_path": "parts/overture/regfile_8x8.sv",
         "json_path": "parts/overture/regfile_8x8.json",
         "top_module": "regfile_8x8",
-        "duration_ms": 20931,
+        "duration_ms": 2873,
         "passed": true,
         "report": {
-          "duration_ms": 20479,
-          "step_hz": 2,
+          "duration_ms": 2840,
+          "step_hz": 17,
           "passed": 8,
           "total": 8,
           "cases": [
@@ -2719,7 +2719,7 @@
         "source_path": "parts/overture/register_8bit.sv",
         "json_path": "parts/overture/register_8bit.json",
         "top_module": "register_8bit",
-        "duration_ms": 56,
+        "duration_ms": 2,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -2805,7 +2805,7 @@
         "source_path": "parts/overture/rom_deadbeef.sv",
         "json_path": "parts/overture/rom_deadbeef.json",
         "top_module": "rom_deadbeef",
-        "duration_ms": 20,
+        "duration_ms": 1,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -2849,11 +2849,11 @@
         "source_path": "parts/overture/xor_gate.sv",
         "json_path": "parts/overture/xor_gate.json",
         "top_module": "xor_gate",
-        "duration_ms": 38,
+        "duration_ms": 1,
         "passed": true,
         "report": {
-          "duration_ms": 4,
-          "step_hz": 1000,
+          "duration_ms": 0,
+          "step_hz": 4000,
           "passed": 4,
           "total": 4,
           "cases": [
@@ -2893,11 +2893,11 @@
         "source_path": "parts/overture/xor_gate_8bit.sv",
         "json_path": "parts/overture/xor_gate_8bit.json",
         "top_module": "xor_gate_8bit",
-        "duration_ms": 196,
+        "duration_ms": 20,
         "passed": true,
         "report": {
-          "duration_ms": 40,
-          "step_hz": 300,
+          "duration_ms": 8,
+          "step_hz": 1500,
           "passed": 12,
           "total": 12,
           "cases": [
