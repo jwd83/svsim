@@ -1,7 +1,7 @@
 {
   "directory": "parts/picorv32",
   "report": {
-    "duration_ms": 13497,
+    "duration_ms": 2355,
     "passed": 13,
     "total": 13,
     "suites": [
@@ -9,11 +9,11 @@
         "source_path": "parts/picorv32/picorv32_program_harness.sv",
         "json_path": "parts/picorv32/demo_add_chain.json",
         "top_module": "picorv32_program_harness",
-        "duration_ms": 8449,
+        "duration_ms": 1433,
         "passed": true,
         "report": {
-          "duration_ms": 4456,
-          "step_hz": 11,
+          "duration_ms": 491,
+          "step_hz": 101,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -32,11 +32,11 @@
         "source_path": "parts/picorv32/picorv32_program_harness.sv",
         "json_path": "parts/picorv32/demo_add_chain_long.json",
         "top_module": "picorv32_program_harness",
-        "duration_ms": 7994,
+        "duration_ms": 1576,
         "passed": true,
         "report": {
-          "duration_ms": 4237,
-          "step_hz": 18,
+          "duration_ms": 603,
+          "step_hz": 131,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -55,11 +55,11 @@
         "source_path": "parts/picorv32/picorv32_program_harness.sv",
         "json_path": "parts/picorv32/demo_branch_taken.json",
         "top_module": "picorv32_program_harness",
-        "duration_ms": 5070,
+        "duration_ms": 802,
         "passed": true,
         "report": {
-          "duration_ms": 1580,
-          "step_hz": 18,
+          "duration_ms": 145,
+          "step_hz": 200,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -78,11 +78,11 @@
         "source_path": "parts/picorv32/picorv32_program_harness.sv",
         "json_path": "parts/picorv32/demo_compare_branch.json",
         "top_module": "picorv32_program_harness",
-        "duration_ms": 7840,
+        "duration_ms": 1354,
         "passed": true,
         "report": {
-          "duration_ms": 4028,
-          "step_hz": 11,
+          "duration_ms": 367,
+          "step_hz": 130,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -101,11 +101,11 @@
         "source_path": "parts/picorv32/picorv32_program_harness.sv",
         "json_path": "parts/picorv32/demo_instr_misaligned_jalr.json",
         "top_module": "picorv32_program_harness",
-        "duration_ms": 4929,
+        "duration_ms": 1122,
         "passed": true,
         "report": {
-          "duration_ms": 1256,
-          "step_hz": 11,
+          "duration_ms": 169,
+          "step_hz": 82,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -320,11 +320,11 @@
         "source_path": "parts/picorv32/picorv32_program_harness.sv",
         "json_path": "parts/picorv32/demo_jump_link.json",
         "top_module": "picorv32_program_harness",
-        "duration_ms": 4425,
+        "duration_ms": 1119,
         "passed": true,
         "report": {
-          "duration_ms": 1387,
-          "step_hz": 21,
+          "duration_ms": 218,
+          "step_hz": 137,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -343,11 +343,11 @@
         "source_path": "parts/picorv32/picorv32_program_harness.sv",
         "json_path": "parts/picorv32/demo_load_roundtrip.json",
         "top_module": "picorv32_program_harness",
-        "duration_ms": 6311,
+        "duration_ms": 1149,
         "passed": true,
         "report": {
-          "duration_ms": 2336,
-          "step_hz": 13,
+          "duration_ms": 206,
+          "step_hz": 150,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -366,11 +366,11 @@
         "source_path": "parts/picorv32/picorv32_program_harness.sv",
         "json_path": "parts/picorv32/demo_misaligned_load.json",
         "top_module": "picorv32_program_harness",
-        "duration_ms": 5279,
+        "duration_ms": 1085,
         "passed": true,
         "report": {
-          "duration_ms": 1405,
-          "step_hz": 13,
+          "duration_ms": 122,
+          "step_hz": 155,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -630,11 +630,11 @@
         "source_path": "parts/picorv32/picorv32_program_harness.sv",
         "json_path": "parts/picorv32/demo_misaligned_store.json",
         "top_module": "picorv32_program_harness",
-        "duration_ms": 5499,
+        "duration_ms": 702,
         "passed": true,
         "report": {
-          "duration_ms": 1612,
-          "step_hz": 12,
+          "duration_ms": 105,
+          "step_hz": 190,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -906,11 +906,11 @@
         "source_path": "parts/picorv32/picorv32_program_harness.sv",
         "json_path": "parts/picorv32/demo_shift_pack.json",
         "top_module": "picorv32_program_harness",
-        "duration_ms": 8036,
+        "duration_ms": 1401,
         "passed": true,
         "report": {
-          "duration_ms": 4316,
-          "step_hz": 11,
+          "duration_ms": 467,
+          "step_hz": 107,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -929,11 +929,11 @@
         "source_path": "parts/picorv32/picorv32_program_harness.sv",
         "json_path": "parts/picorv32/demo_subword_mem.json",
         "top_module": "picorv32_program_harness",
-        "duration_ms": 10384,
+        "duration_ms": 997,
         "passed": true,
         "report": {
-          "duration_ms": 6507,
-          "step_hz": 13,
+          "duration_ms": 475,
+          "step_hz": 178,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -952,11 +952,11 @@
         "source_path": "parts/picorv32/picorv32_program_harness.sv",
         "json_path": "parts/picorv32/demo_two_store.json",
         "top_module": "picorv32_program_harness",
-        "duration_ms": 6021,
+        "duration_ms": 806,
         "passed": true,
         "report": {
-          "duration_ms": 2052,
-          "step_hz": 12,
+          "duration_ms": 125,
+          "step_hz": 208,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -975,11 +975,11 @@
         "source_path": "parts/picorv32/picorv32_smoke.sv",
         "json_path": "parts/picorv32/picorv32_smoke.json",
         "top_module": "picorv32_smoke",
-        "duration_ms": 4199,
+        "duration_ms": 677,
         "passed": true,
         "report": {
-          "duration_ms": 652,
-          "step_hz": 18,
+          "duration_ms": 48,
+          "step_hz": 250,
           "passed": 1,
           "total": 1,
           "cases": [
