@@ -1,7 +1,7 @@
 {
   "directory": "parts/rv32i",
   "report": {
-    "duration_ms": 366,
+    "duration_ms": 415,
     "passed": 16,
     "total": 16,
     "suites": [
@@ -9,11 +9,11 @@
         "source_path": "parts/rv32i/rv32i_cpu.sv",
         "json_path": "parts/rv32i/demo_add_store.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 124,
+        "duration_ms": 150,
         "passed": true,
         "report": {
-          "duration_ms": 5,
-          "step_hz": 1600,
+          "duration_ms": 7,
+          "step_hz": 1142,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -32,11 +32,11 @@
         "source_path": "parts/rv32i/rv32i_cpu.sv",
         "json_path": "parts/rv32i/demo_branch_jal.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 124,
+        "duration_ms": 140,
         "passed": true,
         "report": {
-          "duration_ms": 6,
-          "step_hz": 1666,
+          "duration_ms": 12,
+          "step_hz": 833,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -55,11 +55,11 @@
         "source_path": "parts/rv32i/rv32i_cpu.sv",
         "json_path": "parts/rv32i/demo_breakpoint.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 119,
+        "duration_ms": 157,
         "passed": true,
         "report": {
-          "duration_ms": 1,
-          "step_hz": 3000,
+          "duration_ms": 2,
+          "step_hz": 1500,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -78,11 +78,11 @@
         "source_path": "parts/rv32i/rv32i_cpu.sv",
         "json_path": "parts/rv32i/demo_compare_control.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 113,
+        "duration_ms": 138,
         "passed": true,
         "report": {
-          "duration_ms": 13,
-          "step_hz": 1538,
+          "duration_ms": 29,
+          "step_hz": 689,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -101,7 +101,7 @@
         "source_path": "parts/rv32i/rv32i_cpu.sv",
         "json_path": "parts/rv32i/demo_fetch_access_fault.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 112,
+        "duration_ms": 143,
         "passed": true,
         "report": {
           "duration_ms": 2,
@@ -124,11 +124,11 @@
         "source_path": "parts/rv32i/rv32i_cpu.sv",
         "json_path": "parts/rv32i/demo_illegal_instr.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 119,
+        "duration_ms": 134,
         "passed": true,
         "report": {
-          "duration_ms": 2,
-          "step_hz": 2000,
+          "duration_ms": 3,
+          "step_hz": 1333,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -147,11 +147,11 @@
         "source_path": "parts/rv32i/rv32i_cpu.sv",
         "json_path": "parts/rv32i/demo_instr_misaligned_branch.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 98,
+        "duration_ms": 109,
         "passed": true,
         "report": {
-          "duration_ms": 2,
-          "step_hz": 1500,
+          "duration_ms": 3,
+          "step_hz": 1000,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -170,11 +170,11 @@
         "source_path": "parts/rv32i/rv32i_cpu.sv",
         "json_path": "parts/rv32i/demo_instr_misaligned_jalr.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 94,
+        "duration_ms": 105,
         "passed": true,
         "report": {
-          "duration_ms": 1,
-          "step_hz": 3000,
+          "duration_ms": 2,
+          "step_hz": 1500,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -193,7 +193,7 @@
         "source_path": "parts/rv32i/rv32i_cpu.sv",
         "json_path": "parts/rv32i/demo_load_access_fault.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 141,
+        "duration_ms": 138,
         "passed": true,
         "report": {
           "duration_ms": 2,
@@ -216,11 +216,11 @@
         "source_path": "parts/rv32i/rv32i_cpu.sv",
         "json_path": "parts/rv32i/demo_misaligned_load.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 128,
+        "duration_ms": 137,
         "passed": true,
         "report": {
-          "duration_ms": 2,
-          "step_hz": 1500,
+          "duration_ms": 3,
+          "step_hz": 1000,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -239,11 +239,11 @@
         "source_path": "parts/rv32i/rv32i_cpu.sv",
         "json_path": "parts/rv32i/demo_misaligned_store.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 159,
+        "duration_ms": 112,
         "passed": true,
         "report": {
-          "duration_ms": 2,
-          "step_hz": 2000,
+          "duration_ms": 3,
+          "step_hz": 1333,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -262,11 +262,11 @@
         "source_path": "parts/rv32i/rv32i_cpu.sv",
         "json_path": "parts/rv32i/demo_shift_ops.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 124,
+        "duration_ms": 118,
         "passed": true,
         "report": {
-          "duration_ms": 9,
-          "step_hz": 1666,
+          "duration_ms": 13,
+          "step_hz": 1153,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -285,11 +285,11 @@
         "source_path": "parts/rv32i/rv32i_cpu.sv",
         "json_path": "parts/rv32i/demo_store_access_fault.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 125,
+        "duration_ms": 135,
         "passed": true,
         "report": {
-          "duration_ms": 2,
-          "step_hz": 2000,
+          "duration_ms": 7,
+          "step_hz": 571,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -308,11 +308,11 @@
         "source_path": "parts/rv32i/rv32i_cpu.sv",
         "json_path": "parts/rv32i/demo_subword_mem.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 131,
+        "duration_ms": 162,
         "passed": true,
         "report": {
-          "duration_ms": 20,
-          "step_hz": 750,
+          "duration_ms": 19,
+          "step_hz": 789,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -331,11 +331,11 @@
         "source_path": "parts/rv32i/rv32i_cpu.sv",
         "json_path": "parts/rv32i/demo_sum_loop.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 152,
+        "duration_ms": 157,
         "passed": true,
         "report": {
-          "duration_ms": 18,
-          "step_hz": 1166,
+          "duration_ms": 19,
+          "step_hz": 1105,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -354,11 +354,11 @@
         "source_path": "parts/rv32i/rv32i_cpu.sv",
         "json_path": "parts/rv32i/demo_system_misc.json",
         "top_module": "rv32i_cpu",
-        "duration_ms": 147,
+        "duration_ms": 136,
         "passed": true,
         "report": {
-          "duration_ms": 3,
-          "step_hz": 2000,
+          "duration_ms": 5,
+          "step_hz": 1200,
           "passed": 1,
           "total": 1,
           "cases": [
