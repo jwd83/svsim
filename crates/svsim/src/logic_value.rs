@@ -62,6 +62,15 @@ impl LogicBits {
         Self::default()
     }
 
+    pub(crate) fn filled(width: usize, bit: LogicBit) -> Self {
+        let width = width.max(1);
+        let mut bits = Self::zero();
+        for index in 0..width {
+            bits.set_bit(index, bit);
+        }
+        bits
+    }
+
     pub fn from_bit_value(bits: BitValue) -> Self {
         Self {
             ones: bits,
@@ -88,6 +97,10 @@ impl LogicBits {
 
     pub fn to_bit_value_checked(&self) -> Option<BitValue> {
         self.is_two_state().then(|| self.ones.clone())
+    }
+
+    pub(crate) fn to_bit_value_lossy(&self) -> BitValue {
+        self.ones.clone()
     }
 
     fn truncate_in_place(&mut self, width: usize) {
@@ -159,6 +172,10 @@ impl LogicValue {
         self.bits
             .to_bit_value_checked()
             .map(|bits| bits.truncate(self.width))
+    }
+
+    pub(crate) fn to_bit_value_lossy(&self) -> BitValue {
+        self.bits.to_bit_value_lossy().truncate(self.width)
     }
 
     fn logic_string(&self) -> String {

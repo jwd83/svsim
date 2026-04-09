@@ -10,6 +10,8 @@ use crate::hir::{
     AssignmentKind, BinaryOp, Expr, HirDesign, LValue, ModuleInstanceSummary, ModuleSummary,
     NumericLiteral, PackedRange, PortDirection, ProcBlockKind, Stmt, StorageKind, UnaryOp,
 };
+use crate::logic_value::{LogicBit, LogicBits, LogicValue};
+use crate::net_resolve::{resolve_net, DriveStrengthPair, NetDriver};
 use crate::validate::resolve_legacy_rom_data_path;
 use crate::width::{
     arithmetic_shift_right_bits, expr_width, mask, minimum_width, shift_left_bits,
@@ -20,7 +22,7 @@ use crate::width::{
 pub struct SimulationSession {
     design: CompiledDesign,
     objects: Vec<RuntimeObjectLayout>,
-    persisted: Vec<Value>,
+    persisted: Vec<ObjectValue>,
     state: ModuleState,
 }
 
@@ -43,15 +45,10 @@ struct ChildState {
     state: Box<ModuleState>,
 }
 
-#[derive(Debug, Clone)]
-struct InstanceEvalCache {
-    inputs: BTreeMap<String, BitValue>,
-}
-
 #[derive(Debug, Clone, Copy)]
 struct RuntimeObjectLayout {
     width: usize,
-    _storage: StorageKind,
+    storage: StorageKind,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -94,6 +91,8 @@ struct LegacyRomState {
     words: Vec<Value>,
 }
 
+type NetDriverTable = HashMap<usize, Vec<NetDriver>>;
+
 impl MemoryState {
     fn read(&self, index: usize, memory_name: &str) -> Result<Value> {
         let offset = self.index_range.index_offset(index).ok_or_else(|| {
@@ -116,7 +115,7 @@ impl MemoryState {
             .words
             .get_mut(offset)
             .expect("memory offset is guaranteed to be in range");
-        let next = value.coerced_to(current.width);
+        let next = Value::new(value.coerced_to(current.width).normalized_bits(), current.width);
         let changed = *current != next;
         *current = next;
         Ok(changed)
@@ -139,7 +138,7 @@ impl SimulationSession {
         )?;
         let persisted = objects
             .iter()
-            .map(|object| Value::zero(object.width))
+            .map(|object| ObjectValue::zero(object.width))
             .collect();
         Ok(Self {
             design,
@@ -259,21 +258,36 @@ impl SimulationSession {
         let mut frame =
             seed_runtime_frame(module, &self.state, &self.persisted, &self.objects, inputs)?;
         let mut stack = Vec::new();
-        settle_module(hir, module, &self.state, &mut frame, &self.objects, &mut stack)?;
+        settle_module(
+            hir,
+            module,
+            &self.state,
+            &mut frame,
+            &self.objects,
+            Some(inputs),
+            &mut stack,
+        )?;
 
         let module_state = resolve_instance_path(&self.state, instance_path)?;
         let instance_module = resolve_supported_module(hir, &module_state.module_name)?;
-        let values = build_instance_value_table(instance_module, module_state, &frame, &self.objects)?;
-        values
+        let binding = module_state
+            .signals
             .get(signal_name)
-            .cloned()
-            .map(|value| value.normalized_bits())
+            .copied()
             .ok_or_else(|| {
                 Error::Resolve(format!(
                     "signal '{}' is not declared in '{}'",
                     signal_name, instance_module.name
                 ))
-            })
+            })?;
+        let logic = read_binding_logic(binding, &frame)?;
+        logic_to_public_bit_value(
+            &logic,
+            format!(
+                "signal '{}' in '{}'",
+                signal_name, instance_module.name
+            ),
+        )
     }
 
     pub fn eval_once(
@@ -295,9 +309,10 @@ impl SimulationSession {
             &self.state,
             &mut frame,
             &self.objects,
+            Some(&inputs),
             &mut stack,
         )?;
-        Ok(collect_outputs(module, &self.state, &frame, &self.objects))
+        collect_outputs(module, &self.state, &frame)
     }
 
     pub fn step(
@@ -315,6 +330,7 @@ impl SimulationSession {
             &self.state,
             &mut pre_frame,
             &self.objects,
+            Some(&inputs),
             &mut settle_stack,
         )?;
 
@@ -340,14 +356,10 @@ impl SimulationSession {
             &self.state,
             &mut post_frame,
             &self.objects,
+            Some(&inputs),
             &mut post_settle_stack,
         )?;
-        Ok(collect_outputs(
-            module,
-            &self.state,
-            &post_frame,
-            &self.objects,
-        ))
+        collect_outputs(module, &self.state, &post_frame)
     }
 }
 
@@ -473,6 +485,11 @@ struct Value {
     signed: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ObjectValue {
+    logic: LogicValue,
+}
+
 impl Value {
     fn new(bits: BitValue, width: usize) -> Self {
         Self::new_with_signed(bits, width, false)
@@ -507,6 +524,18 @@ impl Value {
 
     fn truthy(&self) -> bool {
         !self.bits.is_zero()
+    }
+}
+
+impl ObjectValue {
+    fn zero(width: usize) -> Self {
+        Self {
+            logic: LogicValue::zero(width),
+        }
+    }
+
+    fn from_logic(logic: LogicValue) -> Self {
+        Self { logic }
     }
 }
 
@@ -678,112 +707,32 @@ fn settle_module(
     hir: &HirDesign,
     module: &ModuleSummary,
     state: &ModuleState,
-    frame: &mut [Value],
+    frame: &mut [ObjectValue],
     object_layouts: &[RuntimeObjectLayout],
+    inputs: Option<&BTreeMap<String, BitValue>>,
     stack: &mut Vec<String>,
 ) -> Result<()> {
-    if stack.iter().any(|name| name == &state.module_name) {
-        return Err(Error::Unsupported(format!(
-            "recursive combinational instantiation detected at {} -> {}",
-            stack.join(" -> "),
-            state.module_name
-        )));
-    }
-
-    let max_iterations = ((module.continuous_assignments.len()
-        + module.proc_blocks.len()
-        + state.children.len()
-        + state.signals.len())
-    .max(1))
-        * 8;
-    let mut instance_caches: Vec<Option<InstanceEvalCache>> = vec![None; state.children.len()];
-
-    stack.push(state.module_name.clone());
+    let max_iterations = settle_iteration_budget(hir, state)?.max(1) * 8;
     let mut converged = false;
     for _ in 0..max_iterations {
-        let mut values = build_instance_value_table(module, state, frame, object_layouts)?;
-        let mut changed = false;
-
-        if let Some(legacy_rom) = &state.legacy_rom {
-            apply_legacy_rom_outputs(module, &mut values, legacy_rom)?;
-            changed |= sync_instance_values_to_frame(module, state, &values, frame, object_layouts)?;
-        } else {
-            for assign in &module.continuous_assignments {
-                let value = eval_expr(&assign.expr, module, &values, &state.memories)?;
-                let target = resolve_lvalue(&assign.target, module, &values, &state.memories)?;
-                if resolved_lvalue_contains_memory(&target) {
-                    return Err(Error::Unsupported(
-                        "continuous assignments to memory elements are not supported".into(),
-                    ));
-                }
-                let mut no_memories = HashMap::new();
-                changed |=
-                    apply_resolved_lvalue(&target, value, module, &mut values, &mut no_memories)?;
-            }
-
-            for block in &module.proc_blocks {
-                changed |= execute_proc_block(
-                    &block.kind,
-                    &block.body,
-                    module,
-                    &mut values,
-                    &state.memories,
-                )?;
-            }
-
-            changed |= sync_instance_values_to_frame(module, state, &values, frame, object_layouts)?;
-
-            for (child_state, cache) in state.children.iter().zip(instance_caches.iter_mut()) {
-                let child = resolve_supported_module(hir, &child_state.state.module_name)?;
-                let parent_values =
-                    build_instance_value_table(module, state, frame, object_layouts)?;
-                changed |= drive_child_inputs(
-                    module,
-                    child_state,
-                    &parent_values,
-                    &state.memories,
-                    frame,
-                    object_layouts,
-                )?;
-
-                let child_inputs =
-                    snapshot_child_inputs(child, child_state.state.as_ref(), frame, object_layouts)?;
-                let needs_refresh = cache
-                    .as_ref()
-                    .is_none_or(|cached| cached.inputs != child_inputs);
-                if needs_refresh {
-                    settle_module(
-                        hir,
-                        child,
-                        child_state.state.as_ref(),
-                        frame,
-                        object_layouts,
-                        stack,
-                    )?;
-                    *cache = Some(InstanceEvalCache { inputs: child_inputs });
-                    changed = true;
-                }
-
-                let parent_values =
-                    build_instance_value_table(module, state, frame, object_layouts)?;
-                changed |= apply_child_output_sinks(
-                    module,
-                    state,
-                    child_state,
-                    &parent_values,
-                    &state.memories,
-                    frame,
-                    object_layouts,
-                )?;
-            }
-        }
+        let mut net_drivers = NetDriverTable::new();
+        let mut changed = settle_module_pass(
+            hir,
+            module,
+            state,
+            frame,
+            object_layouts,
+            inputs,
+            &mut net_drivers,
+            stack,
+        )?;
+        changed |= resolve_staged_nets(frame, object_layouts, &net_drivers)?;
 
         if !changed {
             converged = true;
             break;
         }
     }
-    stack.pop();
 
     if !converged {
         return Err(Error::Unsupported(format!(
@@ -795,16 +744,156 @@ fn settle_module(
     Ok(())
 }
 
+fn settle_iteration_budget(hir: &HirDesign, state: &ModuleState) -> Result<usize> {
+    let module = resolve_supported_module(hir, &state.module_name)?;
+    let mut budget = module.continuous_assignments.len()
+        + module.proc_blocks.len()
+        + state.children.len()
+        + state.signals.len()
+        + usize::from(state.legacy_rom.is_some());
+
+    for child in &state.children {
+        budget += settle_iteration_budget(hir, child.state.as_ref())?;
+    }
+
+    Ok(budget.max(1))
+}
+
+fn settle_module_pass(
+    hir: &HirDesign,
+    module: &ModuleSummary,
+    state: &ModuleState,
+    frame: &mut [ObjectValue],
+    object_layouts: &[RuntimeObjectLayout],
+    inputs: Option<&BTreeMap<String, BitValue>>,
+    net_drivers: &mut NetDriverTable,
+    stack: &mut Vec<String>,
+) -> Result<bool> {
+    if stack.iter().any(|name| name == &state.module_name) {
+        return Err(Error::Unsupported(format!(
+            "recursive combinational instantiation detected at {} -> {}",
+            stack.join(" -> "),
+            state.module_name
+        )));
+    }
+
+    stack.push(state.module_name.clone());
+    let mut changed = false;
+
+    if let Some(inputs) = inputs {
+        changed |= apply_external_inputs(module, state, frame, object_layouts, inputs, net_drivers)?;
+    }
+
+    let mut values = build_instance_value_table(module, state, frame)?;
+
+    if let Some(legacy_rom) = &state.legacy_rom {
+        apply_legacy_rom_outputs(module, &mut values, legacy_rom)?;
+        if let Some(value) = values.get(&legacy_rom.data_port).cloned() {
+            stage_signal_driver_if_net(&legacy_rom.data_port, value, module, state, object_layouts, net_drivers)?;
+        }
+        changed |= sync_instance_values_to_frame(
+            module,
+            state,
+            &values,
+            frame,
+            object_layouts,
+            net_drivers,
+        )?;
+        stack.pop();
+        return Ok(changed);
+    }
+
+    for assign in &module.continuous_assignments {
+        let value = eval_expr(&assign.expr, module, &values, &state.memories)?;
+        let target = resolve_lvalue(&assign.target, module, &values, &state.memories)?;
+        if resolved_lvalue_contains_memory(&target) {
+            return Err(Error::Unsupported(
+                "continuous assignments to memory elements are not supported".into(),
+            ));
+        }
+        let mut no_memories = HashMap::new();
+        changed |= apply_or_stage_resolved_lvalue(
+            &target,
+            value,
+            module,
+            state,
+            &mut values,
+            &mut no_memories,
+            object_layouts,
+            net_drivers,
+        )?;
+    }
+
+    for block in &module.proc_blocks {
+        changed |= execute_proc_block(
+            &block.kind,
+            &block.body,
+            module,
+            &mut values,
+            &state.memories,
+        )?;
+    }
+
+    changed |= sync_instance_values_to_frame(
+        module,
+        state,
+        &values,
+        frame,
+        object_layouts,
+        net_drivers,
+    )?;
+
+    for child_state in &state.children {
+        let child = resolve_supported_module(hir, &child_state.state.module_name)?;
+        let parent_values = build_instance_value_table(module, state, frame)?;
+        changed |= drive_child_inputs(
+            module,
+            child_state,
+            &parent_values,
+            &state.memories,
+            frame,
+            object_layouts,
+            net_drivers,
+        )?;
+
+        changed |= settle_module_pass(
+            hir,
+            child,
+            child_state.state.as_ref(),
+            frame,
+            object_layouts,
+            None,
+            net_drivers,
+            stack,
+        )?;
+
+        let parent_values = build_instance_value_table(module, state, frame)?;
+        changed |= apply_child_output_sinks(
+            module,
+            state,
+            child_state,
+            &parent_values,
+            &state.memories,
+            frame,
+            object_layouts,
+            net_drivers,
+        )?;
+    }
+
+    stack.pop();
+    Ok(changed)
+}
+
 fn step_module(
     hir: &HirDesign,
     module: &ModuleSummary,
     state: &mut ModuleState,
-    pre_frame: &[Value],
-    next_objects: &mut [Value],
+    pre_frame: &[ObjectValue],
+    next_objects: &mut [ObjectValue],
     object_layouts: &[RuntimeObjectLayout],
     _stack: &mut Vec<String>,
 ) -> Result<()> {
-    let pre_values = build_instance_value_table(module, state, pre_frame, object_layouts)?;
+    let pre_values = build_instance_value_table(module, state, pre_frame)?;
 
     for child_state in &mut state.children {
         let child = resolve_supported_module(hir, &child_state.state.module_name)?;
@@ -819,7 +908,7 @@ fn step_module(
         )?;
     }
 
-    let mut staged = build_instance_value_table(module, state, next_objects, object_layouts)?;
+    let mut staged = build_instance_value_table(module, state, next_objects)?;
     let mut staged_memories = state.memories.clone();
     let mut sampled_clocks = state.previous_clocks.clone();
     for block in &module.proc_blocks {
@@ -874,7 +963,15 @@ fn step_module(
         }
     }
 
-    sync_instance_values_to_frame(module, state, &staged, next_objects, object_layouts)?;
+    let mut no_net_drivers = NetDriverTable::new();
+    sync_instance_values_to_frame(
+        module,
+        state,
+        &staged,
+        next_objects,
+        object_layouts,
+        &mut no_net_drivers,
+    )?;
     state.memories = staged_memories;
     state.previous_clocks = sampled_clocks;
     Ok(())
@@ -897,7 +994,7 @@ fn allocate_runtime_object(
     let object_id = objects.len();
     objects.push(RuntimeObjectLayout {
         width: width.max(1),
-        _storage: storage,
+        storage,
     });
     SignalBinding {
         object_id,
@@ -938,22 +1035,40 @@ fn signal_storage(module: &ModuleSummary, name: &str) -> Option<StorageKind> {
 
 fn read_binding(
     binding: SignalBinding,
-    values: &[Value],
-    _object_layouts: &[RuntimeObjectLayout],
+    values: &[ObjectValue],
 ) -> Result<Value> {
+    let logic = read_binding_logic(binding, values)?;
+    Ok(Value::new(logic.to_bit_value_lossy(), binding.view_width))
+}
+
+fn read_binding_logic(binding: SignalBinding, values: &[ObjectValue]) -> Result<LogicValue> {
     let value = values.get(binding.object_id).ok_or_else(|| {
         Error::Resolve(format!(
             "runtime object {} does not exist",
             binding.object_id
         ))
     })?;
-    Ok(value.coerced_to(binding.view_width))
+    Ok(value.logic.coerced_to(binding.view_width))
 }
 
 fn write_binding(
     binding: SignalBinding,
     value: Value,
-    values: &mut [Value],
+    values: &mut [ObjectValue],
+    object_layouts: &[RuntimeObjectLayout],
+) -> Result<bool> {
+    write_binding_logic(
+        binding,
+        LogicValue::from_bit_value_with_width(value.normalized_bits(), value.width),
+        values,
+        object_layouts,
+    )
+}
+
+fn write_binding_logic(
+    binding: SignalBinding,
+    value: LogicValue,
+    values: &mut [ObjectValue],
     object_layouts: &[RuntimeObjectLayout],
 ) -> Result<bool> {
     let object = object_layouts.get(binding.object_id).ok_or_else(|| {
@@ -968,7 +1083,7 @@ fn write_binding(
             binding.object_id
         ))
     })?;
-    let next = value.coerced_to(binding.view_width).coerced_to(object.width);
+    let next = ObjectValue::from_logic(value.coerced_to(binding.view_width).coerced_to(object.width));
     let changed = *current != next;
     *current = next;
     Ok(changed)
@@ -977,32 +1092,10 @@ fn write_binding(
 fn seed_runtime_frame(
     module: &ModuleSummary,
     state: &ModuleState,
-    persisted: &[Value],
-    object_layouts: &[RuntimeObjectLayout],
+    persisted: &[ObjectValue],
+    _object_layouts: &[RuntimeObjectLayout],
     inputs: &BTreeMap<String, BitValue>,
-) -> Result<Vec<Value>> {
-    let mut frame = persisted.to_vec();
-
-    for port in &module.ports {
-        if !matches!(port.direction, PortDirection::Input) {
-            continue;
-        }
-        let binding = state.signals.get(&port.name).copied().ok_or_else(|| {
-            Error::Resolve(format!(
-                "signal '{}' is not declared in '{}'",
-                port.name, module.name
-            ))
-        })?;
-        let value = Value::new(
-            inputs
-                .get(&port.name)
-                .cloned()
-                .unwrap_or_else(BitValue::zero),
-            port.width(),
-        );
-        write_binding(binding, value, &mut frame, object_layouts)?;
-    }
-
+) -> Result<Vec<ObjectValue>> {
     for name in inputs.keys() {
         if module.port(name).is_none() {
             return Err(Error::Resolve(format!(
@@ -1012,14 +1105,14 @@ fn seed_runtime_frame(
         }
     }
 
-    Ok(frame)
+    let _ = state;
+    Ok(persisted.to_vec())
 }
 
 fn build_instance_value_table(
     module: &ModuleSummary,
     state: &ModuleState,
-    frame: &[Value],
-    object_layouts: &[RuntimeObjectLayout],
+    frame: &[ObjectValue],
 ) -> Result<HashMap<String, Value>> {
     let mut values = HashMap::new();
 
@@ -1030,7 +1123,7 @@ fn build_instance_value_table(
                 port.name, module.name
             ))
         })?;
-        values.insert(port.name.clone(), read_binding(binding, frame, object_layouts)?);
+        values.insert(port.name.clone(), read_binding(binding, frame)?);
     }
 
     for signal in &module.signals {
@@ -1040,7 +1133,7 @@ fn build_instance_value_table(
                 signal.name, module.name
             ))
         })?;
-        values.insert(signal.name.clone(), read_binding(binding, frame, object_layouts)?);
+        values.insert(signal.name.clone(), read_binding(binding, frame)?);
     }
 
     for param in &module.parameters {
@@ -1060,37 +1153,178 @@ fn sync_instance_values_to_frame(
     module: &ModuleSummary,
     state: &ModuleState,
     values: &HashMap<String, Value>,
-    frame: &mut [Value],
+    frame: &mut [ObjectValue],
     object_layouts: &[RuntimeObjectLayout],
+    net_drivers: &mut NetDriverTable,
 ) -> Result<bool> {
     let mut changed = false;
 
     for port in &module.ports {
-        let value = values
-            .get(&port.name)
-            .cloned()
-            .unwrap_or_else(|| Value::zero(port.width()));
         let binding = state.signals.get(&port.name).copied().ok_or_else(|| {
             Error::Resolve(format!(
                 "signal '{}' is not declared in '{}'",
                 port.name, module.name
             ))
         })?;
+        let value = values
+            .get(&port.name)
+            .cloned()
+            .unwrap_or_else(|| Value::zero(port.width()));
+        if object_layouts
+            .get(binding.object_id)
+            .is_some_and(|object| object.storage.is_net())
+        {
+            if net_drivers.contains_key(&binding.object_id) {
+                continue;
+            }
+            if signal_has_procedural_driver(module, &port.name) {
+                stage_whole_signal_driver(binding, value.clone(), object_layouts, net_drivers)?;
+                changed |= write_binding(binding, value, frame, object_layouts)?;
+            }
+            continue;
+        }
         changed |= write_binding(binding, value, frame, object_layouts)?;
     }
 
     for signal in &module.signals {
-        let value = values
-            .get(&signal.name)
-            .cloned()
-            .unwrap_or_else(|| Value::zero(signal.width()));
         let binding = state.signals.get(&signal.name).copied().ok_or_else(|| {
             Error::Resolve(format!(
                 "signal '{}' is not declared in '{}'",
                 signal.name, module.name
             ))
         })?;
+        let value = values
+            .get(&signal.name)
+            .cloned()
+            .unwrap_or_else(|| Value::zero(signal.width()));
+        if object_layouts
+            .get(binding.object_id)
+            .is_some_and(|object| object.storage.is_net())
+        {
+            if net_drivers.contains_key(&binding.object_id) {
+                continue;
+            }
+            if signal_has_procedural_driver(module, &signal.name) {
+                stage_whole_signal_driver(binding, value.clone(), object_layouts, net_drivers)?;
+                changed |= write_binding(binding, value, frame, object_layouts)?;
+            }
+            continue;
+        }
         changed |= write_binding(binding, value, frame, object_layouts)?;
+    }
+
+    Ok(changed)
+}
+
+fn signal_has_procedural_driver(module: &ModuleSummary, signal_name: &str) -> bool {
+    module
+        .proc_blocks
+        .iter()
+        .any(|block| stmt_writes_signal(&block.body, signal_name))
+}
+
+fn stmt_writes_signal(stmt: &Stmt, signal_name: &str) -> bool {
+    match stmt {
+        Stmt::Empty => false,
+        Stmt::Block(statements) => statements
+            .iter()
+            .any(|statement| stmt_writes_signal(statement, signal_name)),
+        Stmt::Assign { target, .. } => lvalue_contains_signal(target, signal_name),
+        Stmt::If {
+            then_branch,
+            else_branch,
+            ..
+        } => {
+            stmt_writes_signal(then_branch, signal_name)
+                || else_branch
+                    .as_ref()
+                    .is_some_and(|else_branch| stmt_writes_signal(else_branch, signal_name))
+        }
+        Stmt::Case { items, default, .. } => {
+            items
+                .iter()
+                .any(|item| stmt_writes_signal(&item.body, signal_name))
+                || default
+                    .as_ref()
+                    .is_some_and(|default| stmt_writes_signal(default, signal_name))
+        }
+    }
+}
+
+fn lvalue_contains_signal(lvalue: &LValue, signal_name: &str) -> bool {
+    match lvalue {
+        LValue::Signal(name) => name == signal_name,
+        LValue::Concat(items) => items
+            .iter()
+            .any(|item| lvalue_contains_signal(item, signal_name)),
+        LValue::BitSelect { signal, .. } | LValue::PartSelect { signal, .. } => signal == signal_name,
+        LValue::MemoryElement { .. } => false,
+    }
+}
+
+fn stage_object_driver(
+    object_id: usize,
+    value: LogicValue,
+    net_drivers: &mut NetDriverTable,
+) {
+    net_drivers
+        .entry(object_id)
+        .or_default()
+        .push(NetDriver::new(value, DriveStrengthPair::STRONG));
+}
+
+fn apply_fixed_binding_drive(
+    binding: SignalBinding,
+    value: Value,
+    frame: &mut [ObjectValue],
+    object_layouts: &[RuntimeObjectLayout],
+    net_drivers: &mut NetDriverTable,
+) -> Result<bool> {
+    let object = object_layouts.get(binding.object_id).ok_or_else(|| {
+        Error::Resolve(format!(
+            "runtime object {} does not exist",
+            binding.object_id
+        ))
+    })?;
+    let logic = LogicValue::from_bit_value_with_width(value.normalized_bits(), value.width)
+        .coerced_to(binding.view_width)
+        .coerced_to(object.width);
+    let changed = write_binding_logic(binding, logic.clone(), frame, object_layouts)?;
+    if object.storage.is_net() {
+        stage_object_driver(binding.object_id, logic, net_drivers);
+    }
+    Ok(changed)
+}
+
+fn apply_external_inputs(
+    module: &ModuleSummary,
+    state: &ModuleState,
+    frame: &mut [ObjectValue],
+    object_layouts: &[RuntimeObjectLayout],
+    inputs: &BTreeMap<String, BitValue>,
+    net_drivers: &mut NetDriverTable,
+) -> Result<bool> {
+    let mut changed = false;
+
+    for port in module
+        .ports
+        .iter()
+        .filter(|port| matches!(port.direction, PortDirection::Input))
+    {
+        let binding = state.signals.get(&port.name).copied().ok_or_else(|| {
+            Error::Resolve(format!(
+                "signal '{}' is not declared in '{}'",
+                port.name, module.name
+            ))
+        })?;
+        let value = Value::new(
+            inputs
+                .get(&port.name)
+                .cloned()
+                .unwrap_or_else(BitValue::zero),
+            port.width(),
+        );
+        changed |= apply_fixed_binding_drive(binding, value, frame, object_layouts, net_drivers)?;
     }
 
     Ok(changed)
@@ -1101,8 +1335,9 @@ fn drive_child_inputs(
     child_state: &ChildState,
     parent_values: &HashMap<String, Value>,
     parent_memories: &HashMap<String, MemoryState>,
-    frame: &mut [Value],
+    frame: &mut [ObjectValue],
     object_layouts: &[RuntimeObjectLayout],
+    net_drivers: &mut NetDriverTable,
 ) -> Result<bool> {
     let mut changed = false;
 
@@ -1119,38 +1354,10 @@ fn drive_child_inputs(
                     driver.port_name, child_state.state.module_name
                 ))
             })?;
-        changed |= write_binding(binding, value, frame, object_layouts)?;
+        changed |= apply_fixed_binding_drive(binding, value, frame, object_layouts, net_drivers)?;
     }
 
     Ok(changed)
-}
-
-fn snapshot_child_inputs(
-    child_module: &ModuleSummary,
-    child_state: &ModuleState,
-    frame: &[Value],
-    object_layouts: &[RuntimeObjectLayout],
-) -> Result<BTreeMap<String, BitValue>> {
-    let mut inputs = BTreeMap::new();
-
-    for port in child_module
-        .ports
-        .iter()
-        .filter(|port| matches!(port.direction, PortDirection::Input))
-    {
-        let binding = child_state.signals.get(&port.name).copied().ok_or_else(|| {
-            Error::Resolve(format!(
-                "signal '{}' is not declared in '{}'",
-                port.name, child_module.name
-            ))
-        })?;
-        inputs.insert(
-            port.name.clone(),
-            read_binding(binding, frame, object_layouts)?.normalized_bits(),
-        );
-    }
-
-    Ok(inputs)
 }
 
 fn apply_child_output_sinks(
@@ -1159,8 +1366,9 @@ fn apply_child_output_sinks(
     child_state: &ChildState,
     parent_values: &HashMap<String, Value>,
     parent_memories: &HashMap<String, MemoryState>,
-    frame: &mut [Value],
+    frame: &mut [ObjectValue],
     object_layouts: &[RuntimeObjectLayout],
+    net_drivers: &mut NetDriverTable,
 ) -> Result<bool> {
     if child_state.output_sinks.is_empty() {
         return Ok(false);
@@ -1181,15 +1389,18 @@ fn apply_child_output_sinks(
                     sink.port_name, child_state.state.module_name
                 ))
             })?;
-        let value = read_binding(binding, frame, object_layouts)?;
+        let value = read_binding_logic(binding, frame)?;
         let target = resolve_lvalue(&sink.target, parent_module, &next_parent_values, parent_memories)?;
         let mut no_memories = HashMap::new();
-        changed |= apply_resolved_lvalue(
+        changed |= apply_or_stage_resolved_lvalue_logic(
             &target,
             value,
             parent_module,
+            parent_state,
             &mut next_parent_values,
             &mut no_memories,
+            object_layouts,
+            net_drivers,
         )?;
     }
 
@@ -1199,6 +1410,7 @@ fn apply_child_output_sinks(
         &next_parent_values,
         frame,
         object_layouts,
+        net_drivers,
     )?;
     Ok(changed)
 }
@@ -1594,9 +1806,29 @@ enum ResolvedLValue {
 fn collect_outputs(
     module: &ModuleSummary,
     state: &ModuleState,
-    frame: &[Value],
-    object_layouts: &[RuntimeObjectLayout],
-) -> BTreeMap<String, BitValue> {
+    frame: &[ObjectValue],
+) -> Result<BTreeMap<String, BitValue>> {
+    let logic_outputs = collect_outputs_logic(module, state, frame)?;
+    let mut outputs = BTreeMap::new();
+
+    for (name, logic) in logic_outputs {
+        outputs.insert(
+            name.clone(),
+            logic_to_public_bit_value(
+                &logic,
+                format!("output '{}' on '{}'", name, module.name),
+            )?,
+        );
+    }
+
+    Ok(outputs)
+}
+
+fn collect_outputs_logic(
+    module: &ModuleSummary,
+    state: &ModuleState,
+    frame: &[ObjectValue],
+) -> Result<BTreeMap<String, LogicValue>> {
     let mut outputs = BTreeMap::new();
 
     for port in module
@@ -1604,17 +1836,29 @@ fn collect_outputs(
         .iter()
         .filter(|port| matches!(port.direction, PortDirection::Output))
     {
-        let value = state
-            .signals
-            .get(&port.name)
-            .copied()
-            .and_then(|binding| read_binding(binding, frame, object_layouts).ok())
-            .unwrap_or_else(|| Value::zero(port.width()))
-            .coerced_to(port.width());
-        outputs.insert(port.name.clone(), value.normalized_bits());
+        let binding = state.signals.get(&port.name).copied().ok_or_else(|| {
+            Error::Resolve(format!(
+                "signal '{}' is not declared in '{}'",
+                port.name, module.name
+            ))
+        })?;
+        outputs.insert(port.name.clone(), read_binding_logic(binding, frame)?);
     }
 
-    outputs
+    Ok(outputs)
+}
+
+fn logic_to_public_bit_value(
+    logic: &LogicValue,
+    context: String,
+) -> Result<BitValue> {
+    logic.to_bit_value_checked().ok_or_else(|| {
+        Error::Unsupported(format!(
+            "{} resolved to four-state value '{}' before the public four-state API cutover",
+            context,
+            logic
+        ))
+    }).map(|bits| bits.truncate(logic.width()))
 }
 
 fn resolve_supported_module<'a>(
@@ -2031,7 +2275,7 @@ fn apply_resolved_lvalue(
                     name, module.name
                 ))
             })?;
-            let next = value.coerced_to(current.width);
+            let next = Value::new(value.coerced_to(current.width).normalized_bits(), current.width);
             let changed = *current != next;
             *current = next;
             Ok(changed)
@@ -2107,6 +2351,306 @@ fn apply_resolved_lvalue(
     }
 }
 
+fn stage_signal_driver_if_net(
+    signal_name: &str,
+    value: Value,
+    module: &ModuleSummary,
+    state: &ModuleState,
+    object_layouts: &[RuntimeObjectLayout],
+    net_drivers: &mut NetDriverTable,
+) -> Result<()> {
+    if !signal_storage(module, signal_name).is_some_and(StorageKind::is_net) {
+        return Ok(());
+    }
+    let binding = state.signals.get(signal_name).copied().ok_or_else(|| {
+        Error::Resolve(format!(
+            "signal '{}' is not declared in '{}'",
+            signal_name, module.name
+        ))
+    })?;
+    stage_whole_signal_driver(binding, value, object_layouts, net_drivers)
+}
+
+fn stage_whole_signal_driver(
+    binding: SignalBinding,
+    value: Value,
+    object_layouts: &[RuntimeObjectLayout],
+    net_drivers: &mut NetDriverTable,
+) -> Result<()> {
+    let logic = LogicValue::from_bit_value_with_width(value.normalized_bits(), value.width);
+    stage_whole_signal_logic_driver(binding, logic, object_layouts, net_drivers)
+}
+
+fn stage_whole_signal_logic_driver(
+    binding: SignalBinding,
+    value: LogicValue,
+    object_layouts: &[RuntimeObjectLayout],
+    net_drivers: &mut NetDriverTable,
+) -> Result<()> {
+    let object = object_layouts.get(binding.object_id).ok_or_else(|| {
+        Error::Resolve(format!(
+            "runtime object {} does not exist",
+            binding.object_id
+        ))
+    })?;
+    let logic = value.coerced_to(binding.view_width).coerced_to(object.width);
+    stage_object_driver(binding.object_id, logic, net_drivers);
+    Ok(())
+}
+
+fn stage_partial_signal_driver(
+    binding: SignalBinding,
+    low: usize,
+    width: usize,
+    value: Value,
+    object_layouts: &[RuntimeObjectLayout],
+    net_drivers: &mut NetDriverTable,
+) -> Result<()> {
+    let logic = LogicValue::from_bit_value_with_width(value.normalized_bits(), width).coerced_to(width);
+    stage_partial_signal_logic_driver(binding, low, width, logic, object_layouts, net_drivers)
+}
+
+fn stage_partial_signal_logic_driver(
+    binding: SignalBinding,
+    low: usize,
+    width: usize,
+    value: LogicValue,
+    object_layouts: &[RuntimeObjectLayout],
+    net_drivers: &mut NetDriverTable,
+) -> Result<()> {
+    let object = object_layouts.get(binding.object_id).ok_or_else(|| {
+        Error::Resolve(format!(
+            "runtime object {} does not exist",
+            binding.object_id
+        ))
+    })?;
+    let mut bits = LogicBits::filled(object.width, LogicBit::Z);
+    let value = value.coerced_to(width);
+    for offset in 0..width {
+        bits.set_bit(low + offset, value.bit(offset));
+    }
+    stage_object_driver(binding.object_id, LogicValue::new(bits, object.width), net_drivers);
+    Ok(())
+}
+
+fn apply_or_stage_resolved_lvalue(
+    lvalue: &ResolvedLValue,
+    value: Value,
+    module: &ModuleSummary,
+    state: &ModuleState,
+    values: &mut HashMap<String, Value>,
+    memories: &mut HashMap<String, MemoryState>,
+    object_layouts: &[RuntimeObjectLayout],
+    net_drivers: &mut NetDriverTable,
+) -> Result<bool> {
+    match lvalue {
+        ResolvedLValue::Signal(name) if signal_storage(module, name).is_some_and(StorageKind::is_net) => {
+            let binding = state.signals.get(name).copied().ok_or_else(|| {
+                Error::Resolve(format!(
+                    "signal '{}' is not declared in '{}'",
+                    name, module.name
+                ))
+            })?;
+            stage_whole_signal_driver(binding, value, object_layouts, net_drivers)?;
+            Ok(false)
+        }
+        ResolvedLValue::BitSelect { signal, index }
+            if signal_storage(module, signal).is_some_and(StorageKind::is_net) =>
+        {
+            let binding = state.signals.get(signal).copied().ok_or_else(|| {
+                Error::Resolve(format!(
+                    "signal '{}' is not declared in '{}'",
+                    signal, module.name
+                ))
+            })?;
+            stage_partial_signal_driver(
+                binding,
+                *index,
+                1,
+                value.coerced_to(1),
+                object_layouts,
+                net_drivers,
+            )?;
+            Ok(false)
+        }
+        ResolvedLValue::PartSelect { signal, msb, lsb }
+            if signal_storage(module, signal).is_some_and(StorageKind::is_net) =>
+        {
+            let binding = state.signals.get(signal).copied().ok_or_else(|| {
+                Error::Resolve(format!(
+                    "signal '{}' is not declared in '{}'",
+                    signal, module.name
+                ))
+            })?;
+            let low = (*msb).min(*lsb);
+            let width = (*msb).max(*lsb) - low + 1;
+            stage_partial_signal_driver(
+                binding,
+                low,
+                width,
+                value.coerced_to(width),
+                object_layouts,
+                net_drivers,
+            )?;
+            Ok(false)
+        }
+        ResolvedLValue::Concat(items) => {
+            let total_width = resolved_lvalue_width(lvalue, module)?;
+            let normalized = value.coerced_to(total_width).normalized_bits();
+            let mut remaining_width = total_width;
+            let mut changed = false;
+            for item in items {
+                let item_width = resolved_lvalue_width(item, module)?;
+                remaining_width -= item_width;
+                let chunk = Value::new(normalized.slice(remaining_width, item_width), item_width);
+                changed |= apply_or_stage_resolved_lvalue(
+                    item,
+                    chunk,
+                    module,
+                    state,
+                    values,
+                    memories,
+                    object_layouts,
+                    net_drivers,
+                )?;
+            }
+            Ok(changed)
+        }
+        _ => apply_resolved_lvalue(lvalue, value, module, values, memories),
+    }
+}
+
+fn apply_or_stage_resolved_lvalue_logic(
+    lvalue: &ResolvedLValue,
+    value: LogicValue,
+    module: &ModuleSummary,
+    state: &ModuleState,
+    values: &mut HashMap<String, Value>,
+    memories: &mut HashMap<String, MemoryState>,
+    object_layouts: &[RuntimeObjectLayout],
+    net_drivers: &mut NetDriverTable,
+) -> Result<bool> {
+    match lvalue {
+        ResolvedLValue::Signal(name) if signal_storage(module, name).is_some_and(StorageKind::is_net) => {
+            let binding = state.signals.get(name).copied().ok_or_else(|| {
+                Error::Resolve(format!(
+                    "signal '{}' is not declared in '{}'",
+                    name, module.name
+                ))
+            })?;
+            stage_whole_signal_logic_driver(binding, value, object_layouts, net_drivers)?;
+            Ok(false)
+        }
+        ResolvedLValue::BitSelect { signal, index }
+            if signal_storage(module, signal).is_some_and(StorageKind::is_net) =>
+        {
+            let binding = state.signals.get(signal).copied().ok_or_else(|| {
+                Error::Resolve(format!(
+                    "signal '{}' is not declared in '{}'",
+                    signal, module.name
+                ))
+            })?;
+            stage_partial_signal_logic_driver(
+                binding,
+                *index,
+                1,
+                value.coerced_to(1),
+                object_layouts,
+                net_drivers,
+            )?;
+            Ok(false)
+        }
+        ResolvedLValue::PartSelect { signal, msb, lsb }
+            if signal_storage(module, signal).is_some_and(StorageKind::is_net) =>
+        {
+            let binding = state.signals.get(signal).copied().ok_or_else(|| {
+                Error::Resolve(format!(
+                    "signal '{}' is not declared in '{}'",
+                    signal, module.name
+                ))
+            })?;
+            let low = (*msb).min(*lsb);
+            let width = (*msb).max(*lsb) - low + 1;
+            stage_partial_signal_logic_driver(
+                binding,
+                low,
+                width,
+                value.coerced_to(width),
+                object_layouts,
+                net_drivers,
+            )?;
+            Ok(false)
+        }
+        ResolvedLValue::Concat(items) => {
+            let total_width = resolved_lvalue_width(lvalue, module)?;
+            let value = value.coerced_to(total_width);
+            let mut remaining_width = total_width;
+            let mut changed = false;
+            for item in items {
+                let item_width = resolved_lvalue_width(item, module)?;
+                remaining_width -= item_width;
+                let mut chunk_bits = LogicBits::zero();
+                for offset in 0..item_width {
+                    chunk_bits.set_bit(offset, value.bit(remaining_width + offset));
+                }
+                let logic_chunk = LogicValue::new(chunk_bits, item_width);
+                changed |= apply_or_stage_resolved_lvalue_logic(
+                    item,
+                    logic_chunk,
+                    module,
+                    state,
+                    values,
+                    memories,
+                    object_layouts,
+                    net_drivers,
+                )?;
+            }
+            Ok(changed)
+        }
+        _ => apply_resolved_lvalue(
+            lvalue,
+            Value::new(value.to_bit_value_lossy(), value.width()),
+            module,
+            values,
+            memories,
+        ),
+    }
+}
+
+fn resolve_staged_nets(
+    frame: &mut [ObjectValue],
+    object_layouts: &[RuntimeObjectLayout],
+    net_drivers: &NetDriverTable,
+) -> Result<bool> {
+    let mut changed = false;
+
+    for (object_id, object) in object_layouts.iter().enumerate() {
+        let Some(kind) = object.storage.net_kind() else {
+            continue;
+        };
+        let previous = frame.get(object_id).cloned().ok_or_else(|| {
+            Error::Resolve(format!("runtime object {} has no value slot", object_id))
+        })?;
+        let resolved = resolve_net(
+            kind,
+            object.width,
+            Some(&previous.logic),
+            net_drivers
+                .get(&object_id)
+                .map(Vec::as_slice)
+                .unwrap_or(&[]),
+        )
+        .map_err(|error| Error::Resolve(error.to_string()))?;
+        let next = ObjectValue::from_logic(resolved);
+        if frame[object_id] != next {
+            frame[object_id] = next;
+            changed = true;
+        }
+    }
+
+    Ok(changed)
+}
+
 fn resolve_instance_path<'a>(
     state: &'a ModuleState,
     instance_path: &[&str],
@@ -2157,7 +2701,7 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::SimulationSession;
-    use crate::{BitValue, Compiler};
+    use crate::{BitValue, Compiler, LogicValue};
 
     fn bv(value: u64) -> BitValue {
         BitValue::from(value)
@@ -2193,11 +2737,35 @@ mod tests {
             .get(name)
             .copied()
             .unwrap_or_else(|| panic!("missing signal binding '{name}'"));
-        super::read_binding(binding, &sim.persisted, &sim.objects)
+        super::read_binding(binding, &sim.persisted)
             .expect("read persisted binding")
             .normalized_bits()
             .to_u64_checked()
             .expect("persisted value fits in u64")
+    }
+
+    fn eval_once_logic<const N: usize>(
+        sim: &mut SimulationSession,
+        pairs: [(String, u64); N],
+    ) -> BTreeMap<String, LogicValue> {
+        let inputs = inputs(pairs);
+        let hir = sim.design.hir();
+        let module = super::top_module(hir, sim.top_module()).expect("top module");
+        let mut frame =
+            super::seed_runtime_frame(module, &sim.state, &sim.persisted, &sim.objects, &inputs)
+                .expect("seed frame");
+        let mut stack = Vec::new();
+        super::settle_module(
+            hir,
+            module,
+            &sim.state,
+            &mut frame,
+            &sim.objects,
+            Some(&inputs),
+            &mut stack,
+        )
+        .expect("settle module");
+        super::collect_outputs_logic(module, &sim.state, &frame).expect("collect logic outputs")
     }
 
     fn memory_u64(state: &super::ModuleState, name: &str, index: usize) -> u64 {
@@ -2312,6 +2880,122 @@ mod tests {
 
         let outputs = sim.eval_once(BTreeMap::new()).expect("eval");
         assert_signal_eq!(outputs, "out", 1);
+    }
+
+    #[test]
+    fn eval_once_logic_reports_floating_tri_outputs() {
+        let design = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                "module top(output tri out); endmodule\n",
+            )
+            .expect("compile floating tri");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let logic_outputs = eval_once_logic(&mut sim, []);
+        assert_eq!(
+            logic_outputs.get("out"),
+            Some(&LogicValue::from_logic_str("z").expect("z logic"))
+        );
+
+        let error = sim.eval_once(BTreeMap::new()).expect_err("public eval should reject z");
+        assert!(
+            error
+                .to_string()
+                .contains("resolved to four-state value 'z'"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn eval_once_applies_tri1_pull_default_through_resolver() {
+        let design = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                "module top(output tri1 out); endmodule\n",
+            )
+            .expect("compile tri1");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let logic_outputs = eval_once_logic(&mut sim, []);
+        assert_eq!(
+            logic_outputs.get("out"),
+            Some(&LogicValue::from_logic_str("1").expect("one logic"))
+        );
+
+        let outputs = sim.eval_once(BTreeMap::new()).expect("eval tri1");
+        assert_signal_eq!(outputs, "out", 1);
+    }
+
+    #[test]
+    fn eval_once_resolves_conflicting_wire_drivers_to_x() {
+        let design = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module top(output wire out); ",
+                    "assign out = 1'b0; ",
+                    "assign out = 1'b1; ",
+                    "endmodule\n"
+                ),
+            )
+            .expect("compile conflicting wire");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let logic_outputs = eval_once_logic(&mut sim, []);
+        assert_eq!(
+            logic_outputs.get("out"),
+            Some(&LogicValue::from_logic_str("x").expect("x logic"))
+        );
+
+        let error = sim.eval_once(BTreeMap::new()).expect_err("public eval should reject x");
+        assert!(
+            error
+                .to_string()
+                .contains("resolved to four-state value 'x'"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn eval_once_applies_wand_resolution_in_settle_path() {
+        let design = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module top(output wand out); ",
+                    "assign out = 1'b1; ",
+                    "assign out = 1'b0; ",
+                    "endmodule\n"
+                ),
+            )
+            .expect("compile wand");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let outputs = sim.eval_once(BTreeMap::new()).expect("eval wand");
+        assert_signal_eq!(outputs, "out", 0);
+    }
+
+    #[test]
+    fn eval_once_rejects_multiple_active_uwire_drivers() {
+        let design = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module top(output uwire out); ",
+                    "assign out = 1'b0; ",
+                    "assign out = 1'b1; ",
+                    "endmodule\n"
+                ),
+            )
+            .expect("compile uwire");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let error = sim.eval_once(BTreeMap::new()).expect_err("uwire should reject contention");
+        assert!(
+            error.to_string().contains("multiple active drivers"),
+            "unexpected error: {error}"
+        );
     }
 
     #[test]

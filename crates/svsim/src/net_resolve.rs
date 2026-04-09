@@ -27,10 +27,6 @@ impl DriveStrengthPair {
     pub(crate) const fn new(zero: DriveStrength, one: DriveStrength) -> Self {
         Self { zero, one }
     }
-
-    fn max(self) -> DriveStrength {
-        self.zero.max(self.one)
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -150,9 +146,18 @@ fn resolve_regular_net_bit(
                 active_driver_count += 1;
             }
             LogicBit::X => {
-                let strength = driver.strengths.max();
-                apply_strength(LogicBit::Zero, strength, &mut zero_strength, &mut one_strength);
-                apply_strength(LogicBit::One, strength, &mut zero_strength, &mut one_strength);
+                apply_strength(
+                    LogicBit::Zero,
+                    driver.strengths.zero,
+                    &mut zero_strength,
+                    &mut one_strength,
+                );
+                apply_strength(
+                    LogicBit::One,
+                    driver.strengths.one,
+                    &mut zero_strength,
+                    &mut one_strength,
+                );
                 active_driver_count += 1;
             }
             LogicBit::Z => {}
@@ -322,6 +327,25 @@ mod tests {
             ],
         )
         .expect("resolve strong wire");
+
+        assert_eq!(resolved, logic("1"));
+    }
+
+    #[test]
+    fn x_driver_preserves_asymmetric_zero_and_one_strengths() {
+        let resolved = resolve_net(
+            NetKind::Wire,
+            1,
+            None,
+            &[
+                NetDriver::new(
+                    logic("x"),
+                    DriveStrengthPair::new(DriveStrength::Weak, DriveStrength::Supply),
+                ),
+                driver("0"),
+            ],
+        )
+        .expect("resolve asymmetric x driver");
 
         assert_eq!(resolved, logic("1"));
     }
