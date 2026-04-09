@@ -5,9 +5,10 @@ use std::path::Path;
 use crate::bit_value::{BitValue, ParseBitValueError};
 use crate::design::CompiledDesign;
 use crate::diag::{Error, Result};
+use crate::elaborate::{ElaboratedInstance, RuntimeObjectShape};
 use crate::hir::{
     AssignmentKind, BinaryOp, Expr, HirDesign, LValue, ModuleInstanceSummary, ModuleSummary,
-    NumericLiteral, PackedRange, PortDirection, ProcBlockKind, Stmt, UnaryOp, expr_to_lvalue,
+    NumericLiteral, PackedRange, PortDirection, ProcBlockKind, Stmt, StorageKind, UnaryOp,
 };
 use crate::validate::resolve_legacy_rom_data_path;
 use crate::width::{
@@ -18,6 +19,8 @@ use crate::width::{
 #[derive(Debug, Clone)]
 pub struct SimulationSession {
     design: CompiledDesign,
+    objects: Vec<RuntimeObjectLayout>,
+    persisted: Vec<Value>,
     state: ModuleState,
 }
 
@@ -25,7 +28,7 @@ pub struct SimulationSession {
 struct ModuleState {
     module_name: String,
     parameter_values: HashMap<String, Value>,
-    persisted: HashMap<String, Value>,
+    signals: HashMap<String, SignalBinding>,
     memories: HashMap<String, MemoryState>,
     previous_clocks: HashMap<String, bool>,
     legacy_rom: Option<LegacyRomState>,
@@ -34,13 +37,48 @@ struct ModuleState {
 
 #[derive(Debug, Clone)]
 struct ChildState {
+    instance_name: String,
+    input_drivers: Vec<PortExprDriver>,
+    output_sinks: Vec<PortSink>,
     state: Box<ModuleState>,
 }
 
 #[derive(Debug, Clone)]
 struct InstanceEvalCache {
     inputs: BTreeMap<String, BitValue>,
-    outputs: HashMap<String, Value>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RuntimeObjectLayout {
+    width: usize,
+    _storage: StorageKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SignalBinding {
+    object_id: usize,
+    view_width: usize,
+}
+
+impl SignalBinding {
+    fn with_view_width(self, view_width: usize) -> Self {
+        Self {
+            object_id: self.object_id,
+            view_width: view_width.max(1),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct PortExprDriver {
+    port_name: String,
+    expr: Expr,
+}
+
+#[derive(Debug, Clone)]
+struct PortSink {
+    port_name: String,
+    target: LValue,
 }
 
 #[derive(Debug, Clone)]
@@ -87,12 +125,28 @@ impl MemoryState {
 
 impl SimulationSession {
     pub(crate) fn new(design: CompiledDesign) -> Result<Self> {
-        let top_module = design
-            .top_module()
-            .expect("compiled designs always carry a top module");
+        let elaborated = design.elaborate()?;
+        let mut objects = Vec::new();
         let mut stack = Vec::new();
-        let state = instantiate_module_state(design.hir(), top_module, None, &mut stack)?;
-        Ok(Self { design, state })
+        let state = instantiate_module_state(
+            design.hir(),
+            &elaborated.top,
+            HashMap::new(),
+            None,
+            None,
+            &mut objects,
+            &mut stack,
+        )?;
+        let persisted = objects
+            .iter()
+            .map(|object| Value::zero(object.width))
+            .collect();
+        Ok(Self {
+            design,
+            objects,
+            persisted,
+            state,
+        })
     }
 
     pub fn top_module(&self) -> &str {
@@ -108,7 +162,7 @@ impl SimulationSession {
         words: &[BitValue],
     ) -> Result<()> {
         let hir = self.design.hir();
-        let module_state = resolve_instance_path_mut(hir, &mut self.state, instance_path)?;
+        let module_state = resolve_instance_path_mut(&mut self.state, instance_path)?;
         let module = resolve_supported_module(hir, &module_state.module_name)?;
         let memory_decl = module.memory_decl(memory_name).ok_or_else(|| {
             Error::Resolve(format!(
@@ -143,7 +197,7 @@ impl SimulationSession {
     ) -> Result<()> {
         let path = path.as_ref();
         let hir = self.design.hir();
-        let module_state = resolve_instance_path_mut(hir, &mut self.state, instance_path)?;
+        let module_state = resolve_instance_path_mut(&mut self.state, instance_path)?;
         let module = resolve_supported_module(hir, &module_state.module_name)?;
         let memory_decl = module.memory_decl(memory_name).ok_or_else(|| {
             Error::Resolve(format!(
@@ -177,7 +231,7 @@ impl SimulationSession {
         index: usize,
     ) -> Result<BitValue> {
         let hir = self.design.hir();
-        let module_state = resolve_instance_path(hir, &self.state, instance_path)?;
+        let module_state = resolve_instance_path(&self.state, instance_path)?;
         let module = resolve_supported_module(hir, &module_state.module_name)?;
         if module.memory_decl(memory_name).is_none() {
             return Err(Error::Resolve(format!(
@@ -202,16 +256,24 @@ impl SimulationSession {
     ) -> Result<BitValue> {
         let hir = self.design.hir();
         let module = top_module(hir, self.top_module())?;
+        let mut frame =
+            seed_runtime_frame(module, &self.state, &self.persisted, &self.objects, inputs)?;
         let mut stack = Vec::new();
-        read_signal_value(
-            hir,
-            module,
-            &self.state,
-            inputs,
-            instance_path,
-            signal_name,
-            &mut stack,
-        )
+        settle_module(hir, module, &self.state, &mut frame, &self.objects, &mut stack)?;
+
+        let module_state = resolve_instance_path(&self.state, instance_path)?;
+        let instance_module = resolve_supported_module(hir, &module_state.module_name)?;
+        let values = build_instance_value_table(instance_module, module_state, &frame, &self.objects)?;
+        values
+            .get(signal_name)
+            .cloned()
+            .map(|value| value.normalized_bits())
+            .ok_or_else(|| {
+                Error::Resolve(format!(
+                    "signal '{}' is not declared in '{}'",
+                    signal_name, instance_module.name
+                ))
+            })
     }
 
     pub fn eval_once(
@@ -219,28 +281,73 @@ impl SimulationSession {
         inputs: BTreeMap<String, BitValue>,
     ) -> Result<BTreeMap<String, BitValue>> {
         let module = top_module(self.design.hir(), self.top_module())?;
+        let mut frame = seed_runtime_frame(
+            module,
+            &self.state,
+            &self.persisted,
+            &self.objects,
+            &inputs,
+        )?;
         let mut stack = Vec::new();
-        let values = settle_module(self.design.hir(), module, &self.state, &inputs, &mut stack)?;
-        Ok(collect_outputs(module, &values))
+        settle_module(
+            self.design.hir(),
+            module,
+            &self.state,
+            &mut frame,
+            &self.objects,
+            &mut stack,
+        )?;
+        Ok(collect_outputs(module, &self.state, &frame, &self.objects))
     }
 
     pub fn step(
         &mut self,
         inputs: BTreeMap<String, BitValue>,
     ) -> Result<BTreeMap<String, BitValue>> {
-        let module = top_module(self.design.hir(), self.top_module())?;
-        let mut stack = Vec::new();
-        step_module(self.design.hir(), &mut self.state, &inputs, &mut stack)?;
-
+        let hir = self.design.hir();
+        let module = top_module(hir, self.top_module())?;
+        let mut pre_frame =
+            seed_runtime_frame(module, &self.state, &self.persisted, &self.objects, &inputs)?;
         let mut settle_stack = Vec::new();
-        let values = settle_module(
-            self.design.hir(),
+        settle_module(
+            hir,
             module,
             &self.state,
-            &inputs,
+            &mut pre_frame,
+            &self.objects,
             &mut settle_stack,
         )?;
-        Ok(collect_outputs(module, &values))
+
+        let mut next_persisted = self.persisted.clone();
+        let mut step_stack = Vec::new();
+        step_module(
+            hir,
+            module,
+            &mut self.state,
+            &pre_frame,
+            &mut next_persisted,
+            &self.objects,
+            &mut step_stack,
+        )?;
+        self.persisted = next_persisted;
+
+        let mut post_frame =
+            seed_runtime_frame(module, &self.state, &self.persisted, &self.objects, &inputs)?;
+        let mut post_settle_stack = Vec::new();
+        settle_module(
+            hir,
+            module,
+            &self.state,
+            &mut post_frame,
+            &self.objects,
+            &mut post_settle_stack,
+        )?;
+        Ok(collect_outputs(
+            module,
+            &self.state,
+            &post_frame,
+            &self.objects,
+        ))
     }
 }
 
@@ -409,45 +516,147 @@ fn top_module<'a>(hir: &'a HirDesign, module_name: &str) -> Result<&'a ModuleSum
 
 fn instantiate_module_state(
     hir: &HirDesign,
-    module_name: &str,
-    parameter_values: Option<HashMap<String, Value>>,
+    elaborated: &ElaboratedInstance,
+    provided_ports: HashMap<String, SignalBinding>,
+    parent_module: Option<&ModuleSummary>,
+    parent_parameter_values: Option<&HashMap<String, Value>>,
+    objects: &mut Vec<RuntimeObjectLayout>,
     stack: &mut Vec<String>,
 ) -> Result<ModuleState> {
-    if stack.iter().any(|name| name == module_name) {
+    if stack.iter().any(|name| name == &elaborated.module_name) {
         return Err(Error::Unsupported(format!(
             "recursive instantiation detected at {} -> {}",
             stack.join(" -> "),
-            module_name
+            elaborated.module_name
         )));
     }
 
-    let module = resolve_supported_module(hir, module_name)?;
-    let parameter_values = if let Some(parameter_values) = parameter_values {
-        parameter_values
-    } else {
-        elaborate_module_parameters(module, None, None, None)?
+    let module = resolve_supported_module(hir, &elaborated.module_name)?;
+    let instance_summary = match (parent_module, elaborated.instance_name.as_deref()) {
+        (Some(parent_module), Some(instance_name)) => Some(
+            parent_module
+                .instantiations
+                .iter()
+                .find(|instance| instance.instance_name == instance_name)
+                .ok_or_else(|| {
+                    Error::Resolve(format!(
+                        "instance '{}' does not exist under '{}'",
+                        instance_name, parent_module.name
+                    ))
+                })?,
+        ),
+        _ => None,
     };
-    stack.push(module_name.to_owned());
+    let parameter_values = elaborate_module_parameters(
+        module,
+        parent_module,
+        parent_parameter_values,
+        instance_summary,
+    )?;
 
-    let mut children = Vec::with_capacity(module.instantiations.len());
-    for instance in &module.instantiations {
-        let child = resolve_supported_module(hir, &instance.module_name).map_err(|_| {
-            Error::Resolve(format!(
-                "instance '{}' references missing module '{}'",
-                instance.instance_name, instance.module_name
-            ))
-        })?;
-        let child_parameter_values = elaborate_module_parameters(
-            child,
-            Some(module),
-            Some(&parameter_values),
-            Some(instance),
-        )?;
+    stack.push(elaborated.module_name.clone());
+
+    let mut signals = HashMap::new();
+    for port in &elaborated.ports {
+        let width = runtime_bits_width(port.shape)?;
+        let binding = provided_ports
+            .get(&port.name)
+            .copied()
+            .unwrap_or_else(|| allocate_runtime_object(objects, width, port.storage));
+        signals.insert(port.name.clone(), binding);
+    }
+    for net in &elaborated.nets {
+        signals.insert(
+            net.name.clone(),
+            allocate_runtime_object(objects, runtime_bits_width(net.shape)?, net.storage),
+        );
+    }
+    for variable in &elaborated.variables {
+        signals.insert(
+            variable.name.clone(),
+            allocate_runtime_object(
+                objects,
+                runtime_bits_width(variable.shape)?,
+                variable.storage,
+            ),
+        );
+    }
+
+    let mut children = Vec::with_capacity(elaborated.children.len());
+    for child in &elaborated.children {
+        let mut child_ports = HashMap::new();
+        let mut input_drivers = Vec::new();
+        let mut output_sinks = Vec::new();
+
+        for port in &child.ports {
+            let port_width = runtime_bits_width(port.shape)?;
+            let binding = if let Some(binding) = child.bindings.iter().find(|binding| binding.port_name == port.name) {
+                if let Some(parent_name) =
+                    aliasable_parent_signal_name(module, port.direction, binding.target.as_ref())
+                {
+                    let parent_binding = signals.get(parent_name).copied().ok_or_else(|| {
+                        Error::Resolve(format!(
+                            "signal '{}' is not declared in '{}'",
+                            parent_name, module.name
+                        ))
+                    })?;
+                    grow_runtime_object(objects, parent_binding.object_id, port_width);
+                    parent_binding.with_view_width(port_width)
+                } else {
+                    let binding_slot =
+                        allocate_runtime_object(objects, port_width, port.storage);
+                    match port.direction {
+                        PortDirection::Input => input_drivers.push(PortExprDriver {
+                            port_name: port.name.clone(),
+                            expr: binding.expr.clone(),
+                        }),
+                        PortDirection::Output => output_sinks.push(PortSink {
+                            port_name: port.name.clone(),
+                            target: binding.target.clone().ok_or_else(|| {
+                                Error::Resolve(format!(
+                                    "instance '{}' output port '{}' is missing a target",
+                                    child.instance_name.as_deref().unwrap_or("<top>"),
+                                    port.name
+                                ))
+                            })?,
+                        }),
+                        PortDirection::Inout | PortDirection::Ref => {
+                            return Err(Error::Unsupported(format!(
+                                "module '{}' uses unsupported port direction on '{}'",
+                                child.module_name, port.name
+                            )));
+                        }
+                    }
+                    binding_slot
+                }
+            } else {
+                if matches!(port.direction, PortDirection::Input) {
+                    return Err(Error::Resolve(format!(
+                        "instance '{}' is missing a connection for input port '{}' on module '{}'",
+                        child.instance_name.as_deref().unwrap_or("<top>"),
+                        port.name,
+                        child.module_name
+                    )));
+                }
+                allocate_runtime_object(objects, port_width, port.storage)
+            };
+            child_ports.insert(port.name.clone(), binding);
+        }
+
         children.push(ChildState {
+            instance_name: child
+                .instance_name
+                .clone()
+                .expect("child elaborated instances always carry a name"),
+            input_drivers,
+            output_sinks,
             state: Box::new(instantiate_module_state(
                 hir,
-                &instance.module_name,
-                Some(child_parameter_values),
+                child,
+                child_ports,
+                Some(module),
+                Some(&parameter_values),
+                objects,
                 stack,
             )?),
         });
@@ -455,9 +664,9 @@ fn instantiate_module_state(
 
     stack.pop();
     Ok(ModuleState {
-        module_name: module_name.to_owned(),
+        module_name: elaborated.module_name.clone(),
         parameter_values,
-        persisted: build_persisted_signal_table(module),
+        signals,
         memories: build_memory_table(module),
         previous_clocks: build_clock_state_table(module),
         legacy_rom: build_legacy_rom_state(hir, module)?,
@@ -469,9 +678,10 @@ fn settle_module(
     hir: &HirDesign,
     module: &ModuleSummary,
     state: &ModuleState,
-    inputs: &BTreeMap<String, BitValue>,
+    frame: &mut [Value],
+    object_layouts: &[RuntimeObjectLayout],
     stack: &mut Vec<String>,
-) -> Result<HashMap<String, Value>> {
+) -> Result<()> {
     if stack.iter().any(|name| name == &state.module_name) {
         return Err(Error::Unsupported(format!(
             "recursive combinational instantiation detected at {} -> {}",
@@ -480,63 +690,92 @@ fn settle_module(
         )));
     }
 
-    let mut values = build_signal_table(module, inputs, &state.persisted, &state.parameter_values)?;
-    if let Some(legacy_rom) = &state.legacy_rom {
-        apply_legacy_rom_outputs(module, &mut values, legacy_rom)?;
-        return Ok(values);
-    }
     let max_iterations = ((module.continuous_assignments.len()
         + module.proc_blocks.len()
-        + module.instantiations.len()
-        + values.len())
+        + state.children.len()
+        + state.signals.len())
     .max(1))
         * 8;
-    let mut instance_caches = vec![None; module.instantiations.len()];
+    let mut instance_caches: Vec<Option<InstanceEvalCache>> = vec![None; state.children.len()];
 
     stack.push(state.module_name.clone());
     let mut converged = false;
     for _ in 0..max_iterations {
+        let mut values = build_instance_value_table(module, state, frame, object_layouts)?;
         let mut changed = false;
 
-        for assign in &module.continuous_assignments {
-            let value = eval_expr(&assign.expr, module, &values, &state.memories)?;
-            let target = resolve_lvalue(&assign.target, module, &values, &state.memories)?;
-            if resolved_lvalue_contains_memory(&target) {
-                return Err(Error::Unsupported(
-                    "continuous assignments to memory elements are not supported".into(),
-                ));
+        if let Some(legacy_rom) = &state.legacy_rom {
+            apply_legacy_rom_outputs(module, &mut values, legacy_rom)?;
+            changed |= sync_instance_values_to_frame(module, state, &values, frame, object_layouts)?;
+        } else {
+            for assign in &module.continuous_assignments {
+                let value = eval_expr(&assign.expr, module, &values, &state.memories)?;
+                let target = resolve_lvalue(&assign.target, module, &values, &state.memories)?;
+                if resolved_lvalue_contains_memory(&target) {
+                    return Err(Error::Unsupported(
+                        "continuous assignments to memory elements are not supported".into(),
+                    ));
+                }
+                let mut no_memories = HashMap::new();
+                changed |=
+                    apply_resolved_lvalue(&target, value, module, &mut values, &mut no_memories)?;
             }
-            let mut no_memories = HashMap::new();
-            changed |=
-                apply_resolved_lvalue(&target, value, module, &mut values, &mut no_memories)?;
-        }
 
-        for block in &module.proc_blocks {
-            changed |= execute_proc_block(
-                &block.kind,
-                &block.body,
-                module,
-                &mut values,
-                &state.memories,
-            )?;
-        }
+            for block in &module.proc_blocks {
+                changed |= execute_proc_block(
+                    &block.kind,
+                    &block.body,
+                    module,
+                    &mut values,
+                    &state.memories,
+                )?;
+            }
 
-        for ((instance, child_state), cache) in module
-            .instantiations
-            .iter()
-            .zip(&state.children)
-            .zip(instance_caches.iter_mut())
-        {
-            changed |= evaluate_instance(
-                hir,
-                module,
-                instance,
-                child_state.state.as_ref(),
-                &mut values,
-                &state.memories,
-                stack,
-                cache,
-            )?;
+            changed |= sync_instance_values_to_frame(module, state, &values, frame, object_layouts)?;
+
+            for (child_state, cache) in state.children.iter().zip(instance_caches.iter_mut()) {
+                let child = resolve_supported_module(hir, &child_state.state.module_name)?;
+                let parent_values =
+                    build_instance_value_table(module, state, frame, object_layouts)?;
+                changed |= drive_child_inputs(
+                    module,
+                    child_state,
+                    &parent_values,
+                    &state.memories,
+                    frame,
+                    object_layouts,
+                )?;
+
+                let child_inputs =
+                    snapshot_child_inputs(child, child_state.state.as_ref(), frame, object_layouts)?;
+                let needs_refresh = cache
+                    .as_ref()
+                    .is_none_or(|cached| cached.inputs != child_inputs);
+                if needs_refresh {
+                    settle_module(
+                        hir,
+                        child,
+                        child_state.state.as_ref(),
+                        frame,
+                        object_layouts,
+                        stack,
+                    )?;
+                    *cache = Some(InstanceEvalCache { inputs: child_inputs });
+                    changed = true;
+                }
+
+                let parent_values =
+                    build_instance_value_table(module, state, frame, object_layouts)?;
+                changed |= apply_child_output_sinks(
+                    module,
+                    state,
+                    child_state,
+                    &parent_values,
+                    &state.memories,
+                    frame,
+                    object_layouts,
+                )?;
+            }
         }
 
         if !changed {
@@ -553,26 +792,34 @@ fn settle_module(
         )));
     }
 
-    Ok(values)
+    Ok(())
 }
 
 fn step_module(
     hir: &HirDesign,
+    module: &ModuleSummary,
     state: &mut ModuleState,
-    inputs: &BTreeMap<String, BitValue>,
-    stack: &mut Vec<String>,
+    pre_frame: &[Value],
+    next_objects: &mut [Value],
+    object_layouts: &[RuntimeObjectLayout],
+    _stack: &mut Vec<String>,
 ) -> Result<()> {
-    let module = resolve_supported_module(hir, &state.module_name)?;
-    let pre_values = settle_module(hir, module, state, inputs, stack)?;
+    let pre_values = build_instance_value_table(module, state, pre_frame, object_layouts)?;
 
-    for (instance, child_state) in module.instantiations.iter().zip(state.children.iter_mut()) {
-        let child = resolve_supported_module(hir, &instance.module_name)?;
-        let child_inputs =
-            build_child_inputs(module, child, instance, &pre_values, &state.memories)?;
-        step_module(hir, child_state.state.as_mut(), &child_inputs, stack)?;
+    for child_state in &mut state.children {
+        let child = resolve_supported_module(hir, &child_state.state.module_name)?;
+        step_module(
+            hir,
+            child,
+            child_state.state.as_mut(),
+            pre_frame,
+            next_objects,
+            object_layouts,
+            _stack,
+        )?;
     }
 
-    let mut staged = state.persisted.clone();
+    let mut staged = build_instance_value_table(module, state, next_objects, object_layouts)?;
     let mut staged_memories = state.memories.clone();
     let mut sampled_clocks = state.previous_clocks.clone();
     for block in &module.proc_blocks {
@@ -627,58 +874,333 @@ fn step_module(
         }
     }
 
-    state.persisted = staged;
+    sync_instance_values_to_frame(module, state, &staged, next_objects, object_layouts)?;
     state.memories = staged_memories;
     state.previous_clocks = sampled_clocks;
     Ok(())
 }
 
-fn read_signal_value(
-    hir: &HirDesign,
+fn runtime_bits_width(shape: RuntimeObjectShape) -> Result<usize> {
+    match shape {
+        RuntimeObjectShape::Bits { width } => Ok(width),
+        RuntimeObjectShape::Memory { .. } => Err(Error::Unsupported(
+            "memory shapes are not valid for scalar runtime objects".into(),
+        )),
+    }
+}
+
+fn allocate_runtime_object(
+    objects: &mut Vec<RuntimeObjectLayout>,
+    width: usize,
+    storage: StorageKind,
+) -> SignalBinding {
+    let object_id = objects.len();
+    objects.push(RuntimeObjectLayout {
+        width: width.max(1),
+        _storage: storage,
+    });
+    SignalBinding {
+        object_id,
+        view_width: width.max(1),
+    }
+}
+
+fn grow_runtime_object(objects: &mut [RuntimeObjectLayout], object_id: usize, width: usize) {
+    if let Some(object) = objects.get_mut(object_id) {
+        object.width = object.width.max(width.max(1));
+    }
+}
+
+fn aliasable_parent_signal_name<'a>(
+    parent_module: &'a ModuleSummary,
+    direction: PortDirection,
+    target: Option<&'a LValue>,
+) -> Option<&'a str> {
+    let LValue::Signal(name) = target? else {
+        return None;
+    };
+
+    match direction {
+        PortDirection::Input => Some(name.as_str()),
+        PortDirection::Output if signal_storage(parent_module, name).is_some_and(StorageKind::is_net) => {
+            Some(name.as_str())
+        }
+        PortDirection::Output | PortDirection::Inout | PortDirection::Ref => None,
+    }
+}
+
+fn signal_storage(module: &ModuleSummary, name: &str) -> Option<StorageKind> {
+    module
+        .port(name)
+        .map(|port| port.storage)
+        .or_else(|| module.signal_decl(name).map(|signal| signal.storage))
+}
+
+fn read_binding(
+    binding: SignalBinding,
+    values: &[Value],
+    _object_layouts: &[RuntimeObjectLayout],
+) -> Result<Value> {
+    let value = values.get(binding.object_id).ok_or_else(|| {
+        Error::Resolve(format!(
+            "runtime object {} does not exist",
+            binding.object_id
+        ))
+    })?;
+    Ok(value.coerced_to(binding.view_width))
+}
+
+fn write_binding(
+    binding: SignalBinding,
+    value: Value,
+    values: &mut [Value],
+    object_layouts: &[RuntimeObjectLayout],
+) -> Result<bool> {
+    let object = object_layouts.get(binding.object_id).ok_or_else(|| {
+        Error::Resolve(format!(
+            "runtime object {} does not exist",
+            binding.object_id
+        ))
+    })?;
+    let current = values.get_mut(binding.object_id).ok_or_else(|| {
+        Error::Resolve(format!(
+            "runtime object {} has no value slot",
+            binding.object_id
+        ))
+    })?;
+    let next = value.coerced_to(binding.view_width).coerced_to(object.width);
+    let changed = *current != next;
+    *current = next;
+    Ok(changed)
+}
+
+fn seed_runtime_frame(
     module: &ModuleSummary,
     state: &ModuleState,
+    persisted: &[Value],
+    object_layouts: &[RuntimeObjectLayout],
     inputs: &BTreeMap<String, BitValue>,
-    instance_path: &[&str],
-    signal_name: &str,
-    stack: &mut Vec<String>,
-) -> Result<BitValue> {
-    let values = settle_module(hir, module, state, inputs, stack)?;
-    let Some((segment, rest)) = instance_path.split_first() else {
-        return values
-            .get(signal_name)
+) -> Result<Vec<Value>> {
+    let mut frame = persisted.to_vec();
+
+    for port in &module.ports {
+        if !matches!(port.direction, PortDirection::Input) {
+            continue;
+        }
+        let binding = state.signals.get(&port.name).copied().ok_or_else(|| {
+            Error::Resolve(format!(
+                "signal '{}' is not declared in '{}'",
+                port.name, module.name
+            ))
+        })?;
+        let value = Value::new(
+            inputs
+                .get(&port.name)
+                .cloned()
+                .unwrap_or_else(BitValue::zero),
+            port.width(),
+        );
+        write_binding(binding, value, &mut frame, object_layouts)?;
+    }
+
+    for name in inputs.keys() {
+        if module.port(name).is_none() {
+            return Err(Error::Resolve(format!(
+                "input '{}' does not match any port on module '{}'",
+                name, module.name
+            )));
+        }
+    }
+
+    Ok(frame)
+}
+
+fn build_instance_value_table(
+    module: &ModuleSummary,
+    state: &ModuleState,
+    frame: &[Value],
+    object_layouts: &[RuntimeObjectLayout],
+) -> Result<HashMap<String, Value>> {
+    let mut values = HashMap::new();
+
+    for port in &module.ports {
+        let binding = state.signals.get(&port.name).copied().ok_or_else(|| {
+            Error::Resolve(format!(
+                "signal '{}' is not declared in '{}'",
+                port.name, module.name
+            ))
+        })?;
+        values.insert(port.name.clone(), read_binding(binding, frame, object_layouts)?);
+    }
+
+    for signal in &module.signals {
+        let binding = state.signals.get(&signal.name).copied().ok_or_else(|| {
+            Error::Resolve(format!(
+                "signal '{}' is not declared in '{}'",
+                signal.name, module.name
+            ))
+        })?;
+        values.insert(signal.name.clone(), read_binding(binding, frame, object_layouts)?);
+    }
+
+    for param in &module.parameters {
+        let coerced = state
+            .parameter_values
+            .get(&param.name)
             .cloned()
-            .map(|value| value.normalized_bits())
+            .unwrap_or_else(|| Value::zero(param.width()))
+            .coerced_to(param.width());
+        values.insert(param.name.clone(), coerced);
+    }
+
+    Ok(values)
+}
+
+fn sync_instance_values_to_frame(
+    module: &ModuleSummary,
+    state: &ModuleState,
+    values: &HashMap<String, Value>,
+    frame: &mut [Value],
+    object_layouts: &[RuntimeObjectLayout],
+) -> Result<bool> {
+    let mut changed = false;
+
+    for port in &module.ports {
+        let value = values
+            .get(&port.name)
+            .cloned()
+            .unwrap_or_else(|| Value::zero(port.width()));
+        let binding = state.signals.get(&port.name).copied().ok_or_else(|| {
+            Error::Resolve(format!(
+                "signal '{}' is not declared in '{}'",
+                port.name, module.name
+            ))
+        })?;
+        changed |= write_binding(binding, value, frame, object_layouts)?;
+    }
+
+    for signal in &module.signals {
+        let value = values
+            .get(&signal.name)
+            .cloned()
+            .unwrap_or_else(|| Value::zero(signal.width()));
+        let binding = state.signals.get(&signal.name).copied().ok_or_else(|| {
+            Error::Resolve(format!(
+                "signal '{}' is not declared in '{}'",
+                signal.name, module.name
+            ))
+        })?;
+        changed |= write_binding(binding, value, frame, object_layouts)?;
+    }
+
+    Ok(changed)
+}
+
+fn drive_child_inputs(
+    parent_module: &ModuleSummary,
+    child_state: &ChildState,
+    parent_values: &HashMap<String, Value>,
+    parent_memories: &HashMap<String, MemoryState>,
+    frame: &mut [Value],
+    object_layouts: &[RuntimeObjectLayout],
+) -> Result<bool> {
+    let mut changed = false;
+
+    for driver in &child_state.input_drivers {
+        let value = eval_expr(&driver.expr, parent_module, parent_values, parent_memories)?;
+        let binding = child_state
+            .state
+            .signals
+            .get(&driver.port_name)
+            .copied()
             .ok_or_else(|| {
                 Error::Resolve(format!(
                     "signal '{}' is not declared in '{}'",
-                    signal_name, module.name
+                    driver.port_name, child_state.state.module_name
                 ))
-            });
-    };
+            })?;
+        changed |= write_binding(binding, value, frame, object_layouts)?;
+    }
 
-    let child_index = module
-        .instantiations
+    Ok(changed)
+}
+
+fn snapshot_child_inputs(
+    child_module: &ModuleSummary,
+    child_state: &ModuleState,
+    frame: &[Value],
+    object_layouts: &[RuntimeObjectLayout],
+) -> Result<BTreeMap<String, BitValue>> {
+    let mut inputs = BTreeMap::new();
+
+    for port in child_module
+        .ports
         .iter()
-        .position(|instance| instance.instance_name == *segment)
-        .ok_or_else(|| {
+        .filter(|port| matches!(port.direction, PortDirection::Input))
+    {
+        let binding = child_state.signals.get(&port.name).copied().ok_or_else(|| {
             Error::Resolve(format!(
-                "instance path '{}' does not exist under module '{}'",
-                instance_path.join("."),
-                module.name
+                "signal '{}' is not declared in '{}'",
+                port.name, child_module.name
             ))
         })?;
-    let instance = &module.instantiations[child_index];
-    let child = resolve_supported_module(hir, &instance.module_name)?;
-    let child_inputs = build_child_inputs(module, child, instance, &values, &state.memories)?;
-    read_signal_value(
-        hir,
-        child,
-        state.children[child_index].state.as_ref(),
-        &child_inputs,
-        rest,
-        signal_name,
-        stack,
-    )
+        inputs.insert(
+            port.name.clone(),
+            read_binding(binding, frame, object_layouts)?.normalized_bits(),
+        );
+    }
+
+    Ok(inputs)
+}
+
+fn apply_child_output_sinks(
+    parent_module: &ModuleSummary,
+    parent_state: &ModuleState,
+    child_state: &ChildState,
+    parent_values: &HashMap<String, Value>,
+    parent_memories: &HashMap<String, MemoryState>,
+    frame: &mut [Value],
+    object_layouts: &[RuntimeObjectLayout],
+) -> Result<bool> {
+    if child_state.output_sinks.is_empty() {
+        return Ok(false);
+    }
+
+    let mut next_parent_values = parent_values.clone();
+    let mut changed = false;
+
+    for sink in &child_state.output_sinks {
+        let binding = child_state
+            .state
+            .signals
+            .get(&sink.port_name)
+            .copied()
+            .ok_or_else(|| {
+                Error::Resolve(format!(
+                    "signal '{}' is not declared in '{}'",
+                    sink.port_name, child_state.state.module_name
+                ))
+            })?;
+        let value = read_binding(binding, frame, object_layouts)?;
+        let target = resolve_lvalue(&sink.target, parent_module, &next_parent_values, parent_memories)?;
+        let mut no_memories = HashMap::new();
+        changed |= apply_resolved_lvalue(
+            &target,
+            value,
+            parent_module,
+            &mut next_parent_values,
+            &mut no_memories,
+        )?;
+    }
+
+    changed |= sync_instance_values_to_frame(
+        parent_module,
+        parent_state,
+        &next_parent_values,
+        frame,
+        object_layouts,
+    )?;
+    Ok(changed)
 }
 
 fn execute_proc_block(
@@ -871,24 +1393,6 @@ fn execute_sequential_stmt(
     }
 }
 
-fn build_persisted_signal_table(module: &ModuleSummary) -> HashMap<String, Value> {
-    let mut values = HashMap::new();
-
-    for port in &module.ports {
-        values.insert(port.name.clone(), Value::zero(port.width()));
-    }
-    for signal in &module.signals {
-        values.insert(signal.name.clone(), Value::zero(signal.width()));
-    }
-    // Parameters are placeholder-initialized here; they get their true values
-    // in build_signal_table where expression evaluation is available.
-    for param in &module.parameters {
-        values.insert(param.name.clone(), Value::zero(param.width()));
-    }
-
-    values
-}
-
 fn build_memory_table(module: &ModuleSummary) -> HashMap<String, MemoryState> {
     let mut memories = HashMap::new();
 
@@ -1068,150 +1572,6 @@ fn elaborate_module_parameters(
     Ok(values)
 }
 
-fn build_signal_table(
-    module: &ModuleSummary,
-    inputs: &BTreeMap<String, BitValue>,
-    persisted: &HashMap<String, Value>,
-    parameter_values: &HashMap<String, Value>,
-) -> Result<HashMap<String, Value>> {
-    let mut values = HashMap::new();
-
-    for port in &module.ports {
-        let value = if matches!(port.direction, PortDirection::Input) {
-            Value::new(
-                inputs
-                    .get(&port.name)
-                    .cloned()
-                    .unwrap_or_else(BitValue::zero),
-                port.width(),
-            )
-        } else {
-            persisted
-                .get(&port.name)
-                .cloned()
-                .unwrap_or_else(|| Value::zero(port.width()))
-        };
-        values.insert(port.name.clone(), value);
-    }
-
-    for signal in &module.signals {
-        values.insert(
-            signal.name.clone(),
-            persisted
-                .get(&signal.name)
-                .cloned()
-                .unwrap_or_else(|| Value::zero(signal.width())),
-        );
-    }
-
-    for param in &module.parameters {
-        let coerced = parameter_values
-            .get(&param.name)
-            .cloned()
-            .unwrap_or_else(|| Value::zero(param.width()))
-            .coerced_to(param.width());
-        values.insert(param.name.clone(), coerced);
-    }
-
-    for name in inputs.keys() {
-        if module.port(name).is_none() {
-            return Err(Error::Resolve(format!(
-                "input '{}' does not match any port on module '{}'",
-                name, module.name
-            )));
-        }
-    }
-
-    Ok(values)
-}
-
-fn build_child_inputs(
-    parent: &ModuleSummary,
-    child: &ModuleSummary,
-    instance: &ModuleInstanceSummary,
-    parent_values: &HashMap<String, Value>,
-    parent_memories: &HashMap<String, MemoryState>,
-) -> Result<BTreeMap<String, BitValue>> {
-    let mut child_inputs = BTreeMap::new();
-
-    for port in child
-        .ports
-        .iter()
-        .filter(|port| matches!(port.direction, PortDirection::Input))
-    {
-        let Some(connection) = find_connection(instance, &port.name) else {
-            continue;
-        };
-        // Cache keys should reflect the child-visible port value, not the raw parent expression.
-        let value = eval_expr(&connection.expr, parent, parent_values, parent_memories)?
-            .coerced_to(port.width());
-        child_inputs.insert(port.name.clone(), value.normalized_bits());
-    }
-
-    Ok(child_inputs)
-}
-
-fn evaluate_instance(
-    hir: &HirDesign,
-    parent: &ModuleSummary,
-    instance: &ModuleInstanceSummary,
-    child_state: &ModuleState,
-    values: &mut HashMap<String, Value>,
-    memories: &HashMap<String, MemoryState>,
-    stack: &mut Vec<String>,
-    cache: &mut Option<InstanceEvalCache>,
-) -> Result<bool> {
-    let child = resolve_supported_module(hir, &instance.module_name).map_err(|_| {
-        Error::Resolve(format!(
-            "instance '{}' references missing module '{}'",
-            instance.instance_name, instance.module_name
-        ))
-    })?;
-
-    let child_inputs = build_child_inputs(parent, child, instance, values, memories)?;
-    let needs_refresh = cache
-        .as_ref()
-        .is_none_or(|cached| cached.inputs != child_inputs);
-    if needs_refresh {
-        let child_values = settle_module(hir, child, child_state, &child_inputs, stack)?;
-        *cache = Some(InstanceEvalCache {
-            inputs: child_inputs,
-            outputs: child_values,
-        });
-    }
-    let child_values = &cache
-        .as_ref()
-        .expect("instance cache is initialized before applying outputs")
-        .outputs;
-    let mut changed = false;
-
-    for port in child
-        .ports
-        .iter()
-        .filter(|port| matches!(port.direction, PortDirection::Output))
-    {
-        let Some(connection) = find_connection(instance, &port.name) else {
-            continue;
-        };
-        let lvalue = expr_to_lvalue(&connection.expr).ok_or_else(|| {
-            Error::Unsupported(format!(
-                "instance '{}' connects output port '{}' to a non-lvalue expression",
-                instance.instance_name, port.name
-            ))
-        })?;
-        let value = child_values
-            .get(&port.name)
-            .cloned()
-            .unwrap_or_else(|| Value::zero(port.width()))
-            .coerced_to(port.width());
-        let target = resolve_lvalue(&lvalue, parent, values, memories)?;
-        let mut no_memories = HashMap::new();
-        changed |= apply_resolved_lvalue(&target, value, parent, values, &mut no_memories)?;
-    }
-
-    Ok(changed)
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum ResolvedLValue {
     Signal(String),
@@ -1233,7 +1593,9 @@ enum ResolvedLValue {
 
 fn collect_outputs(
     module: &ModuleSummary,
-    values: &HashMap<String, Value>,
+    state: &ModuleState,
+    frame: &[Value],
+    object_layouts: &[RuntimeObjectLayout],
 ) -> BTreeMap<String, BitValue> {
     let mut outputs = BTreeMap::new();
 
@@ -1242,9 +1604,11 @@ fn collect_outputs(
         .iter()
         .filter(|port| matches!(port.direction, PortDirection::Output))
     {
-        let value = values
+        let value = state
+            .signals
             .get(&port.name)
-            .cloned()
+            .copied()
+            .and_then(|binding| read_binding(binding, frame, object_layouts).ok())
             .unwrap_or_else(|| Value::zero(port.width()))
             .coerced_to(port.width());
         outputs.insert(port.name.clone(), value.normalized_bits());
@@ -1273,16 +1637,6 @@ fn resolve_supported_module<'a>(
         )));
     }
     Ok(module)
-}
-
-fn find_connection<'a>(
-    instance: &'a ModuleInstanceSummary,
-    port_name: &str,
-) -> Option<&'a crate::hir::NamedPortConnection> {
-    instance
-        .connections
-        .iter()
-        .find(|connection| connection.port_name == port_name)
 }
 
 fn eval_expr(
@@ -1754,49 +2108,45 @@ fn apply_resolved_lvalue(
 }
 
 fn resolve_instance_path<'a>(
-    hir: &'a HirDesign,
     state: &'a ModuleState,
     instance_path: &[&str],
 ) -> Result<&'a ModuleState> {
     let Some((segment, rest)) = instance_path.split_first() else {
         return Ok(state);
     };
-    let module = resolve_supported_module(hir, &state.module_name)?;
-    let child_index = module
-        .instantiations
+    let child_index = state
+        .children
         .iter()
-        .position(|instance| instance.instance_name == *segment)
+        .position(|child| child.instance_name == *segment)
         .ok_or_else(|| {
             Error::Resolve(format!(
                 "instance path '{}' does not exist under module '{}'",
                 instance_path.join("."),
-                module.name
+                state.module_name
             ))
         })?;
-    resolve_instance_path(hir, state.children[child_index].state.as_ref(), rest)
+    resolve_instance_path(state.children[child_index].state.as_ref(), rest)
 }
 
 fn resolve_instance_path_mut<'a>(
-    hir: &HirDesign,
     state: &'a mut ModuleState,
     instance_path: &[&str],
 ) -> Result<&'a mut ModuleState> {
     let Some((segment, rest)) = instance_path.split_first() else {
         return Ok(state);
     };
-    let module = resolve_supported_module(hir, &state.module_name)?;
-    let child_index = module
-        .instantiations
+    let child_index = state
+        .children
         .iter()
-        .position(|instance| instance.instance_name == *segment)
+        .position(|child| child.instance_name == *segment)
         .ok_or_else(|| {
             Error::Resolve(format!(
                 "instance path '{}' does not exist under module '{}'",
                 instance_path.join("."),
-                module.name
+                state.module_name
             ))
         })?;
-    resolve_instance_path_mut(hir, state.children[child_index].state.as_mut(), rest)
+    resolve_instance_path_mut(state.children[child_index].state.as_mut(), rest)
 }
 
 #[cfg(test)]
@@ -1837,11 +2187,14 @@ mod tests {
         sim.step(high_inputs).expect("step high")
     }
 
-    fn persisted_u64(state: &super::ModuleState, name: &str) -> u64 {
-        state
-            .persisted
+    fn persisted_u64(sim: &super::SimulationSession, state: &super::ModuleState, name: &str) -> u64 {
+        let binding = state
+            .signals
             .get(name)
-            .unwrap_or_else(|| panic!("missing persisted signal '{name}'"))
+            .copied()
+            .unwrap_or_else(|| panic!("missing signal binding '{name}'"));
+        super::read_binding(binding, &sim.persisted, &sim.objects)
+            .expect("read persisted binding")
             .normalized_bits()
             .to_u64_checked()
             .expect("persisted value fits in u64")
@@ -1857,6 +2210,14 @@ mod tests {
             .normalized_bits()
             .to_u64_checked()
             .expect("memory value fits in u64")
+    }
+
+    fn child_state<'a>(state: &'a super::ModuleState, name: &str) -> &'a super::ChildState {
+        state
+            .children
+            .iter()
+            .find(|child| child.instance_name == name)
+            .unwrap_or_else(|| panic!("missing child instance '{name}'"))
     }
 
     macro_rules! assert_signal_eq {
@@ -1903,6 +2264,94 @@ mod tests {
 
         assert_signal_eq!(outputs, "outSum", 1);
         assert_signal_eq!(outputs, "outCarry", 1);
+    }
+
+    #[test]
+    fn structural_runtime_shares_sibling_net_bindings() {
+        let design = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module producer(output wire y); ",
+                    "assign y = 1'b1; ",
+                    "endmodule\n",
+                    "module consumer(input wire a, output logic y); ",
+                    "assign y = a; ",
+                    "endmodule\n",
+                    "module top(output logic out); ",
+                    "wire link; ",
+                    "producer u_prod(.y(link)); ",
+                    "consumer u_cons(.a(link), .y(out)); ",
+                    "endmodule\n"
+                ),
+            )
+            .expect("compile structural fixture");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let top_link = sim
+            .state
+            .signals
+            .get("link")
+            .copied()
+            .expect("top link binding");
+        let producer_y = child_state(&sim.state, "u_prod")
+            .state
+            .signals
+            .get("y")
+            .copied()
+            .expect("producer y binding");
+        let consumer_a = child_state(&sim.state, "u_cons")
+            .state
+            .signals
+            .get("a")
+            .copied()
+            .expect("consumer a binding");
+
+        assert_eq!(top_link.object_id, producer_y.object_id);
+        assert_eq!(top_link.object_id, consumer_a.object_id);
+
+        let outputs = sim.eval_once(BTreeMap::new()).expect("eval");
+        assert_signal_eq!(outputs, "out", 1);
+    }
+
+    #[test]
+    fn structural_runtime_aliases_input_bindings_across_width_changes() {
+        let design = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module pass4(input wire [3:0] a, output logic [3:0] y); ",
+                    "assign y = a; ",
+                    "endmodule\n",
+                    "module top(input logic in, output logic [3:0] out); ",
+                    "pass4 u_pass(.a(in), .y(out)); ",
+                    "endmodule\n"
+                ),
+            )
+            .expect("compile width alias fixture");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let top_in = sim
+            .state
+            .signals
+            .get("in")
+            .copied()
+            .expect("top input binding");
+        let child_a = child_state(&sim.state, "u_pass")
+            .state
+            .signals
+            .get("a")
+            .copied()
+            .expect("child input binding");
+
+        assert_eq!(top_in.object_id, child_a.object_id);
+        assert_eq!(top_in.view_width, 1);
+        assert_eq!(child_a.view_width, 4);
+
+        let outputs = sim
+            .eval_once(inputs([("in".into(), 1)]))
+            .expect("eval width alias");
+        assert_signal_eq!(outputs, "out", 0b0001);
     }
 
     #[test]
@@ -2794,9 +3243,9 @@ endmodule
             .state
             .as_ref();
         assert_eq!(memory_u64(core, "cpuregs", 1), 1);
-        assert_eq!(persisted_u64(core, "mem_do_wdata"), 1);
-        assert_eq!(persisted_u64(core, "reg_op1"), 8);
-        assert_eq!(persisted_u64(core, "reg_op2"), 1);
+        assert_eq!(persisted_u64(&sim, core, "mem_do_wdata"), 1);
+        assert_eq!(persisted_u64(&sim, core, "reg_op1"), 8);
+        assert_eq!(persisted_u64(&sim, core, "reg_op2"), 1);
 
         let outputs = step_posedge(&mut sim, [("resetn".into(), 1)]);
         assert_signal_eq!(outputs, "trap", 0);
