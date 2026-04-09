@@ -1,0 +1,125 @@
+{
+  "directory": "parts/simple8",
+  "report": {
+    "duration_ms": 32,
+    "passed": 5,
+    "total": 5,
+    "suites": [
+      {
+        "source_path": "parts/simple8/simple8.sv",
+        "json_path": "parts/simple8/simple8.json",
+        "top_module": "simple8_cpu",
+        "duration_ms": 31,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "step_hz": 11000,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Built-in demo program reaches the taken JZ path",
+              "description": null,
+              "steps": 11,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/simple8/simple8_programmable.sv",
+        "json_path": "parts/simple8/demo_add_store.json",
+        "top_module": "simple8_programmable",
+        "duration_ms": 25,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "step_hz": 7000,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Adds two immediates, stores to RAM, and loads back",
+              "description": null,
+              "steps": 7,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/simple8/simple8_programmable.sv",
+        "json_path": "parts/simple8/demo_countdown_branch.json",
+        "top_module": "simple8_programmable",
+        "duration_ms": 32,
+        "passed": true,
+        "report": {
+          "duration_ms": 1,
+          "step_hz": 14000,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Counts down to zero and takes the JZ branch",
+              "description": null,
+              "steps": 14,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/simple8/simple8_programmable.sv",
+        "json_path": "parts/simple8/demo_fibonacci.json",
+        "top_module": "simple8_programmable",
+        "duration_ms": 18,
+        "passed": true,
+        "report": {
+          "duration_ms": 1,
+          "step_hz": 19000,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Computes Fibonacci to 233, stores and loads back from RAM",
+              "description": null,
+              "steps": 19,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/simple8/simple8_programmable.sv",
+        "json_path": "parts/simple8/demo_reset.json",
+        "top_module": "simple8_programmable",
+        "duration_ms": 26,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "step_hz": 10000,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Reset clears all state mid-execution and program restarts cleanly",
+              "description": null,
+              "steps": 10,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      }
+    ]
+  }
+}

@@ -45,10 +45,50 @@ pub enum PortDirection {
     Ref,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub enum NetKind {
+    Supply0,
+    Supply1,
+    Tri,
+    Triand,
+    Trior,
+    Trireg,
+    Tri0,
+    Tri1,
+    Uwire,
+    Wire,
+    Wand,
+    Wor,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub enum StorageKind {
+    Variable,
+    Net(NetKind),
+}
+
+impl StorageKind {
+    pub fn is_variable(self) -> bool {
+        matches!(self, Self::Variable)
+    }
+
+    pub fn is_net(self) -> bool {
+        matches!(self, Self::Net(_))
+    }
+
+    pub fn net_kind(self) -> Option<NetKind> {
+        match self {
+            Self::Variable => None,
+            Self::Net(kind) => Some(kind),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct PortDecl {
     pub name: String,
     pub direction: PortDirection,
+    pub storage: StorageKind,
     pub range: Option<PackedRange>,
     pub span: Option<SourceSpan>,
 }
@@ -57,11 +97,20 @@ impl PortDecl {
     pub fn width(&self) -> usize {
         self.range.map_or(1, |range| range.width())
     }
+
+    pub fn is_variable(&self) -> bool {
+        self.storage.is_variable()
+    }
+
+    pub fn is_net(&self) -> bool {
+        self.storage.is_net()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct SignalDecl {
     pub name: String,
+    pub storage: StorageKind,
     pub range: Option<PackedRange>,
     pub span: Option<SourceSpan>,
 }
@@ -69,6 +118,14 @@ pub struct SignalDecl {
 impl SignalDecl {
     pub fn width(&self) -> usize {
         self.range.map_or(1, |range| range.width())
+    }
+
+    pub fn is_variable(&self) -> bool {
+        self.storage.is_variable()
+    }
+
+    pub fn is_net(&self) -> bool {
+        self.storage.is_net()
     }
 }
 
@@ -89,6 +146,7 @@ impl ParameterDecl {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct MemoryDecl {
     pub name: String,
+    pub storage: StorageKind,
     pub element_range: Option<PackedRange>,
     pub index_range: PackedRange,
     pub span: Option<SourceSpan>,
@@ -101,6 +159,10 @@ impl MemoryDecl {
 
     pub fn depth(&self) -> usize {
         self.index_range.width()
+    }
+
+    pub fn is_variable(&self) -> bool {
+        self.storage.is_variable()
     }
 }
 

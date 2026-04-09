@@ -1,0 +1,148 @@
+{
+  "directory": "parts/sap1",
+  "report": {
+    "duration_ms": 702,
+    "passed": 6,
+    "total": 6,
+    "suites": [
+      {
+        "source_path": "parts/sap1/sap1.sv",
+        "json_path": "parts/sap1/sap1_add3to42.json",
+        "top_module": "machine",
+        "duration_ms": 699,
+        "passed": true,
+        "report": {
+          "duration_ms": 658,
+          "step_hz": 4057,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Repeatedly adds 3 starting from 42, outputs each step, halts at 0",
+              "description": null,
+              "steps": 2670,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/sap1/sap1.sv",
+        "json_path": "parts/sap1/sap1_fib.json",
+        "top_module": "machine",
+        "duration_ms": 130,
+        "passed": true,
+        "report": {
+          "duration_ms": 103,
+          "step_hz": 2689,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Fibonacci sequence halts with out=233",
+              "description": null,
+              "steps": 277,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/sap1/sap1.sv",
+        "json_path": "parts/sap1/sap1_memory_traffic.json",
+        "top_module": "machine",
+        "duration_ms": 80,
+        "passed": true,
+        "report": {
+          "duration_ms": 58,
+          "step_hz": 1965,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Accumulates through RAM-backed sum/count cells and halts with out=6",
+              "description": null,
+              "steps": 114,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/sap1/sap1.sv",
+        "json_path": "parts/sap1/sap1_multiply.json",
+        "top_module": "machine",
+        "duration_ms": 129,
+        "passed": true,
+        "report": {
+          "duration_ms": 106,
+          "step_hz": 2330,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Multiplies 7*8=56 via repeated addition",
+              "description": null,
+              "steps": 247,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/sap1/sap1.sv",
+        "json_path": "parts/sap1/sap1_self_modify_fetch.json",
+        "top_module": "machine",
+        "duration_ms": 46,
+        "passed": true,
+        "report": {
+          "duration_ms": 10,
+          "step_hz": 2300,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Overwrites a future HLT with NOP, jumps into it, outputs 7, then halts",
+              "description": null,
+              "steps": 23,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/sap1/sap1.sv",
+        "json_path": "parts/sap1/sap1_test_jumps.json",
+        "top_module": "machine",
+        "duration_ms": 83,
+        "passed": true,
+        "report": {
+          "duration_ms": 57,
+          "step_hz": 2315,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Exercises JNZ, JZ, JC, and JNC via decrement and underflow loops",
+              "description": null,
+              "steps": 132,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      }
+    ]
+  }
+}

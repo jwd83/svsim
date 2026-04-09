@@ -24,8 +24,9 @@ use crate::hir::{
     AssignmentKind, BinaryOp, CaseStmtItem, ContinuousAssign as HirContinuousAssign, Expr, LValue,
     MemoryDecl, ModuleDeclStyle, ModuleInstanceSummary, ModuleSummary,
     NamedParameterAssign as HirNamedParameterAssign, NamedPortConnection as HirNamedPortConnection,
-    NumericLiteral, PackedRange, ParameterDecl, PortDecl, PortDirection as HirPortDirection,
-    ProcBlock, ProcBlockKind, SignalDecl, SourceFile, Stmt, UnaryOp,
+    NetKind, NumericLiteral, PackedRange, ParameterDecl, PortDecl,
+    PortDirection as HirPortDirection, ProcBlock, ProcBlockKind, SignalDecl, SourceFile, Stmt,
+    StorageKind, UnaryOp,
 };
 use crate::width::{
     arithmetic_shift_right_bits, mask, minimum_width, shift_left_bits, shift_right_bits,
@@ -50,6 +51,7 @@ struct LoweredNetDeclarations {
 #[derive(Debug, Clone, Copy)]
 struct AnsiPortContext {
     direction: HirPortDirection,
+    storage: StorageKind,
     range: Option<PackedRange>,
 }
 
@@ -843,8 +845,10 @@ fn lower_ansi_port_declaration(
             let context = if let Some(header) = decl.nodes.0.as_ref() {
                 match header {
                     sv_parser::NetPortHeaderOrInterfacePortHeader::NetPortHeader(header) => {
+                        let direction = lower_port_direction(header.nodes.0.as_ref(), path)?;
                         AnsiPortContext {
-                            direction: lower_port_direction(header.nodes.0.as_ref(), path)?,
+                            direction,
+                            storage: lower_net_port_storage_kind(direction, &header.nodes.1)?,
                             range: lower_net_port_range(
                                 syntax_tree,
                                 &header.nodes.1,
@@ -874,6 +878,7 @@ fn lower_ansi_port_declaration(
                 PortDecl {
                     name,
                     direction: context.direction,
+                    storage: context.storage,
                     range: context.range,
                     span: Some(span_from_locate(path, locate)),
                 },
@@ -884,6 +889,7 @@ fn lower_ansi_port_declaration(
             let context = if let Some(header) = decl.nodes.0.as_ref() {
                 AnsiPortContext {
                     direction: lower_port_direction(header.nodes.0.as_ref(), path)?,
+                    storage: lower_variable_port_storage_kind(&header.nodes.1)?,
                     range: lower_variable_port_range(syntax_tree, &header.nodes.1, path, params)?,
                 }
             } else {
@@ -903,6 +909,7 @@ fn lower_ansi_port_declaration(
                 PortDecl {
                     name,
                     direction: context.direction,
+                    storage: context.storage,
                     range: context.range,
                     span: Some(span_from_locate(path, locate)),
                 },
@@ -949,6 +956,32 @@ fn lower_net_port_range(
     }
 }
 
+fn lower_net_port_storage_kind(
+    direction: HirPortDirection,
+    port_type: &sv_parser::NetPortType,
+) -> LowerResult<StorageKind> {
+    match port_type {
+        sv_parser::NetPortType::DataType(data_type) => {
+            if let Some(net_type) = data_type.nodes.0.as_ref() {
+                return Ok(StorageKind::Net(lower_net_kind(net_type)));
+            }
+
+            let storage = match direction {
+                HirPortDirection::Input | HirPortDirection::Inout => {
+                    StorageKind::Net(NetKind::Wire)
+                }
+                HirPortDirection::Output => match &data_type.nodes.1 {
+                    DataTypeOrImplicit::ImplicitDataType(_) => StorageKind::Net(NetKind::Wire),
+                    DataTypeOrImplicit::DataType(_) => StorageKind::Variable,
+                },
+                HirPortDirection::Ref => StorageKind::Variable,
+            };
+            Ok(storage)
+        }
+        _ => Err(unsupported("unsupported net port type", None)),
+    }
+}
+
 fn lower_variable_port_range(
     syntax_tree: &SyntaxTree,
     port_type: &VariablePortType,
@@ -961,6 +994,14 @@ fn lower_variable_port_range(
         }
         sv_parser::VarDataType::Var(var_type) => {
             lower_data_type_or_implicit_range(syntax_tree, &var_type.nodes.1, path, params)
+        }
+    }
+}
+
+fn lower_variable_port_storage_kind(port_type: &VariablePortType) -> LowerResult<StorageKind> {
+    match &port_type.nodes.0 {
+        sv_parser::VarDataType::DataType(_) | sv_parser::VarDataType::Var(_) => {
+            Ok(StorageKind::Variable)
         }
     }
 }
@@ -996,9 +1037,15 @@ fn lower_data_declaration(
                         })?;
                 let span = Some(span_from_locate(path, locate));
                 match lower_variable_dimensions(syntax_tree, &assignment.nodes.1, path, params)? {
-                    None => lowered.signals.push(SignalDecl { name, range, span }),
+                    None => lowered.signals.push(SignalDecl {
+                        name,
+                        storage: StorageKind::Variable,
+                        range,
+                        span,
+                    }),
                     Some(index_range) => lowered.memories.push(MemoryDecl {
                         name,
+                        storage: StorageKind::Variable,
                         element_range: range,
                         index_range,
                         span,
@@ -1040,6 +1087,7 @@ fn lower_net_declaration(
                         })?;
                 let signal = SignalDecl {
                     name,
+                    storage: StorageKind::Net(lower_net_kind(&decl.nodes.0)),
                     range,
                     span: Some(span_from_locate(path, locate)),
                 };
@@ -1095,6 +1143,23 @@ fn lower_data_type_range(
             "data type is outside the current executable subset",
             None,
         )),
+    }
+}
+
+fn lower_net_kind(net_type: &sv_parser::NetType) -> NetKind {
+    match net_type {
+        sv_parser::NetType::Supply0(_) => NetKind::Supply0,
+        sv_parser::NetType::Supply1(_) => NetKind::Supply1,
+        sv_parser::NetType::Tri(_) => NetKind::Tri,
+        sv_parser::NetType::Triand(_) => NetKind::Triand,
+        sv_parser::NetType::Trior(_) => NetKind::Trior,
+        sv_parser::NetType::Trireg(_) => NetKind::Trireg,
+        sv_parser::NetType::Tri0(_) => NetKind::Tri0,
+        sv_parser::NetType::Tri1(_) => NetKind::Tri1,
+        sv_parser::NetType::Uwire(_) => NetKind::Uwire,
+        sv_parser::NetType::Wire(_) => NetKind::Wire,
+        sv_parser::NetType::Wand(_) => NetKind::Wand,
+        sv_parser::NetType::Wor(_) => NetKind::Wor,
     }
 }
 
@@ -3783,7 +3848,10 @@ mod tests {
     use std::path::PathBuf;
 
     use super::SvParserFrontend;
-    use crate::hir::{AssignmentKind, BinaryOp, Expr, LValue, NumericLiteral, ProcBlockKind, Stmt};
+    use crate::hir::{
+        AssignmentKind, BinaryOp, Expr, LValue, NetKind, NumericLiteral, ProcBlockKind, Stmt,
+        StorageKind,
+    };
 
     fn repo_root() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -4076,6 +4144,48 @@ mod tests {
             }
             other => panic!("unexpected multiple concatenation: {other:?}"),
         }
+    }
+
+    #[test]
+    fn parse_str_preserves_storage_kinds_for_ports_signals_and_memories() {
+        let frontend = SvParserFrontend::default();
+        let source = frontend
+            .parse_str(
+                PathBuf::from("/virtual/design/storage_kinds.sv"),
+                concat!(
+                    "module top(input wire a, output logic y);\n",
+                    "  wand pull_bus;\n",
+                    "  logic state;\n",
+                    "  logic [7:0] ram [0:3];\n",
+                    "  assign pull_bus = a;\n",
+                    "  assign y = pull_bus ^ state[0];\n",
+                    "endmodule\n",
+                ),
+            )
+            .expect("parse storage kind module");
+
+        let module = &source.modules[0];
+        assert!(module.unsupported.is_empty());
+        assert_eq!(
+            module.port("a").expect("input port").storage,
+            StorageKind::Net(NetKind::Wire)
+        );
+        assert_eq!(
+            module.port("y").expect("output port").storage,
+            StorageKind::Variable
+        );
+        assert_eq!(
+            module.signal_decl("pull_bus").expect("net decl").storage,
+            StorageKind::Net(NetKind::Wand)
+        );
+        assert_eq!(
+            module.signal_decl("state").expect("variable decl").storage,
+            StorageKind::Variable
+        );
+        assert_eq!(
+            module.memory_decl("ram").expect("memory decl").storage,
+            StorageKind::Variable
+        );
     }
 
     #[test]

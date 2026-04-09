@@ -1,8 +1,8 @@
 use std::path::Path;
 use std::path::PathBuf;
 
-use crate::diag::Error;
 use crate::diag::Result;
+use crate::elaborate::{ElaboratedDesign, ElaboratedInstance, elaborate_design};
 use crate::hir::{HirDesign, SourceFile};
 use crate::sim::SimulationSession;
 use crate::test::{JsonTestReport, JsonTestSuite};
@@ -55,10 +55,15 @@ impl CompiledDesign {
         Some(self.top_module.as_str())
     }
 
+    pub fn elaborate(&self) -> Result<ElaboratedDesign> {
+        elaborate_design(&self.hir, &self.top_module)
+    }
+
     pub fn hierarchy(&self) -> Result<DesignHierarchy> {
+        let elaborated = self.elaborate()?;
         Ok(DesignHierarchy {
-            top_module: self.top_module.clone(),
-            children: build_hierarchy(&self.hir, &self.top_module, &mut Vec::new())?,
+            top_module: elaborated.top.module_name.clone(),
+            children: hierarchy_children(&elaborated.top.children),
         })
     }
 
@@ -71,35 +76,18 @@ impl CompiledDesign {
     }
 }
 
-fn build_hierarchy(
-    hir: &HirDesign,
-    module_name: &str,
-    stack: &mut Vec<String>,
-) -> Result<Vec<InstanceHierarchy>> {
-    if stack.iter().any(|name| name == module_name) {
-        return Err(Error::Unsupported(format!(
-            "recursive instantiation detected at {} -> {}",
-            stack.join(" -> "),
-            module_name
-        )));
-    }
-
-    let module = hir
-        .module(module_name)
-        .ok_or_else(|| Error::Resolve(format!("module '{}' was not compiled", module_name)))?;
-    stack.push(module_name.to_owned());
-
-    let mut children = Vec::with_capacity(module.instantiations.len());
-    for instance in &module.instantiations {
-        children.push(InstanceHierarchy {
-            instance_name: instance.instance_name.clone(),
+fn hierarchy_children(instances: &[ElaboratedInstance]) -> Vec<InstanceHierarchy> {
+    instances
+        .iter()
+        .map(|instance| InstanceHierarchy {
+            instance_name: instance
+                .instance_name
+                .clone()
+                .expect("child elaborated instances always carry a name"),
             module_name: instance.module_name.clone(),
-            children: build_hierarchy(hir, &instance.module_name, stack)?,
-        });
-    }
-
-    stack.pop();
-    Ok(children)
+            children: hierarchy_children(&instance.children),
+        })
+        .collect()
 }
 
 #[cfg(test)]

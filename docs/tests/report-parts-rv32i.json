@@ -1,0 +1,378 @@
+{
+  "directory": "parts/rv32i",
+  "report": {
+    "duration_ms": 366,
+    "passed": 16,
+    "total": 16,
+    "suites": [
+      {
+        "source_path": "parts/rv32i/rv32i_cpu.sv",
+        "json_path": "parts/rv32i/demo_add_store.json",
+        "top_module": "rv32i_cpu",
+        "duration_ms": 124,
+        "passed": true,
+        "report": {
+          "duration_ms": 5,
+          "step_hz": 1600,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Add, store, load, halt",
+              "description": null,
+              "steps": 8,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/rv32i/rv32i_cpu.sv",
+        "json_path": "parts/rv32i/demo_branch_jal.json",
+        "top_module": "rv32i_cpu",
+        "duration_ms": 124,
+        "passed": true,
+        "report": {
+          "duration_ms": 6,
+          "step_hz": 1666,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Taken beq skips work and jal writes the link register",
+              "description": null,
+              "steps": 10,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/rv32i/rv32i_cpu.sv",
+        "json_path": "parts/rv32i/demo_breakpoint.json",
+        "top_module": "rv32i_cpu",
+        "duration_ms": 119,
+        "passed": true,
+        "report": {
+          "duration_ms": 1,
+          "step_hz": 3000,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Ebreak stops execution and reports breakpoint trap cause",
+              "description": null,
+              "steps": 3,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/rv32i/rv32i_cpu.sv",
+        "json_path": "parts/rv32i/demo_compare_control.json",
+        "top_module": "rv32i_cpu",
+        "duration_ms": 113,
+        "passed": true,
+        "report": {
+          "duration_ms": 13,
+          "step_hz": 1538,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "AUIPC, JALR, compare ops, and signed or unsigned branches execute correctly",
+              "description": null,
+              "steps": 20,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/rv32i/rv32i_cpu.sv",
+        "json_path": "parts/rv32i/demo_fetch_access_fault.json",
+        "top_module": "rv32i_cpu",
+        "duration_ms": 112,
+        "passed": true,
+        "report": {
+          "duration_ms": 2,
+          "step_hz": 1500,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Aligned jumps beyond imem raise an instruction access fault",
+              "description": null,
+              "steps": 3,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/rv32i/rv32i_cpu.sv",
+        "json_path": "parts/rv32i/demo_illegal_instr.json",
+        "top_module": "rv32i_cpu",
+        "duration_ms": 119,
+        "passed": true,
+        "report": {
+          "duration_ms": 2,
+          "step_hz": 2000,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Unknown instructions trap instead of advancing silently",
+              "description": null,
+              "steps": 4,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/rv32i/rv32i_cpu.sv",
+        "json_path": "parts/rv32i/demo_instr_misaligned_branch.json",
+        "top_module": "rv32i_cpu",
+        "duration_ms": 98,
+        "passed": true,
+        "report": {
+          "duration_ms": 2,
+          "step_hz": 1500,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Taken branches trap on misaligned instruction targets",
+              "description": null,
+              "steps": 3,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/rv32i/rv32i_cpu.sv",
+        "json_path": "parts/rv32i/demo_instr_misaligned_jalr.json",
+        "top_module": "rv32i_cpu",
+        "duration_ms": 94,
+        "passed": true,
+        "report": {
+          "duration_ms": 1,
+          "step_hz": 3000,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Jalr traps on misaligned instruction targets before writing rd",
+              "description": null,
+              "steps": 3,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/rv32i/rv32i_cpu.sv",
+        "json_path": "parts/rv32i/demo_load_access_fault.json",
+        "top_module": "rv32i_cpu",
+        "duration_ms": 141,
+        "passed": true,
+        "report": {
+          "duration_ms": 2,
+          "step_hz": 1500,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Aligned loads beyond dmem raise a load access fault",
+              "description": null,
+              "steps": 3,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/rv32i/rv32i_cpu.sv",
+        "json_path": "parts/rv32i/demo_misaligned_load.json",
+        "top_module": "rv32i_cpu",
+        "duration_ms": 128,
+        "passed": true,
+        "report": {
+          "duration_ms": 2,
+          "step_hz": 1500,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Misaligned word loads raise a load-address trap",
+              "description": null,
+              "steps": 3,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/rv32i/rv32i_cpu.sv",
+        "json_path": "parts/rv32i/demo_misaligned_store.json",
+        "top_module": "rv32i_cpu",
+        "duration_ms": 159,
+        "passed": true,
+        "report": {
+          "duration_ms": 2,
+          "step_hz": 2000,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Misaligned word stores raise a store-address trap without mutating memory",
+              "description": null,
+              "steps": 4,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/rv32i/rv32i_cpu.sv",
+        "json_path": "parts/rv32i/demo_shift_ops.json",
+        "top_module": "rv32i_cpu",
+        "duration_ms": 124,
+        "passed": true,
+        "report": {
+          "duration_ms": 9,
+          "step_hz": 1666,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Shift instructions update registers and memory with RV32I shamt semantics",
+              "description": null,
+              "steps": 15,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/rv32i/rv32i_cpu.sv",
+        "json_path": "parts/rv32i/demo_store_access_fault.json",
+        "top_module": "rv32i_cpu",
+        "duration_ms": 125,
+        "passed": true,
+        "report": {
+          "duration_ms": 2,
+          "step_hz": 2000,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Aligned stores beyond dmem raise a store access fault without mutating memory",
+              "description": null,
+              "steps": 4,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/rv32i/rv32i_cpu.sv",
+        "json_path": "parts/rv32i/demo_subword_mem.json",
+        "top_module": "rv32i_cpu",
+        "duration_ms": 131,
+        "passed": true,
+        "report": {
+          "duration_ms": 20,
+          "step_hz": 750,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Subword loads and stores select the correct byte and halfword lanes",
+              "description": null,
+              "steps": 15,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/rv32i/rv32i_cpu.sv",
+        "json_path": "parts/rv32i/demo_sum_loop.json",
+        "top_module": "rv32i_cpu",
+        "duration_ms": 152,
+        "passed": true,
+        "report": {
+          "duration_ms": 18,
+          "step_hz": 1166,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Loop with bne accumulates 1 through 5",
+              "description": null,
+              "steps": 21,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/rv32i/rv32i_cpu.sv",
+        "json_path": "parts/rv32i/demo_system_misc.json",
+        "top_module": "rv32i_cpu",
+        "duration_ms": 147,
+        "passed": true,
+        "report": {
+          "duration_ms": 3,
+          "step_hz": 2000,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Fence instructions act as no-ops and ecall raises a trap",
+              "description": null,
+              "steps": 6,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      }
+    ]
+  }
+}
