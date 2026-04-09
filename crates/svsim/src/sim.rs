@@ -11,7 +11,7 @@ use crate::hir::{
     NumericLiteral, PackedRange, PortDirection, ProcBlockKind, Stmt, StorageKind, UnaryOp,
 };
 use crate::logic_value::{LogicBit, LogicBits, LogicValue};
-use crate::net_resolve::{resolve_net, DriveStrengthPair, NetDriver};
+use crate::net_resolve::{DriveStrengthPair, NetDriver, resolve_net};
 use crate::validate::resolve_legacy_rom_data_path;
 use crate::width::{
     arithmetic_shift_right_bits, expr_width, mask, minimum_width, shift_left_bits,
@@ -115,7 +115,10 @@ impl MemoryState {
             .words
             .get_mut(offset)
             .expect("memory offset is guaranteed to be in range");
-        let next = Value::new(value.coerced_to(current.width).normalized_bits(), current.width);
+        let next = Value::new(
+            value.coerced_to(current.width).normalized_bits(),
+            current.width,
+        );
         let changed = *current != next;
         *current = next;
         Ok(changed)
@@ -283,10 +286,7 @@ impl SimulationSession {
         let logic = read_binding_logic(binding, &frame)?;
         logic_to_public_bit_value(
             &logic,
-            format!(
-                "signal '{}' in '{}'",
-                signal_name, instance_module.name
-            ),
+            format!("signal '{}' in '{}'", signal_name, instance_module.name),
         )
     }
 
@@ -295,13 +295,8 @@ impl SimulationSession {
         inputs: BTreeMap<String, BitValue>,
     ) -> Result<BTreeMap<String, BitValue>> {
         let module = top_module(self.design.hir(), self.top_module())?;
-        let mut frame = seed_runtime_frame(
-            module,
-            &self.state,
-            &self.persisted,
-            &self.objects,
-            &inputs,
-        )?;
+        let mut frame =
+            seed_runtime_frame(module, &self.state, &self.persisted, &self.objects, &inputs)?;
         let mut stack = Vec::new();
         settle_module(
             self.design.hir(),
@@ -619,7 +614,11 @@ fn instantiate_module_state(
 
         for port in &child.ports {
             let port_width = runtime_bits_width(port.shape)?;
-            let binding = if let Some(binding) = child.bindings.iter().find(|binding| binding.port_name == port.name) {
+            let binding = if let Some(binding) = child
+                .bindings
+                .iter()
+                .find(|binding| binding.port_name == port.name)
+            {
                 if let Some(parent_name) =
                     aliasable_parent_signal_name(module, port.direction, binding.target.as_ref())
                 {
@@ -632,8 +631,7 @@ fn instantiate_module_state(
                     grow_runtime_object(objects, parent_binding.object_id, port_width);
                     parent_binding.with_view_width(port_width)
                 } else {
-                    let binding_slot =
-                        allocate_runtime_object(objects, port_width, port.storage);
+                    let binding_slot = allocate_runtime_object(objects, port_width, port.storage);
                     match port.direction {
                         PortDirection::Input => input_drivers.push(PortExprDriver {
                             port_name: port.name.clone(),
@@ -715,8 +713,9 @@ fn settle_module(
     let max_iterations = settle_iteration_budget(hir, state)?.max(1) * 8;
     let mut converged = false;
     for _ in 0..max_iterations {
+        let frame_before_iteration = frame.to_vec();
         let mut net_drivers = NetDriverTable::new();
-        let mut changed = settle_module_pass(
+        let _changed = settle_module_pass(
             hir,
             module,
             state,
@@ -726,7 +725,8 @@ fn settle_module(
             &mut net_drivers,
             stack,
         )?;
-        changed |= resolve_staged_nets(frame, object_layouts, &net_drivers)?;
+        resolve_staged_nets(frame, object_layouts, &net_drivers)?;
+        let changed = *frame != frame_before_iteration;
 
         if !changed {
             converged = true;
@@ -781,7 +781,8 @@ fn settle_module_pass(
     let mut changed = false;
 
     if let Some(inputs) = inputs {
-        changed |= apply_external_inputs(module, state, frame, object_layouts, inputs, net_drivers)?;
+        changed |=
+            apply_external_inputs(module, state, frame, object_layouts, inputs, net_drivers)?;
     }
 
     let mut values = build_instance_value_table(module, state, frame)?;
@@ -789,7 +790,14 @@ fn settle_module_pass(
     if let Some(legacy_rom) = &state.legacy_rom {
         apply_legacy_rom_outputs(module, &mut values, legacy_rom)?;
         if let Some(value) = values.get(&legacy_rom.data_port).cloned() {
-            stage_signal_driver_if_net(&legacy_rom.data_port, value, module, state, object_layouts, net_drivers)?;
+            stage_signal_driver_if_net(
+                &legacy_rom.data_port,
+                value,
+                module,
+                state,
+                object_layouts,
+                net_drivers,
+            )?;
         }
         changed |= sync_instance_values_to_frame(
             module,
@@ -798,6 +806,8 @@ fn settle_module_pass(
             frame,
             object_layouts,
             net_drivers,
+            false,
+            true,
         )?;
         stack.pop();
         return Ok(changed);
@@ -841,12 +851,14 @@ fn settle_module_pass(
         frame,
         object_layouts,
         net_drivers,
+        false,
+        true,
     )?;
 
     for child_state in &state.children {
         let child = resolve_supported_module(hir, &child_state.state.module_name)?;
         let parent_values = build_instance_value_table(module, state, frame)?;
-        changed |= drive_child_inputs(
+        let drove_inputs = drive_child_inputs(
             module,
             child_state,
             &parent_values,
@@ -855,8 +867,9 @@ fn settle_module_pass(
             object_layouts,
             net_drivers,
         )?;
+        changed |= drove_inputs;
 
-        changed |= settle_module_pass(
+        let child_changed = settle_module_pass(
             hir,
             child,
             child_state.state.as_ref(),
@@ -866,9 +879,10 @@ fn settle_module_pass(
             net_drivers,
             stack,
         )?;
+        changed |= child_changed;
 
         let parent_values = build_instance_value_table(module, state, frame)?;
-        changed |= apply_child_output_sinks(
+        let applied_outputs = apply_child_output_sinks(
             module,
             state,
             child_state,
@@ -878,6 +892,7 @@ fn settle_module_pass(
             object_layouts,
             net_drivers,
         )?;
+        changed |= applied_outputs;
     }
 
     stack.pop();
@@ -971,6 +986,8 @@ fn step_module(
         next_objects,
         object_layouts,
         &mut no_net_drivers,
+        true,
+        false,
     )?;
     state.memories = staged_memories;
     state.previous_clocks = sampled_clocks;
@@ -1019,7 +1036,9 @@ fn aliasable_parent_signal_name<'a>(
 
     match direction {
         PortDirection::Input => Some(name.as_str()),
-        PortDirection::Output if signal_storage(parent_module, name).is_some_and(StorageKind::is_net) => {
+        PortDirection::Output
+            if signal_storage(parent_module, name).is_some_and(StorageKind::is_net) =>
+        {
             Some(name.as_str())
         }
         PortDirection::Output | PortDirection::Inout | PortDirection::Ref => None,
@@ -1033,10 +1052,7 @@ fn signal_storage(module: &ModuleSummary, name: &str) -> Option<StorageKind> {
         .or_else(|| module.signal_decl(name).map(|signal| signal.storage))
 }
 
-fn read_binding(
-    binding: SignalBinding,
-    values: &[ObjectValue],
-) -> Result<Value> {
+fn read_binding(binding: SignalBinding, values: &[ObjectValue]) -> Result<Value> {
     let logic = read_binding_logic(binding, values)?;
     Ok(Value::new(logic.to_bit_value_lossy(), binding.view_width))
 }
@@ -1083,7 +1099,11 @@ fn write_binding_logic(
             binding.object_id
         ))
     })?;
-    let next = ObjectValue::from_logic(value.coerced_to(binding.view_width).coerced_to(object.width));
+    let next = ObjectValue::from_logic(
+        value
+            .coerced_to(binding.view_width)
+            .coerced_to(object.width),
+    );
     let changed = *current != next;
     *current = next;
     Ok(changed)
@@ -1156,6 +1176,8 @@ fn sync_instance_values_to_frame(
     frame: &mut [ObjectValue],
     object_layouts: &[RuntimeObjectLayout],
     net_drivers: &mut NetDriverTable,
+    write_net_values: bool,
+    defer_child_output_net_drivers: bool,
 ) -> Result<bool> {
     let mut changed = false;
 
@@ -1170,16 +1192,27 @@ fn sync_instance_values_to_frame(
             .get(&port.name)
             .cloned()
             .unwrap_or_else(|| Value::zero(port.width()));
+        if defer_child_output_net_drivers && signal_has_whole_child_output_driver(state, &port.name)
+        {
+            continue;
+        }
         if object_layouts
             .get(binding.object_id)
             .is_some_and(|object| object.storage.is_net())
         {
+            if matches!(port.direction, PortDirection::Output) && port.storage.is_variable() {
+                replace_whole_signal_driver(binding, value.clone(), object_layouts, net_drivers)?;
+                changed |= write_binding(binding, value, frame, object_layouts)?;
+                continue;
+            }
             if net_drivers.contains_key(&binding.object_id) {
                 continue;
             }
             if signal_has_procedural_driver(module, &port.name) {
                 stage_whole_signal_driver(binding, value.clone(), object_layouts, net_drivers)?;
-                changed |= write_binding(binding, value, frame, object_layouts)?;
+                if write_net_values {
+                    changed |= write_binding(binding, value, frame, object_layouts)?;
+                }
             }
             continue;
         }
@@ -1197,16 +1230,28 @@ fn sync_instance_values_to_frame(
             .get(&signal.name)
             .cloned()
             .unwrap_or_else(|| Value::zero(signal.width()));
+        if defer_child_output_net_drivers
+            && signal_has_whole_child_output_driver(state, &signal.name)
+        {
+            continue;
+        }
         if object_layouts
             .get(binding.object_id)
             .is_some_and(|object| object.storage.is_net())
         {
+            if signal.storage.is_variable() {
+                replace_whole_signal_driver(binding, value.clone(), object_layouts, net_drivers)?;
+                changed |= write_binding(binding, value, frame, object_layouts)?;
+                continue;
+            }
             if net_drivers.contains_key(&binding.object_id) {
                 continue;
             }
             if signal_has_procedural_driver(module, &signal.name) {
                 stage_whole_signal_driver(binding, value.clone(), object_layouts, net_drivers)?;
-                changed |= write_binding(binding, value, frame, object_layouts)?;
+                if write_net_values {
+                    changed |= write_binding(binding, value, frame, object_layouts)?;
+                }
             }
             continue;
         }
@@ -1221,6 +1266,15 @@ fn signal_has_procedural_driver(module: &ModuleSummary, signal_name: &str) -> bo
         .proc_blocks
         .iter()
         .any(|block| stmt_writes_signal(&block.body, signal_name))
+}
+
+fn signal_has_whole_child_output_driver(state: &ModuleState, signal_name: &str) -> bool {
+    state.children.iter().any(|child| {
+        child
+            .output_sinks
+            .iter()
+            .any(|sink| matches!(&sink.target, LValue::Signal(name) if name == signal_name))
+    })
 }
 
 fn stmt_writes_signal(stmt: &Stmt, signal_name: &str) -> bool {
@@ -1257,20 +1311,44 @@ fn lvalue_contains_signal(lvalue: &LValue, signal_name: &str) -> bool {
         LValue::Concat(items) => items
             .iter()
             .any(|item| lvalue_contains_signal(item, signal_name)),
-        LValue::BitSelect { signal, .. } | LValue::PartSelect { signal, .. } => signal == signal_name,
+        LValue::BitSelect { signal, .. } | LValue::PartSelect { signal, .. } => {
+            signal == signal_name
+        }
         LValue::MemoryElement { .. } => false,
     }
 }
 
-fn stage_object_driver(
-    object_id: usize,
-    value: LogicValue,
-    net_drivers: &mut NetDriverTable,
-) {
+fn stage_object_driver(object_id: usize, value: LogicValue, net_drivers: &mut NetDriverTable) {
     net_drivers
         .entry(object_id)
         .or_default()
         .push(NetDriver::new(value, DriveStrengthPair::STRONG));
+}
+
+fn replace_object_driver(object_id: usize, value: LogicValue, net_drivers: &mut NetDriverTable) {
+    net_drivers.insert(
+        object_id,
+        vec![NetDriver::new(value, DriveStrengthPair::STRONG)],
+    );
+}
+
+fn replace_whole_signal_driver(
+    binding: SignalBinding,
+    value: Value,
+    object_layouts: &[RuntimeObjectLayout],
+    net_drivers: &mut NetDriverTable,
+) -> Result<()> {
+    let object = object_layouts.get(binding.object_id).ok_or_else(|| {
+        Error::Resolve(format!(
+            "runtime object {} does not exist",
+            binding.object_id
+        ))
+    })?;
+    let logic = LogicValue::from_bit_value_with_width(value.normalized_bits(), value.width)
+        .coerced_to(binding.view_width)
+        .coerced_to(object.width);
+    replace_object_driver(binding.object_id, logic, net_drivers);
+    Ok(())
 }
 
 fn apply_fixed_binding_drive(
@@ -1289,11 +1367,11 @@ fn apply_fixed_binding_drive(
     let logic = LogicValue::from_bit_value_with_width(value.normalized_bits(), value.width)
         .coerced_to(binding.view_width)
         .coerced_to(object.width);
-    let changed = write_binding_logic(binding, logic.clone(), frame, object_layouts)?;
     if object.storage.is_net() {
         stage_object_driver(binding.object_id, logic, net_drivers);
+        return Ok(false);
     }
-    Ok(changed)
+    write_binding_logic(binding, logic, frame, object_layouts)
 }
 
 fn apply_external_inputs(
@@ -1390,7 +1468,12 @@ fn apply_child_output_sinks(
                 ))
             })?;
         let value = read_binding_logic(binding, frame)?;
-        let target = resolve_lvalue(&sink.target, parent_module, &next_parent_values, parent_memories)?;
+        let target = resolve_lvalue(
+            &sink.target,
+            parent_module,
+            &next_parent_values,
+            parent_memories,
+        )?;
         let mut no_memories = HashMap::new();
         changed |= apply_or_stage_resolved_lvalue_logic(
             &target,
@@ -1411,6 +1494,8 @@ fn apply_child_output_sinks(
         frame,
         object_layouts,
         net_drivers,
+        false,
+        false,
     )?;
     Ok(changed)
 }
@@ -1814,10 +1899,7 @@ fn collect_outputs(
     for (name, logic) in logic_outputs {
         outputs.insert(
             name.clone(),
-            logic_to_public_bit_value(
-                &logic,
-                format!("output '{}' on '{}'", name, module.name),
-            )?,
+            logic_to_public_bit_value(&logic, format!("output '{}' on '{}'", name, module.name))?,
         );
     }
 
@@ -1848,17 +1930,16 @@ fn collect_outputs_logic(
     Ok(outputs)
 }
 
-fn logic_to_public_bit_value(
-    logic: &LogicValue,
-    context: String,
-) -> Result<BitValue> {
-    logic.to_bit_value_checked().ok_or_else(|| {
-        Error::Unsupported(format!(
-            "{} resolved to four-state value '{}' before the public four-state API cutover",
-            context,
-            logic
-        ))
-    }).map(|bits| bits.truncate(logic.width()))
+fn logic_to_public_bit_value(logic: &LogicValue, context: String) -> Result<BitValue> {
+    logic
+        .to_bit_value_checked()
+        .ok_or_else(|| {
+            Error::Unsupported(format!(
+                "{} resolved to four-state value '{}' before the public four-state API cutover",
+                context, logic
+            ))
+        })
+        .map(|bits| bits.truncate(logic.width()))
 }
 
 fn resolve_supported_module<'a>(
@@ -2275,7 +2356,10 @@ fn apply_resolved_lvalue(
                     name, module.name
                 ))
             })?;
-            let next = Value::new(value.coerced_to(current.width).normalized_bits(), current.width);
+            let next = Value::new(
+                value.coerced_to(current.width).normalized_bits(),
+                current.width,
+            );
             let changed = *current != next;
             *current = next;
             Ok(changed)
@@ -2393,7 +2477,9 @@ fn stage_whole_signal_logic_driver(
             binding.object_id
         ))
     })?;
-    let logic = value.coerced_to(binding.view_width).coerced_to(object.width);
+    let logic = value
+        .coerced_to(binding.view_width)
+        .coerced_to(object.width);
     stage_object_driver(binding.object_id, logic, net_drivers);
     Ok(())
 }
@@ -2406,7 +2492,8 @@ fn stage_partial_signal_driver(
     object_layouts: &[RuntimeObjectLayout],
     net_drivers: &mut NetDriverTable,
 ) -> Result<()> {
-    let logic = LogicValue::from_bit_value_with_width(value.normalized_bits(), width).coerced_to(width);
+    let logic =
+        LogicValue::from_bit_value_with_width(value.normalized_bits(), width).coerced_to(width);
     stage_partial_signal_logic_driver(binding, low, width, logic, object_layouts, net_drivers)
 }
 
@@ -2429,7 +2516,11 @@ fn stage_partial_signal_logic_driver(
     for offset in 0..width {
         bits.set_bit(low + offset, value.bit(offset));
     }
-    stage_object_driver(binding.object_id, LogicValue::new(bits, object.width), net_drivers);
+    stage_object_driver(
+        binding.object_id,
+        LogicValue::new(bits, object.width),
+        net_drivers,
+    );
     Ok(())
 }
 
@@ -2444,7 +2535,9 @@ fn apply_or_stage_resolved_lvalue(
     net_drivers: &mut NetDriverTable,
 ) -> Result<bool> {
     match lvalue {
-        ResolvedLValue::Signal(name) if signal_storage(module, name).is_some_and(StorageKind::is_net) => {
+        ResolvedLValue::Signal(name)
+            if signal_storage(module, name).is_some_and(StorageKind::is_net) =>
+        {
             let binding = state.signals.get(name).copied().ok_or_else(|| {
                 Error::Resolve(format!(
                     "signal '{}' is not declared in '{}'",
@@ -2531,7 +2624,9 @@ fn apply_or_stage_resolved_lvalue_logic(
     net_drivers: &mut NetDriverTable,
 ) -> Result<bool> {
     match lvalue {
-        ResolvedLValue::Signal(name) if signal_storage(module, name).is_some_and(StorageKind::is_net) => {
+        ResolvedLValue::Signal(name)
+            if signal_storage(module, name).is_some_and(StorageKind::is_net) =>
+        {
             let binding = state.signals.get(name).copied().ok_or_else(|| {
                 Error::Resolve(format!(
                     "signal '{}' is not declared in '{}'",
@@ -2731,7 +2826,11 @@ mod tests {
         sim.step(high_inputs).expect("step high")
     }
 
-    fn persisted_u64(sim: &super::SimulationSession, state: &super::ModuleState, name: &str) -> u64 {
+    fn persisted_u64(
+        sim: &super::SimulationSession,
+        state: &super::ModuleState,
+        name: &str,
+    ) -> u64 {
         let binding = state
             .signals
             .get(name)
@@ -2898,7 +2997,9 @@ mod tests {
             Some(&LogicValue::from_logic_str("z").expect("z logic"))
         );
 
-        let error = sim.eval_once(BTreeMap::new()).expect_err("public eval should reject z");
+        let error = sim
+            .eval_once(BTreeMap::new())
+            .expect_err("public eval should reject z");
         assert!(
             error
                 .to_string()
@@ -2948,7 +3049,9 @@ mod tests {
             Some(&LogicValue::from_logic_str("x").expect("x logic"))
         );
 
-        let error = sim.eval_once(BTreeMap::new()).expect_err("public eval should reject x");
+        let error = sim
+            .eval_once(BTreeMap::new())
+            .expect_err("public eval should reject x");
         assert!(
             error
                 .to_string()
@@ -2991,7 +3094,9 @@ mod tests {
             .expect("compile uwire");
         let mut sim = design.instantiate_top().expect("instantiate");
 
-        let error = sim.eval_once(BTreeMap::new()).expect_err("uwire should reject contention");
+        let error = sim
+            .eval_once(BTreeMap::new())
+            .expect_err("uwire should reject contention");
         assert!(
             error.to_string().contains("multiple active drivers"),
             "unexpected error: {error}"
@@ -3036,6 +3141,30 @@ mod tests {
             .eval_once(inputs([("in".into(), 1)]))
             .expect("eval width alias");
         assert_signal_eq!(outputs, "out", 0b0001);
+    }
+
+    #[test]
+    fn structural_runtime_keeps_parent_bits_when_child_drives_part_select() {
+        let design = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module upper(output logic [3:0] y); ",
+                    "assign y = 4'ha; ",
+                    "endmodule\n",
+                    "module top(output logic [7:0] out); ",
+                    "assign out[3:0] = 4'h5; ",
+                    "upper u_upper(.y(out[7:4])); ",
+                    "endmodule\n"
+                ),
+            )
+            .expect("compile mixed parent/child part-select fixture");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let outputs = sim
+            .eval_once(BTreeMap::new())
+            .expect("eval mixed part-select");
+        assert_signal_eq!(outputs, "out", 0xa5);
     }
 
     #[test]
@@ -3861,6 +3990,166 @@ endmodule
                 .expect("read child rom"),
             bv(0x05)
         );
+    }
+
+    #[test]
+    fn read_signal_settles_overture_cpu_copy_path_from_input_port() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .add_search_path(repo.join("parts/overture"))
+            .compile_file(repo.join("parts/overture/overture_cpu.sv"))
+            .expect("compile overture_cpu");
+        let mut sim = design.instantiate_top().expect("instantiate");
+        sim.load_memory_file(
+            &["fetch_unit"],
+            "rom",
+            repo.join("parts/overture/overture_add5.txt"),
+        )
+        .expect("load add5 program");
+
+        let src_mux_module = design
+            .hir()
+            .module("mux_8to1_8bit")
+            .expect("mux_8to1_8bit module");
+        assert_eq!(
+            src_mux_module
+                .port("out")
+                .expect("src_mux out port")
+                .storage,
+            crate::hir::StorageKind::Variable
+        );
+
+        let settled_inputs = inputs([("in_port".into(), 10), ("run".into(), 1)]);
+        let settled_instr = sim
+            .read_signal(&settled_inputs, &[], "instr")
+            .expect("read settled instr");
+        let settled_is_copy = sim
+            .read_signal(&settled_inputs, &[], "is_copy")
+            .expect("read settled is_copy");
+        let settled_src_sel = sim
+            .read_signal(&settled_inputs, &[], "src_sel")
+            .expect("read settled src_sel");
+        let settled_dst_sel = sim
+            .read_signal(&settled_inputs, &[], "dst_sel")
+            .expect("read settled dst_sel");
+        let settled_mux_sel = sim
+            .read_signal(&settled_inputs, &["src_mux"], "sel")
+            .expect("read settled src_mux.sel");
+        let settled_mux_in6 = sim
+            .read_signal(&settled_inputs, &["src_mux"], "in6")
+            .expect("read settled src_mux.in6");
+        let settled_mux_hi = sim
+            .read_signal(&settled_inputs, &["src_mux"], "mux_hi")
+            .expect("read settled src_mux.mux_hi");
+        let settled_final_sel = sim
+            .read_signal(&settled_inputs, &["src_mux", "u_mux_out"], "sel")
+            .expect("read settled src_mux.u_mux_out.sel");
+        let settled_final_in1 = sim
+            .read_signal(&settled_inputs, &["src_mux", "u_mux_out"], "in1")
+            .expect("read settled src_mux.u_mux_out.in1");
+        let settled_final_out = sim
+            .read_signal(&settled_inputs, &["src_mux", "u_mux_out"], "out")
+            .expect("read settled src_mux.u_mux_out.out");
+        let settled_mux_out = sim
+            .read_signal(&settled_inputs, &["src_mux"], "out")
+            .expect("read settled src_mux.out");
+        let settled_src_value = sim
+            .read_signal(&settled_inputs, &[], "src_value")
+            .expect("read settled src_value");
+
+        assert_eq!(settled_instr, bv(177));
+        assert_eq!(settled_is_copy, bv(1));
+        assert_eq!(settled_src_sel, bv(6));
+        assert_eq!(settled_dst_sel, bv(1));
+        assert_eq!(settled_mux_sel, bv(6));
+        assert_eq!(settled_mux_in6, bv(10));
+        assert_eq!(settled_mux_hi, bv(10));
+        assert_eq!(settled_final_sel, bv(1));
+        assert_eq!(settled_final_in1, bv(10));
+        assert_eq!(settled_final_out, bv(10));
+        assert_eq!(settled_mux_out, bv(10));
+        assert_eq!(settled_src_value, bv(10));
+    }
+
+    #[test]
+    fn step_runs_overture_cpu_add5_program() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .add_search_path(repo.join("parts/overture"))
+            .compile_file(repo.join("parts/overture/overture_cpu.sv"))
+            .expect("compile overture_cpu");
+        let mut sim = design.instantiate_top().expect("instantiate");
+        sim.load_memory_file(
+            &["fetch_unit"],
+            "rom",
+            repo.join("parts/overture/overture_add5.txt"),
+        )
+        .expect("load add5 program");
+
+        let outputs = step_posedge(
+            &mut sim,
+            [
+                ("reset".into(), 1),
+                ("run".into(), 0),
+                ("in_port".into(), 0),
+            ],
+        );
+        assert_signal_eq!(outputs, "pc", 0);
+
+        let outputs = step_posedge(
+            &mut sim,
+            [
+                ("reset".into(), 0),
+                ("run".into(), 1),
+                ("in_port".into(), 10),
+            ],
+        );
+        assert_signal_eq!(outputs, "pc", 1);
+        assert_signal_eq!(outputs, "r1_out", 10);
+
+        let outputs = step_posedge(
+            &mut sim,
+            [
+                ("reset".into(), 0),
+                ("run".into(), 1),
+                ("in_port".into(), 10),
+            ],
+        );
+        assert_signal_eq!(outputs, "pc", 2);
+        assert_signal_eq!(outputs, "r0_out", 5);
+
+        let outputs = step_posedge(
+            &mut sim,
+            [
+                ("reset".into(), 0),
+                ("run".into(), 1),
+                ("in_port".into(), 10),
+            ],
+        );
+        assert_signal_eq!(outputs, "pc", 3);
+        assert_signal_eq!(outputs, "r2_out", 5);
+
+        let outputs = step_posedge(
+            &mut sim,
+            [
+                ("reset".into(), 0),
+                ("run".into(), 1),
+                ("in_port".into(), 10),
+            ],
+        );
+        assert_signal_eq!(outputs, "pc", 4);
+        assert_signal_eq!(outputs, "r3_out", 15);
+
+        let outputs = step_posedge(
+            &mut sim,
+            [
+                ("reset".into(), 0),
+                ("run".into(), 1),
+                ("in_port".into(), 10),
+            ],
+        );
+        assert_signal_eq!(outputs, "pc", 5);
+        assert_signal_eq!(outputs, "out_port", 15);
     }
 
     #[test]

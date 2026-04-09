@@ -281,7 +281,7 @@ fn update_strength(slot: &mut Option<DriveStrength>, next: DriveStrength) {
 
 #[cfg(test)]
 mod tests {
-    use super::{resolve_net, DriveStrength, DriveStrengthPair, NetDriver};
+    use super::{DriveStrength, DriveStrengthPair, NetDriver, resolve_net};
     use crate::hir::NetKind;
     use crate::logic_value::LogicValue;
 
@@ -361,18 +361,18 @@ mod tests {
 
     #[test]
     fn supply_strength_beats_strong_driver() {
-        let resolved = resolve_net(NetKind::Supply0, 1, None, &[driver("1")])
-            .expect("resolve supply0");
+        let resolved =
+            resolve_net(NetKind::Supply0, 1, None, &[driver("1")]).expect("resolve supply0");
 
         assert_eq!(resolved, logic("0"));
     }
 
     #[test]
     fn wand_and_wor_apply_wired_logic_rules() {
-        let wand = resolve_net(NetKind::Wand, 1, None, &[driver("1"), driver("0")])
-            .expect("resolve wand");
-        let wor = resolve_net(NetKind::Wor, 1, None, &[driver("0"), driver("1")])
-            .expect("resolve wor");
+        let wand =
+            resolve_net(NetKind::Wand, 1, None, &[driver("1"), driver("0")]).expect("resolve wand");
+        let wor =
+            resolve_net(NetKind::Wor, 1, None, &[driver("0"), driver("1")]).expect("resolve wor");
 
         assert_eq!(wand, logic("0"));
         assert_eq!(wor, logic("1"));

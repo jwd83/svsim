@@ -1,19 +1,19 @@
 {
   "directory": "parts/overture",
   "report": {
-    "duration_ms": 424590,
-    "passed": 31,
+    "duration_ms": 13072,
+    "passed": 43,
     "total": 43,
     "suites": [
       {
         "source_path": "parts/overture/adder_4bit.sv",
         "json_path": "parts/overture/adder_4bit.json",
         "top_module": "adder_4bit",
-        "duration_ms": 28,
+        "duration_ms": 40,
         "passed": true,
         "report": {
-          "duration_ms": 15,
-          "step_hz": 666,
+          "duration_ms": 29,
+          "step_hz": 344,
           "passed": 10,
           "total": 10,
           "cases": [
@@ -95,11 +95,11 @@
         "source_path": "parts/overture/adder_8bit.sv",
         "json_path": "parts/overture/adder_8bit.json",
         "top_module": "adder_8bit",
-        "duration_ms": 39,
+        "duration_ms": 82,
         "passed": true,
         "report": {
-          "duration_ms": 23,
-          "step_hz": 434,
+          "duration_ms": 69,
+          "step_hz": 144,
           "passed": 10,
           "total": 10,
           "cases": [
@@ -181,7 +181,7 @@
         "source_path": "parts/overture/alu_1bit.sv",
         "json_path": "parts/overture/alu_1bit.json",
         "top_module": "alu_1bit",
-        "duration_ms": 1,
+        "duration_ms": 5,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -281,7 +281,7 @@
         "source_path": "parts/overture/and_gate.sv",
         "json_path": "parts/overture/and_gate.json",
         "top_module": "and_gate",
-        "duration_ms": 1,
+        "duration_ms": 2,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -325,11 +325,11 @@
         "source_path": "parts/overture/and_gate_8bit.sv",
         "json_path": "parts/overture/and_gate_8bit.json",
         "top_module": "and_gate_8bit",
-        "duration_ms": 5,
+        "duration_ms": 14,
         "passed": true,
         "report": {
-          "duration_ms": 2,
-          "step_hz": 6000,
+          "duration_ms": 5,
+          "step_hz": 2400,
           "passed": 12,
           "total": 12,
           "cases": [
@@ -425,11 +425,11 @@
         "source_path": "parts/overture/counter8.sv",
         "json_path": "parts/overture/counter8.json",
         "top_module": "counter8",
-        "duration_ms": 3,
+        "duration_ms": 11,
         "passed": true,
         "report": {
-          "duration_ms": 2,
-          "step_hz": 44500,
+          "duration_ms": 6,
+          "step_hz": 14833,
           "passed": 11,
           "total": 11,
           "cases": [
@@ -518,11 +518,11 @@
         "source_path": "parts/overture/decoder_3to8.sv",
         "json_path": "parts/overture/decoder_3to8.json",
         "top_module": "decoder_3to8",
-        "duration_ms": 6,
+        "duration_ms": 28,
         "passed": true,
         "report": {
-          "duration_ms": 2,
-          "step_hz": 4000,
+          "duration_ms": 15,
+          "step_hz": 533,
           "passed": 8,
           "total": 8,
           "cases": [
@@ -590,195 +590,7 @@
         "source_path": "parts/overture/full_adder.sv",
         "json_path": "parts/overture/full_adder.json",
         "top_module": "full_adder",
-        "duration_ms": 3,
-        "passed": true,
-        "report": {
-          "duration_ms": 1,
-          "step_hz": 8000,
-          "passed": 8,
-          "total": 8,
-          "cases": [
-            {
-              "name": "Test 1",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 2",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 3",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 4",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 5",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 6",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 7",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 8",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            }
-          ]
-        },
-        "error": null
-      },
-      {
-        "source_path": "parts/overture/half_adder.sv",
-        "json_path": "parts/overture/half_adder.json",
-        "top_module": "half_adder",
-        "duration_ms": 1,
-        "passed": true,
-        "report": {
-          "duration_ms": 0,
-          "step_hz": 4000,
-          "passed": 4,
-          "total": 4,
-          "cases": [
-            {
-              "name": "Test 1",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 2",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 3",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 4",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            }
-          ]
-        },
-        "error": null
-      },
-      {
-        "source_path": "parts/overture/mux_2to1_1bit.sv",
-        "json_path": "parts/overture/mux_2to1_1bit.json",
-        "top_module": "mux_2to1_1bit",
-        "duration_ms": 2,
-        "passed": true,
-        "report": {
-          "duration_ms": 0,
-          "step_hz": 8000,
-          "passed": 8,
-          "total": 8,
-          "cases": [
-            {
-              "name": "Test 1",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 2",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 3",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 4",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 5",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 6",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 7",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            },
-            {
-              "name": "Test 8",
-              "description": null,
-              "steps": 1,
-              "passed": true,
-              "failures": []
-            }
-          ]
-        },
-        "error": null
-      },
-      {
-        "source_path": "parts/overture/mux_2to1_4bit.sv",
-        "json_path": "parts/overture/mux_2to1_4bit.json",
-        "top_module": "mux_2to1_4bit",
-        "duration_ms": 24,
+        "duration_ms": 13,
         "passed": true,
         "report": {
           "duration_ms": 3,
@@ -847,14 +659,202 @@
         "error": null
       },
       {
+        "source_path": "parts/overture/half_adder.sv",
+        "json_path": "parts/overture/half_adder.json",
+        "top_module": "half_adder",
+        "duration_ms": 2,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "step_hz": 4000,
+          "passed": 4,
+          "total": 4,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/overture/mux_2to1_1bit.sv",
+        "json_path": "parts/overture/mux_2to1_1bit.json",
+        "top_module": "mux_2to1_1bit",
+        "duration_ms": 6,
+        "passed": true,
+        "report": {
+          "duration_ms": 1,
+          "step_hz": 8000,
+          "passed": 8,
+          "total": 8,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/overture/mux_2to1_4bit.sv",
+        "json_path": "parts/overture/mux_2to1_4bit.json",
+        "top_module": "mux_2to1_4bit",
+        "duration_ms": 33,
+        "passed": true,
+        "report": {
+          "duration_ms": 21,
+          "step_hz": 380,
+          "passed": 8,
+          "total": 8,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 5",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 6",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 7",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 8",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
         "source_path": "parts/overture/mux_2to1_8bit.sv",
         "json_path": "parts/overture/mux_2to1_8bit.json",
         "top_module": "mux_2to1_8bit",
-        "duration_ms": 14,
+        "duration_ms": 42,
         "passed": true,
         "report": {
-          "duration_ms": 9,
-          "step_hz": 1333,
+          "duration_ms": 37,
+          "step_hz": 324,
           "passed": 12,
           "total": 12,
           "cases": [
@@ -950,11 +950,11 @@
         "source_path": "parts/overture/mux_4to1_8bit.sv",
         "json_path": "parts/overture/mux_4to1_8bit.json",
         "top_module": "mux_4to1_8bit",
-        "duration_ms": 94,
+        "duration_ms": 398,
         "passed": true,
         "report": {
-          "duration_ms": 83,
-          "step_hz": 289,
+          "duration_ms": 391,
+          "step_hz": 61,
           "passed": 24,
           "total": 24,
           "cases": [
@@ -1134,11 +1134,11 @@
         "source_path": "parts/overture/mux_8to1_8bit.sv",
         "json_path": "parts/overture/mux_8to1_8bit.json",
         "top_module": "mux_8to1_8bit",
-        "duration_ms": 244,
+        "duration_ms": 1122,
         "passed": true,
         "report": {
-          "duration_ms": 229,
-          "step_hz": 122,
+          "duration_ms": 1107,
+          "step_hz": 25,
           "passed": 28,
           "total": 28,
           "cases": [
@@ -1346,7 +1346,7 @@
         "source_path": "parts/overture/nand_gate.sv",
         "json_path": "parts/overture/nand_gate.json",
         "top_module": "nand_gate",
-        "duration_ms": 1,
+        "duration_ms": 2,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -1390,10 +1390,10 @@
         "source_path": "parts/overture/nand_gate_8bit.sv",
         "json_path": "parts/overture/nand_gate_8bit.json",
         "top_module": "nand_gate_8bit",
-        "duration_ms": 3,
+        "duration_ms": 8,
         "passed": true,
         "report": {
-          "duration_ms": 0,
+          "duration_ms": 1,
           "step_hz": 12000,
           "passed": 12,
           "total": 12,
@@ -1490,7 +1490,7 @@
         "source_path": "parts/overture/nor_gate.sv",
         "json_path": "parts/overture/nor_gate.json",
         "top_module": "nor_gate",
-        "duration_ms": 1,
+        "duration_ms": 2,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -1534,11 +1534,11 @@
         "source_path": "parts/overture/nor_gate_8bit.sv",
         "json_path": "parts/overture/nor_gate_8bit.json",
         "top_module": "nor_gate_8bit",
-        "duration_ms": 8,
+        "duration_ms": 32,
         "passed": true,
         "report": {
-          "duration_ms": 4,
-          "step_hz": 3000,
+          "duration_ms": 26,
+          "step_hz": 461,
           "passed": 12,
           "total": 12,
           "cases": [
@@ -1708,11 +1708,11 @@
         "source_path": "parts/overture/or_gate_8bit.sv",
         "json_path": "parts/overture/or_gate_8bit.json",
         "top_module": "or_gate_8bit",
-        "duration_ms": 6,
+        "duration_ms": 19,
         "passed": true,
         "report": {
-          "duration_ms": 3,
-          "step_hz": 4000,
+          "duration_ms": 14,
+          "step_hz": 857,
           "passed": 12,
           "total": 12,
           "cases": [
@@ -1808,7 +1808,7 @@
         "source_path": "parts/overture/overture_alu_8bit.sv",
         "json_path": "parts/overture/overture_alu_8bit.json",
         "top_module": "overture_alu_8bit",
-        "duration_ms": 6,
+        "duration_ms": 4,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -1887,7 +1887,7 @@
         "source_path": "parts/overture/overture_condition.sv",
         "json_path": "parts/overture/overture_condition.json",
         "top_module": "overture_condition",
-        "duration_ms": 4,
+        "duration_ms": 9,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -2183,34 +2183,83 @@
         "source_path": "parts/overture/overture_cpu.sv",
         "json_path": "parts/overture/overture_cpu.json",
         "top_module": "overture_cpu",
-        "duration_ms": 177297,
-        "passed": false,
-        "report": null,
-        "error": "combinational evaluation did not converge for module 'overture_cpu'"
+        "duration_ms": 2656,
+        "passed": true,
+        "report": {
+          "duration_ms": 2610,
+          "step_hz": 6,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Overture CPU ALU smoke",
+              "description": null,
+              "steps": 18,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
       },
       {
         "source_path": "parts/overture/overture_cpu.sv",
         "json_path": "parts/overture/overture_cpu_program_branch.json",
         "top_module": "overture_cpu",
-        "duration_ms": 162146,
-        "passed": false,
-        "report": null,
-        "error": "combinational evaluation did not converge for module 'overture_cpu'"
+        "duration_ms": 2018,
+        "passed": true,
+        "report": {
+          "duration_ms": 1970,
+          "step_hz": 8,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Branch instructions: less and greater",
+              "description": null,
+              "steps": 16,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
       },
       {
         "source_path": "parts/overture/overture_cpu.sv",
         "json_path": "parts/overture/overture_cpu_program_io.json",
         "top_module": "overture_cpu",
-        "duration_ms": 85134,
-        "passed": false,
-        "report": null,
-        "error": "combinational evaluation did not converge for module 'overture_cpu'"
+        "duration_ms": 4078,
+        "passed": true,
+        "report": {
+          "duration_ms": 4040,
+          "step_hz": 9,
+          "passed": 2,
+          "total": 2,
+          "cases": [
+            {
+              "name": "I/O and conditions with zero input",
+              "description": null,
+              "steps": 18,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "I/O and conditions with non-zero input",
+              "description": null,
+              "steps": 20,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
       },
       {
         "source_path": "parts/overture/overture_decoder_8bit.sv",
         "json_path": "parts/overture/overture_decoder_8bit.json",
         "top_module": "overture_decoder_8bit",
-        "duration_ms": 12,
+        "duration_ms": 8,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -2254,7 +2303,7 @@
         "source_path": "parts/overture/overture_fetch.sv",
         "json_path": "parts/overture/overture_fetch.json",
         "top_module": "overture_fetch",
-        "duration_ms": 1,
+        "duration_ms": 0,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -2314,92 +2363,295 @@
         "source_path": "parts/overture/pgm_overture_add5.sv",
         "json_path": "parts/overture/pgm_overture_add5.json",
         "top_module": "pgm_overture_add5",
-        "duration_ms": 177467,
-        "passed": false,
-        "report": null,
-        "error": "combinational evaluation did not converge for module 'pgm_overture_add5'"
+        "duration_ms": 2379,
+        "passed": true,
+        "report": {
+          "duration_ms": 2298,
+          "step_hz": 7,
+          "passed": 3,
+          "total": 3,
+          "cases": [
+            {
+              "name": "Add 5: input 10",
+              "description": null,
+              "steps": 6,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Add 5: input 0",
+              "description": null,
+              "steps": 6,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Add 5: input 250",
+              "description": null,
+              "steps": 6,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
       },
       {
         "source_path": "parts/overture/pgm_overture_alu.sv",
         "json_path": "parts/overture/pgm_overture_alu.json",
         "top_module": "pgm_overture_alu",
-        "duration_ms": 163281,
-        "passed": false,
-        "report": null,
-        "error": "combinational evaluation did not converge for module 'pgm_overture_alu'"
+        "duration_ms": 2474,
+        "passed": true,
+        "report": {
+          "duration_ms": 2403,
+          "step_hz": 7,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Overture CPU ALU smoke",
+              "description": null,
+              "steps": 18,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
       },
       {
         "source_path": "parts/overture/pgm_overture_branch.sv",
         "json_path": "parts/overture/pgm_overture_branch.json",
         "top_module": "pgm_overture_branch",
-        "duration_ms": 162635,
-        "passed": false,
-        "report": null,
-        "error": "combinational evaluation did not converge for module 'pgm_overture_branch'"
+        "duration_ms": 2025,
+        "passed": true,
+        "report": {
+          "duration_ms": 1981,
+          "step_hz": 8,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Branch instructions: less and greater",
+              "description": null,
+              "steps": 16,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
       },
       {
         "source_path": "parts/overture/pgm_overture_cracker.sv",
         "json_path": "parts/overture/pgm_overture_cracker.json",
         "top_module": "pgm_overture_cracker",
-        "duration_ms": 177819,
-        "passed": false,
-        "report": null,
-        "error": "combinational evaluation did not converge for module 'pgm_overture_cracker'"
+        "duration_ms": 2803,
+        "passed": true,
+        "report": {
+          "duration_ms": 2754,
+          "step_hz": 7,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Cracker: outputs 0, 1, 2, 3",
+              "description": null,
+              "steps": 22,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
       },
       {
         "source_path": "parts/overture/pgm_overture_invasion.sv",
         "json_path": "parts/overture/pgm_overture_invasion.json",
         "top_module": "pgm_overture_invasion",
-        "duration_ms": 178804,
-        "passed": false,
-        "report": null,
-        "error": "combinational evaluation did not converge for module 'pgm_overture_invasion'"
+        "duration_ms": 2259,
+        "passed": true,
+        "report": {
+          "duration_ms": 2223,
+          "step_hz": 8,
+          "passed": 2,
+          "total": 2,
+          "cases": [
+            {
+              "name": "Invasion: no enemy (0), move forward",
+              "description": null,
+              "steps": 9,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Invasion: enemy (33), shoot",
+              "description": null,
+              "steps": 9,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
       },
       {
         "source_path": "parts/overture/pgm_overture_io.sv",
         "json_path": "parts/overture/pgm_overture_io.json",
         "top_module": "pgm_overture_io",
-        "duration_ms": 180566,
-        "passed": false,
-        "report": null,
-        "error": "combinational evaluation did not converge for module 'pgm_overture_io'"
+        "duration_ms": 4827,
+        "passed": true,
+        "report": {
+          "duration_ms": 4784,
+          "step_hz": 7,
+          "passed": 2,
+          "total": 2,
+          "cases": [
+            {
+              "name": "I/O and conditions with zero input",
+              "description": null,
+              "steps": 18,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "I/O and conditions with non-zero input",
+              "description": null,
+              "steps": 20,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
       },
       {
         "source_path": "parts/overture/pgm_overture_laser.sv",
         "json_path": "parts/overture/pgm_overture_laser.json",
         "top_module": "pgm_overture_laser",
-        "duration_ms": 162826,
-        "passed": false,
-        "report": null,
-        "error": "combinational evaluation did not converge for module 'pgm_overture_laser'"
+        "duration_ms": 3865,
+        "passed": true,
+        "report": {
+          "duration_ms": 3829,
+          "step_hz": 7,
+          "passed": 3,
+          "total": 3,
+          "cases": [
+            {
+              "name": "Laser: input 5, output 30",
+              "description": null,
+              "steps": 10,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Laser: input 1, output 6",
+              "description": null,
+              "steps": 10,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Laser: input 42, output 252",
+              "description": null,
+              "steps": 10,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
       },
       {
         "source_path": "parts/overture/pgm_overture_masking.sv",
         "json_path": "parts/overture/pgm_overture_masking.json",
         "top_module": "pgm_overture_masking",
-        "duration_ms": 163279,
-        "passed": false,
-        "report": null,
-        "error": "combinational evaluation did not converge for module 'pgm_overture_masking'"
+        "duration_ms": 2784,
+        "passed": true,
+        "report": {
+          "duration_ms": 2746,
+          "step_hz": 8,
+          "passed": 4,
+          "total": 4,
+          "cases": [
+            {
+              "name": "Masking: 7 AND 3 = 3",
+              "description": null,
+              "steps": 6,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Masking: 16 AND 3 = 0",
+              "description": null,
+              "steps": 6,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Masking: 13 AND 3 = 1",
+              "description": null,
+              "steps": 6,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Masking: 255 AND 3 = 3",
+              "description": null,
+              "steps": 6,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
       },
       {
         "source_path": "parts/overture/pgm_overture_maze.sv",
         "json_path": "parts/overture/pgm_overture_maze.json",
         "top_module": "pgm_overture_maze",
-        "duration_ms": 177092,
-        "passed": false,
-        "report": null,
-        "error": "combinational evaluation did not converge for module 'pgm_overture_maze'"
+        "duration_ms": 5668,
+        "passed": true,
+        "report": {
+          "duration_ms": 5623,
+          "step_hz": 9,
+          "passed": 3,
+          "total": 3,
+          "cases": [
+            {
+              "name": "Maze: left path open",
+              "description": null,
+              "steps": 9,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Maze: left blocked, forward open",
+              "description": null,
+              "steps": 17,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Maze: left and forward blocked, right open",
+              "description": null,
+              "steps": 25,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
       },
       {
         "source_path": "parts/overture/regfile_8x8.sv",
         "json_path": "parts/overture/regfile_8x8.json",
         "top_module": "regfile_8x8",
-        "duration_ms": 4444,
+        "duration_ms": 10378,
         "passed": true,
         "report": {
-          "duration_ms": 4412,
-          "step_hz": 11,
+          "duration_ms": 10351,
+          "step_hz": 4,
           "passed": 8,
           "total": 8,
           "cases": [
@@ -2467,7 +2719,7 @@
         "source_path": "parts/overture/register_8bit.sv",
         "json_path": "parts/overture/register_8bit.json",
         "top_module": "register_8bit",
-        "duration_ms": 6,
+        "duration_ms": 3,
         "passed": true,
         "report": {
           "duration_ms": 1,
@@ -2553,7 +2805,7 @@
         "source_path": "parts/overture/rom_deadbeef.sv",
         "json_path": "parts/overture/rom_deadbeef.json",
         "top_module": "rom_deadbeef",
-        "duration_ms": 2,
+        "duration_ms": 1,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -2597,7 +2849,7 @@
         "source_path": "parts/overture/xor_gate.sv",
         "json_path": "parts/overture/xor_gate.json",
         "top_module": "xor_gate",
-        "duration_ms": 2,
+        "duration_ms": 1,
         "passed": true,
         "report": {
           "duration_ms": 0,
@@ -2641,11 +2893,11 @@
         "source_path": "parts/overture/xor_gate_8bit.sv",
         "json_path": "parts/overture/xor_gate_8bit.json",
         "top_module": "xor_gate_8bit",
-        "duration_ms": 9,
+        "duration_ms": 18,
         "passed": true,
         "report": {
-          "duration_ms": 4,
-          "step_hz": 3000,
+          "duration_ms": 14,
+          "step_hz": 857,
           "passed": 12,
           "total": 12,
           "cases": [
