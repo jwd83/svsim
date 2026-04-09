@@ -96,7 +96,7 @@ impl LogicBits {
         self.z_mask.truncate_in_place(width);
     }
 
-    fn set_bit(&mut self, index: usize, bit: LogicBit) {
+    pub(crate) fn set_bit(&mut self, index: usize, bit: LogicBit) {
         self.ones.set_bit(index, false);
         self.x_mask.set_bit(index, false);
         self.z_mask.set_bit(index, false);
@@ -148,6 +148,11 @@ impl LogicValue {
 
     pub fn is_two_state(&self) -> bool {
         self.bits.is_two_state()
+    }
+
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn coerced_to(&self, width: usize) -> Self {
+        Self::new(self.bits.clone(), width)
     }
 
     pub fn to_bit_value_checked(&self) -> Option<BitValue> {

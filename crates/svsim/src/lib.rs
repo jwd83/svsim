@@ -6,6 +6,7 @@ pub mod elaborate;
 pub mod frontend;
 pub mod hir;
 pub mod logic_value;
+mod net_resolve;
 pub mod sim;
 pub mod test;
 mod validate;
