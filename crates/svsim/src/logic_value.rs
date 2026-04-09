@@ -99,10 +99,6 @@ impl LogicBits {
         self.is_two_state().then(|| self.ones.clone())
     }
 
-    pub(crate) fn to_bit_value_lossy(&self) -> BitValue {
-        self.ones.clone()
-    }
-
     fn truncate_in_place(&mut self, width: usize) {
         self.ones.truncate_in_place(width);
         self.x_mask.truncate_in_place(width);
@@ -172,10 +168,6 @@ impl LogicValue {
         self.bits
             .to_bit_value_checked()
             .map(|bits| bits.truncate(self.width))
-    }
-
-    pub(crate) fn to_bit_value_lossy(&self) -> BitValue {
-        self.bits.to_bit_value_lossy().truncate(self.width)
     }
 
     fn logic_string(&self) -> String {

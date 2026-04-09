@@ -822,6 +822,21 @@ mod tests {
     }
 
     #[test]
+    fn run_json_file_passes_four_state_control_suite() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .compile_file(repo.join("parts/testing/022-FourStateControl.sv"))
+            .expect("compile four-state control");
+
+        let report = design
+            .run_json_file(repo.join("parts/testing/022-FourStateControl.json"))
+            .expect("run json tests");
+
+        assert!(report.all_passed());
+        assert_eq!(report.passed, report.total);
+    }
+
+    #[test]
     fn run_json_file_passes_legacy_rom_primitive_suite() {
         let repo = repo_root();
         let design = Compiler::new()

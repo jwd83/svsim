@@ -1,0 +1,11 @@
+[
+  {
+    "expect": {
+      "eq_guard": 0,
+      "not_guard": 0,
+      "case_default": 1,
+      "ternary_guard": 0,
+      "lt_guard": 0
+    }
+  }
+]

@@ -13,10 +13,7 @@ use crate::hir::{
 use crate::logic_value::{LogicBit, LogicBits, LogicValue};
 use crate::net_resolve::{DriveStrengthPair, NetDriver, resolve_net};
 use crate::validate::resolve_legacy_rom_data_path;
-use crate::width::{
-    arithmetic_shift_right_bits, expr_width, mask, minimum_width, shift_left_bits,
-    shift_right_bits, sign_extend_bits,
-};
+use crate::width::{expr_width, minimum_width};
 
 #[derive(Debug, Clone)]
 pub struct SimulationSession {
@@ -115,10 +112,8 @@ impl MemoryState {
             .words
             .get_mut(offset)
             .expect("memory offset is guaranteed to be in range");
-        let next = Value::new(
-            value.coerced_to(current.width).normalized_bits(),
-            current.width,
-        );
+        let coerced = value.coerced_to(current.width);
+        let next = Value::from_logic(coerced.logic, current.width);
         let changed = *current != next;
         *current = next;
         Ok(changed)
@@ -247,7 +242,14 @@ impl SimulationSession {
                 memory_name, module.name
             ))
         })?;
-        Ok(memory_state.read(index, memory_name)?.normalized_bits())
+        let value = memory_state.read(index, memory_name)?;
+        logic_to_public_bit_value(
+            value.logic(),
+            format!(
+                "memory '{}' word {} in '{}'",
+                memory_name, index, module.name
+            ),
+        )
     }
 
     pub fn read_signal(
@@ -475,9 +477,16 @@ fn parse_prefixed_value(raw: &str) -> std::result::Result<BitValue, ParseBitValu
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Value {
-    bits: BitValue,
+    logic: LogicValue,
     width: usize,
     signed: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LogicTruth {
+    False,
+    True,
+    Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -491,9 +500,17 @@ impl Value {
     }
 
     fn new_with_signed(bits: BitValue, width: usize, signed: bool) -> Self {
-        let width = width.max(1);
+        Self::from_logic_with_signed(LogicValue::from_bit_value_with_width(bits, width), signed)
+    }
+
+    fn from_logic(logic: LogicValue, width: usize) -> Self {
+        Self::from_logic_with_signed(logic.coerced_to(width), false)
+    }
+
+    fn from_logic_with_signed(logic: LogicValue, signed: bool) -> Self {
+        let width = logic.width().max(1);
         Self {
-            bits: bits.truncate(width),
+            logic: logic.coerced_to(width),
             width,
             signed,
         }
@@ -501,24 +518,51 @@ impl Value {
 
     fn coerced_to(&self, width: usize) -> Self {
         let width = width.max(1);
-        let bits = if self.signed {
-            sign_extend_bits(&self.normalized_bits(), self.width, width)
+        let logic = if self.signed {
+            logic_sign_extend(&self.logic, self.width, width)
         } else {
-            self.normalized_bits().truncate(width)
+            self.logic.coerced_to(width)
         };
-        Self::new_with_signed(bits, width, self.signed)
+        Self::from_logic_with_signed(logic, self.signed)
     }
 
     fn zero(width: usize) -> Self {
         Self::new(BitValue::zero(), width)
     }
 
-    fn normalized_bits(&self) -> BitValue {
-        self.bits.clone()
+    fn unknown(width: usize) -> Self {
+        Self::from_logic(
+            LogicValue::new(LogicBits::filled(width, LogicBit::X), width),
+            width,
+        )
+    }
+
+    fn logic(&self) -> &LogicValue {
+        &self.logic
+    }
+
+    fn to_bit_value_checked(&self) -> Option<BitValue> {
+        self.logic.to_bit_value_checked()
+    }
+
+    fn truthiness(&self) -> LogicTruth {
+        let mut saw_unknown = false;
+        for index in 0..self.width {
+            match self.logic.bit(index) {
+                LogicBit::One => return LogicTruth::True,
+                LogicBit::Zero => {}
+                LogicBit::X | LogicBit::Z => saw_unknown = true,
+            }
+        }
+        if saw_unknown {
+            LogicTruth::Unknown
+        } else {
+            LogicTruth::False
+        }
     }
 
     fn truthy(&self) -> bool {
-        !self.bits.is_zero()
+        matches!(self.truthiness(), LogicTruth::True)
     }
 }
 
@@ -1054,7 +1098,7 @@ fn signal_storage(module: &ModuleSummary, name: &str) -> Option<StorageKind> {
 
 fn read_binding(binding: SignalBinding, values: &[ObjectValue]) -> Result<Value> {
     let logic = read_binding_logic(binding, values)?;
-    Ok(Value::new(logic.to_bit_value_lossy(), binding.view_width))
+    Ok(Value::from_logic(logic, binding.view_width))
 }
 
 fn read_binding_logic(binding: SignalBinding, values: &[ObjectValue]) -> Result<LogicValue> {
@@ -1073,12 +1117,8 @@ fn write_binding(
     values: &mut [ObjectValue],
     object_layouts: &[RuntimeObjectLayout],
 ) -> Result<bool> {
-    write_binding_logic(
-        binding,
-        LogicValue::from_bit_value_with_width(value.normalized_bits(), value.width),
-        values,
-        object_layouts,
-    )
+    let logic = value.coerced_to(binding.view_width).logic;
+    write_binding_logic(binding, logic, values, object_layouts)
 }
 
 fn write_binding_logic(
@@ -1344,9 +1384,7 @@ fn replace_whole_signal_driver(
             binding.object_id
         ))
     })?;
-    let logic = LogicValue::from_bit_value_with_width(value.normalized_bits(), value.width)
-        .coerced_to(binding.view_width)
-        .coerced_to(object.width);
+    let logic = value.coerced_to(binding.view_width).logic.coerced_to(object.width);
     replace_object_driver(binding.object_id, logic, net_drivers);
     Ok(())
 }
@@ -1364,9 +1402,7 @@ fn apply_fixed_binding_drive(
             binding.object_id
         ))
     })?;
-    let logic = LogicValue::from_bit_value_with_width(value.normalized_bits(), value.width)
-        .coerced_to(binding.view_width)
-        .coerced_to(object.width);
+    let logic = value.coerced_to(binding.view_width).logic.coerced_to(object.width);
     if object.storage.is_net() {
         stage_object_driver(binding.object_id, logic, net_drivers);
         return Ok(false);
@@ -1467,7 +1503,7 @@ fn apply_child_output_sinks(
                     sink.port_name, child_state.state.module_name
                 ))
             })?;
-        let value = read_binding_logic(binding, frame)?;
+        let value = read_binding(binding, frame)?;
         let target = resolve_lvalue(
             &sink.target,
             parent_module,
@@ -1475,7 +1511,7 @@ fn apply_child_output_sinks(
             parent_memories,
         )?;
         let mut no_memories = HashMap::new();
-        changed |= apply_or_stage_resolved_lvalue_logic(
+        changed |= apply_or_stage_resolved_lvalue(
             &target,
             value,
             parent_module,
@@ -1556,7 +1592,10 @@ fn execute_comb_stmt(
             then_branch,
             else_branch,
         } => {
-            if eval_expr(cond, module, values, memories)?.truthy() {
+            if matches!(
+                eval_expr(cond, module, values, memories)?.truthiness(),
+                LogicTruth::True
+            ) {
                 execute_comb_stmt(then_branch, module, values, memories)
             } else if let Some(else_branch) = else_branch {
                 execute_comb_stmt(else_branch, module, values, memories)
@@ -1572,7 +1611,7 @@ fn execute_comb_stmt(
             let value = eval_expr(expr, module, values, memories)?;
             for item in items {
                 for pattern in &item.patterns {
-                    if values_equal(&value, &eval_expr(pattern, module, values, memories)?) {
+                    if values_case_equal(&value, &eval_expr(pattern, module, values, memories)?) {
                         return execute_comb_stmt(&item.body, module, values, memories);
                     }
                 }
@@ -1629,7 +1668,10 @@ fn execute_sequential_stmt(
             then_branch,
             else_branch,
         } => {
-            if eval_expr(cond, module, current_values, memories)?.truthy() {
+            if matches!(
+                eval_expr(cond, module, current_values, memories)?.truthiness(),
+                LogicTruth::True
+            ) {
                 execute_sequential_stmt(
                     then_branch,
                     module,
@@ -1659,7 +1701,7 @@ fn execute_sequential_stmt(
             let value = eval_expr(expr, module, current_values, memories)?;
             for item in items {
                 for pattern in &item.patterns {
-                    if values_equal(
+                    if values_case_equal(
                         &value,
                         &eval_expr(pattern, module, current_values, memories)?,
                     ) {
@@ -1808,8 +1850,8 @@ fn apply_legacy_rom_outputs(
                 module.name, legacy_rom.addr_port
             ))
         })?
-        .normalized_bits()
-        .to_usize_checked()
+        .to_bit_value_checked()
+        .and_then(|bits| bits.to_usize_checked())
         .ok_or_else(|| {
             Error::Resolve(format!(
                 "legacy ROM primitive '{}' address exceeds host limits",
@@ -1942,6 +1984,279 @@ fn logic_to_public_bit_value(logic: &LogicValue, context: String) -> Result<BitV
         .map(|bits| bits.truncate(logic.width()))
 }
 
+fn logic_sign_extend(logic: &LogicValue, from_width: usize, to_width: usize) -> LogicValue {
+    let to_width = to_width.max(1);
+    let from_width = from_width.max(1);
+    let mut bits = LogicBits::zero();
+    let sign = logic.bit(from_width - 1);
+    for index in 0..to_width {
+        let bit = if index < from_width {
+            logic.bit(index)
+        } else {
+            sign
+        };
+        bits.set_bit(index, bit);
+    }
+    LogicValue::new(bits, to_width)
+}
+
+fn logic_slice(value: &LogicValue, low: usize, width: usize) -> LogicValue {
+    let width = width.max(1);
+    let mut bits = LogicBits::zero();
+    for offset in 0..width {
+        bits.set_bit(offset, value.bit(low + offset));
+    }
+    LogicValue::new(bits, width)
+}
+
+fn logic_replace_slice(
+    base: &LogicValue,
+    low: usize,
+    width: usize,
+    replacement: &LogicValue,
+) -> LogicValue {
+    let mut bits = LogicBits::zero();
+    let replacement = replacement.coerced_to(width);
+    for index in 0..base.width() {
+        let bit = if (low..low + width).contains(&index) {
+            replacement.bit(index - low)
+        } else {
+            base.bit(index)
+        };
+        bits.set_bit(index, bit);
+    }
+    LogicValue::new(bits, base.width())
+}
+
+fn normalize_unknown_bit(bit: LogicBit) -> LogicBit {
+    match bit {
+        LogicBit::Zero => LogicBit::Zero,
+        LogicBit::One => LogicBit::One,
+        LogicBit::X | LogicBit::Z => LogicBit::X,
+    }
+}
+
+fn logic_bit_not(bit: LogicBit) -> LogicBit {
+    match bit {
+        LogicBit::Zero => LogicBit::One,
+        LogicBit::One => LogicBit::Zero,
+        LogicBit::X | LogicBit::Z => LogicBit::X,
+    }
+}
+
+fn logic_bit_and(left: LogicBit, right: LogicBit) -> LogicBit {
+    match (normalize_unknown_bit(left), normalize_unknown_bit(right)) {
+        (LogicBit::Zero, _) | (_, LogicBit::Zero) => LogicBit::Zero,
+        (LogicBit::One, LogicBit::One) => LogicBit::One,
+        _ => LogicBit::X,
+    }
+}
+
+fn logic_bit_or(left: LogicBit, right: LogicBit) -> LogicBit {
+    match (normalize_unknown_bit(left), normalize_unknown_bit(right)) {
+        (LogicBit::One, _) | (_, LogicBit::One) => LogicBit::One,
+        (LogicBit::Zero, LogicBit::Zero) => LogicBit::Zero,
+        _ => LogicBit::X,
+    }
+}
+
+fn logic_bit_xor(left: LogicBit, right: LogicBit) -> LogicBit {
+    match (normalize_unknown_bit(left), normalize_unknown_bit(right)) {
+        (LogicBit::Zero, LogicBit::Zero) | (LogicBit::One, LogicBit::One) => LogicBit::Zero,
+        (LogicBit::Zero, LogicBit::One) | (LogicBit::One, LogicBit::Zero) => LogicBit::One,
+        _ => LogicBit::X,
+    }
+}
+
+fn logic_value_from_bit(bit: LogicBit) -> LogicValue {
+    let mut bits = LogicBits::zero();
+    bits.set_bit(0, bit);
+    LogicValue::new(bits, 1)
+}
+
+fn logic_value_from_ordering(ordering: Option<bool>) -> Value {
+    match ordering {
+        Some(true) => Value::from_logic(logic_value_from_bit(LogicBit::One), 1),
+        Some(false) => Value::from_logic(logic_value_from_bit(LogicBit::Zero), 1),
+        None => Value::from_logic(logic_value_from_bit(LogicBit::X), 1),
+    }
+}
+
+fn logic_reduce_or(value: &Value) -> LogicBit {
+    match value.truthiness() {
+        LogicTruth::False => LogicBit::Zero,
+        LogicTruth::True => LogicBit::One,
+        LogicTruth::Unknown => LogicBit::X,
+    }
+}
+
+fn logic_reduce_and(value: &Value) -> LogicBit {
+    let mut saw_unknown = false;
+    for index in 0..value.width {
+        match value.logic.bit(index) {
+            LogicBit::Zero => return LogicBit::Zero,
+            LogicBit::One => {}
+            LogicBit::X | LogicBit::Z => saw_unknown = true,
+        }
+    }
+    if saw_unknown {
+        LogicBit::X
+    } else {
+        LogicBit::One
+    }
+}
+
+fn logic_reduce_xor(value: &Value) -> LogicBit {
+    let mut parity = false;
+    for index in 0..value.width {
+        match value.logic.bit(index) {
+            LogicBit::Zero => {}
+            LogicBit::One => parity = !parity,
+            LogicBit::X | LogicBit::Z => return LogicBit::X,
+        }
+    }
+    if parity {
+        LogicBit::One
+    } else {
+        LogicBit::Zero
+    }
+}
+
+fn logic_bitwise_binary(
+    left: &Value,
+    right: &Value,
+    op: fn(LogicBit, LogicBit) -> LogicBit,
+) -> Value {
+    let width = left.width.max(right.width);
+    let left = left.coerced_to(width);
+    let right = right.coerced_to(width);
+    let mut bits = LogicBits::zero();
+    for index in 0..width {
+        bits.set_bit(index, op(left.logic.bit(index), right.logic.bit(index)));
+    }
+    Value::from_logic_with_signed(LogicValue::new(bits, width), left.signed && right.signed)
+}
+
+fn logical_and(left: &Value, right: &Value) -> LogicBit {
+    match (left.truthiness(), right.truthiness()) {
+        (LogicTruth::False, _) | (_, LogicTruth::False) => LogicBit::Zero,
+        (LogicTruth::True, LogicTruth::True) => LogicBit::One,
+        _ => LogicBit::X,
+    }
+}
+
+fn logical_or(left: &Value, right: &Value) -> LogicBit {
+    match (left.truthiness(), right.truthiness()) {
+        (LogicTruth::True, _) | (_, LogicTruth::True) => LogicBit::One,
+        (LogicTruth::False, LogicTruth::False) => LogicBit::Zero,
+        _ => LogicBit::X,
+    }
+}
+
+fn values_logical_equal(left: &Value, right: &Value) -> LogicBit {
+    let width = left.width.max(right.width);
+    let left = left.coerced_to(width);
+    let right = right.coerced_to(width);
+    let mut saw_unknown = false;
+
+    for index in 0..width {
+        match (left.logic.bit(index), right.logic.bit(index)) {
+            (LogicBit::Zero, LogicBit::One) | (LogicBit::One, LogicBit::Zero) => {
+                return LogicBit::Zero;
+            }
+            (LogicBit::Zero, LogicBit::Zero) | (LogicBit::One, LogicBit::One) => {}
+            _ => saw_unknown = true,
+        }
+    }
+
+    if saw_unknown {
+        LogicBit::X
+    } else {
+        LogicBit::One
+    }
+}
+
+fn values_case_equal(left: &Value, right: &Value) -> bool {
+    let width = left.width.max(right.width);
+    let left = left.coerced_to(width);
+    let right = right.coerced_to(width);
+    (0..width).all(|index| left.logic.bit(index) == right.logic.bit(index))
+}
+
+fn compare_values(left: &Value, right: &Value) -> Option<std::cmp::Ordering> {
+    let left_bits = left.to_bit_value_checked()?;
+    let right_bits = right.to_bit_value_checked()?;
+    if left.signed && right.signed {
+        Some(compare_signed_bits(&left_bits, &right_bits, left.width))
+    } else {
+        Some(left_bits.cmp_unsigned(&right_bits))
+    }
+}
+
+fn logic_shift_left_value(left: &Value, right: &Value) -> Value {
+    let Some(shift_bits) = right.to_bit_value_checked() else {
+        return Value::unknown(left.width);
+    };
+    let shift = shift_bits.to_usize_checked().unwrap_or(left.width);
+    let mut bits = LogicBits::zero();
+    if shift < left.width {
+        for index in shift..left.width {
+            bits.set_bit(index, left.logic.bit(index - shift));
+        }
+    }
+    Value::from_logic_with_signed(LogicValue::new(bits, left.width), left.signed)
+}
+
+fn logic_shift_right_value(left: &Value, right: &Value) -> Value {
+    let Some(shift_bits) = right.to_bit_value_checked() else {
+        return Value::unknown(left.width);
+    };
+    let shift = shift_bits.to_usize_checked().unwrap_or(left.width);
+    let mut bits = LogicBits::zero();
+    if shift < left.width {
+        for index in 0..(left.width - shift) {
+            bits.set_bit(index, left.logic.bit(index + shift));
+        }
+    }
+    Value::from_logic_with_signed(LogicValue::new(bits, left.width), left.signed)
+}
+
+fn logic_arithmetic_shift_right_value(left: &Value, right: &Value) -> Value {
+    let Some(shift_bits) = right.to_bit_value_checked() else {
+        return Value::unknown(left.width);
+    };
+    let shift = shift_bits.to_usize_checked().unwrap_or(left.width);
+    let fill = left.logic.bit(left.width.saturating_sub(1));
+    let mut bits = LogicBits::zero();
+    for index in 0..left.width {
+        let bit = if index + shift < left.width {
+            left.logic.bit(index + shift)
+        } else {
+            fill
+        };
+        bits.set_bit(index, bit);
+    }
+    Value::from_logic_with_signed(LogicValue::new(bits, left.width), left.signed)
+}
+
+fn logic_ternary_merge(when_true: &Value, when_false: &Value, width: usize) -> Value {
+    let when_true = when_true.coerced_to(width);
+    let when_false = when_false.coerced_to(width);
+    let mut bits = LogicBits::zero();
+    for index in 0..width {
+        let bit = if when_true.logic.bit(index) == when_false.logic.bit(index) {
+            when_true.logic.bit(index)
+        } else {
+            LogicBit::X
+        };
+        bits.set_bit(index, bit);
+    }
+    Value::from_logic_with_signed(
+        LogicValue::new(bits, width),
+        when_true.signed && when_false.signed,
+    )
+}
+
 fn resolve_supported_module<'a>(
     hir: &'a HirDesign,
     module_name: &str,
@@ -1989,9 +2304,10 @@ fn eval_expr(
             concat_values(&values_out)
         }
         Expr::MemoryRead { memory, index } => {
-            let index = eval_expr(index, module, values, memories)?
-                .normalized_bits()
-                .to_usize_checked()
+            let index_value = eval_expr(index, module, values, memories)?;
+            let index = index_value
+                .to_bit_value_checked()
+                .and_then(|bits| bits.to_usize_checked())
                 .ok_or_else(|| Error::Resolve("memory index exceeds host limits".into()))?;
             let memory_state = memories
                 .get(memory)
@@ -2006,8 +2322,8 @@ fn eval_expr(
                     index, value.width
                 )));
             }
-            Ok(Value::new(
-                BitValue::from(value.normalized_bits().get_bit(*index)),
+            Ok(Value::from_logic(
+                logic_value_from_bit(value.logic.bit(*index)),
                 1,
             ))
         }
@@ -2022,59 +2338,61 @@ fn eval_expr(
                 )));
             }
             let width = high - low + 1;
-            Ok(Value::new(value.normalized_bits().slice(low, width), width))
+            Ok(Value::from_logic(
+                logic_slice(value.logic(), low, width),
+                width,
+            ))
         }
         Expr::Unary { op, expr } => {
             let value = eval_expr(expr, module, values, memories)?;
             match op {
-                UnaryOp::BitNot => Ok(Value::new_with_signed(
-                    value.normalized_bits().bitnot_with_width(value.width),
-                    value.width,
-                    value.signed,
-                )),
-                UnaryOp::Negate => Ok(Value::new_with_signed(
-                    BitValue::zero().wrapping_sub(&value.normalized_bits(), value.width),
-                    value.width,
-                    value.signed,
-                )),
-                UnaryOp::LogicalNot => {
-                    let is_zero = value.normalized_bits().is_zero();
-                    Ok(Value::new(BitValue::from(u64::from(is_zero)), 1))
-                }
-                UnaryOp::ReductionOr => {
-                    let result = !value.normalized_bits().is_zero();
-                    Ok(Value::new(BitValue::from(u64::from(result)), 1))
-                }
-                UnaryOp::ReductionAnd => {
-                    let mask = mask(value.width);
-                    let result = value.normalized_bits().bitand(&mask) == mask;
-                    Ok(Value::new(BitValue::from(u64::from(result)), 1))
-                }
-                UnaryOp::ReductionNand => {
-                    let mask = mask(value.width);
-                    let result = value.normalized_bits().bitand(&mask) != mask;
-                    Ok(Value::new(BitValue::from(u64::from(result)), 1))
-                }
-                UnaryOp::ReductionXor => {
-                    let mut count = 0u32;
-                    let bits = value.normalized_bits();
-                    for i in 0..value.width {
-                        if !bits.slice(i, 1).is_zero() {
-                            count += 1;
-                        }
+                UnaryOp::BitNot => {
+                    let mut bits = LogicBits::zero();
+                    for index in 0..value.width {
+                        bits.set_bit(index, logic_bit_not(value.logic.bit(index)));
                     }
-                    Ok(Value::new(BitValue::from(u64::from(count % 2 != 0)), 1))
+                    Ok(Value::from_logic_with_signed(
+                        LogicValue::new(bits, value.width),
+                        value.signed,
+                    ))
                 }
-                UnaryOp::Signed => Ok(Value::new_with_signed(
-                    value.normalized_bits(),
-                    value.width,
-                    true,
+                UnaryOp::Negate => {
+                    if let Some(bits) = value.to_bit_value_checked() {
+                        Ok(Value::new_with_signed(
+                            BitValue::zero().wrapping_sub(&bits, value.width),
+                            value.width,
+                            value.signed,
+                        ))
+                    } else {
+                        Ok(Value::unknown(value.width))
+                    }
+                }
+                UnaryOp::LogicalNot => Ok(Value::from_logic(
+                    logic_value_from_bit(match value.truthiness() {
+                        LogicTruth::False => LogicBit::One,
+                        LogicTruth::True => LogicBit::Zero,
+                        LogicTruth::Unknown => LogicBit::X,
+                    }),
+                    1,
                 )),
-                UnaryOp::Unsigned => Ok(Value::new_with_signed(
-                    value.normalized_bits(),
-                    value.width,
-                    false,
+                UnaryOp::ReductionOr => Ok(Value::from_logic(
+                    logic_value_from_bit(logic_reduce_or(&value)),
+                    1,
                 )),
+                UnaryOp::ReductionAnd => Ok(Value::from_logic(
+                    logic_value_from_bit(logic_reduce_and(&value)),
+                    1,
+                )),
+                UnaryOp::ReductionNand => Ok(Value::from_logic(
+                    logic_value_from_bit(logic_bit_not(logic_reduce_and(&value))),
+                    1,
+                )),
+                UnaryOp::ReductionXor => Ok(Value::from_logic(
+                    logic_value_from_bit(logic_reduce_xor(&value)),
+                    1,
+                )),
+                UnaryOp::Signed => Ok(Value::from_logic_with_signed(value.logic, true)),
+                UnaryOp::Unsigned => Ok(Value::from_logic_with_signed(value.logic, false)),
             }
         }
         Expr::Binary { left, op, right } => {
@@ -2083,85 +2401,83 @@ fn eval_expr(
             let common_width = left.width.max(right.width);
             left = left.coerced_to(common_width);
             right = right.coerced_to(common_width);
-            let (bits, width) = match op {
-                BinaryOp::BitAnd => (
-                    left.normalized_bits().bitand(&right.normalized_bits()),
-                    common_width,
-                ),
-                BinaryOp::BitOr => (
-                    left.normalized_bits().bitor(&right.normalized_bits()),
-                    common_width,
-                ),
-                BinaryOp::BitXor => (
-                    left.normalized_bits().bitxor(&right.normalized_bits()),
-                    common_width,
-                ),
-                BinaryOp::ShiftLeft => (
-                    shift_left_bits(
-                        &left.normalized_bits(),
-                        &right.normalized_bits(),
-                        left.width,
-                    ),
-                    left.width,
-                ),
-                BinaryOp::ShiftRight => (
-                    shift_right_bits(
-                        &left.normalized_bits(),
-                        &right.normalized_bits(),
-                        left.width,
-                    ),
-                    left.width,
-                ),
-                BinaryOp::ArithmeticShiftRight => (
-                    arithmetic_shift_right_bits(
-                        &left.normalized_bits(),
-                        &right.normalized_bits(),
-                        left.width,
-                    ),
-                    left.width,
-                ),
-                BinaryOp::LogicalAnd => (BitValue::from(left.truthy() && right.truthy()), 1),
-                BinaryOp::LogicalOr => (BitValue::from(left.truthy() || right.truthy()), 1),
-                BinaryOp::Eq => (BitValue::from(values_equal(&left, &right)), 1),
-                BinaryOp::NotEq => (BitValue::from(!values_equal(&left, &right)), 1),
-                BinaryOp::Lt => (BitValue::from(compare_values(&left, &right).is_lt()), 1),
-                BinaryOp::LtEq => (BitValue::from(!compare_values(&left, &right).is_gt()), 1),
-                BinaryOp::Gt => (BitValue::from(compare_values(&left, &right).is_gt()), 1),
-                BinaryOp::GtEq => (BitValue::from(!compare_values(&left, &right).is_lt()), 1),
-                BinaryOp::Add => (
-                    left.normalized_bits()
-                        .wrapping_add(&right.normalized_bits(), common_width),
-                    common_width,
-                ),
-                BinaryOp::Sub => (
-                    left.normalized_bits()
-                        .wrapping_sub(&right.normalized_bits(), common_width),
-                    common_width,
-                ),
-                BinaryOp::Mul => (
-                    left.normalized_bits()
-                        .wrapping_mul(&right.normalized_bits(), common_width),
-                    common_width,
-                ),
-            };
-            Ok(Value::new_with_signed(
-                bits,
-                width,
-                matches!(
-                    op,
-                    BinaryOp::ShiftLeft | BinaryOp::ShiftRight | BinaryOp::ArithmeticShiftRight
-                ) && left.signed
-                    || matches!(
-                        op,
-                        BinaryOp::BitAnd
-                            | BinaryOp::BitOr
-                            | BinaryOp::BitXor
-                            | BinaryOp::Add
-                            | BinaryOp::Sub
-                            | BinaryOp::Mul
-                    ) && left.signed
-                        && right.signed,
-            ))
+            match op {
+                BinaryOp::BitAnd => Ok(logic_bitwise_binary(&left, &right, logic_bit_and)),
+                BinaryOp::BitOr => Ok(logic_bitwise_binary(&left, &right, logic_bit_or)),
+                BinaryOp::BitXor => Ok(logic_bitwise_binary(&left, &right, logic_bit_xor)),
+                BinaryOp::ShiftLeft => Ok(logic_shift_left_value(&left, &right)),
+                BinaryOp::ShiftRight => Ok(logic_shift_right_value(&left, &right)),
+                BinaryOp::ArithmeticShiftRight => {
+                    Ok(logic_arithmetic_shift_right_value(&left, &right))
+                }
+                BinaryOp::LogicalAnd => Ok(Value::from_logic(
+                    logic_value_from_bit(logical_and(&left, &right)),
+                    1,
+                )),
+                BinaryOp::LogicalOr => Ok(Value::from_logic(
+                    logic_value_from_bit(logical_or(&left, &right)),
+                    1,
+                )),
+                BinaryOp::Eq => Ok(Value::from_logic(
+                    logic_value_from_bit(values_logical_equal(&left, &right)),
+                    1,
+                )),
+                BinaryOp::NotEq => Ok(Value::from_logic(
+                    logic_value_from_bit(logic_bit_not(values_logical_equal(&left, &right))),
+                    1,
+                )),
+                BinaryOp::Lt => Ok(logic_value_from_ordering(
+                    compare_values(&left, &right).map(|ordering| ordering.is_lt()),
+                )),
+                BinaryOp::LtEq => Ok(logic_value_from_ordering(
+                    compare_values(&left, &right).map(|ordering| !ordering.is_gt()),
+                )),
+                BinaryOp::Gt => Ok(logic_value_from_ordering(
+                    compare_values(&left, &right).map(|ordering| ordering.is_gt()),
+                )),
+                BinaryOp::GtEq => Ok(logic_value_from_ordering(
+                    compare_values(&left, &right).map(|ordering| !ordering.is_lt()),
+                )),
+                BinaryOp::Add => {
+                    if let (Some(left_bits), Some(right_bits)) =
+                        (left.to_bit_value_checked(), right.to_bit_value_checked())
+                    {
+                        Ok(Value::new_with_signed(
+                            left_bits.wrapping_add(&right_bits, common_width),
+                            common_width,
+                            left.signed && right.signed,
+                        ))
+                    } else {
+                        Ok(Value::unknown(common_width))
+                    }
+                }
+                BinaryOp::Sub => {
+                    if let (Some(left_bits), Some(right_bits)) =
+                        (left.to_bit_value_checked(), right.to_bit_value_checked())
+                    {
+                        Ok(Value::new_with_signed(
+                            left_bits.wrapping_sub(&right_bits, common_width),
+                            common_width,
+                            left.signed && right.signed,
+                        ))
+                    } else {
+                        Ok(Value::unknown(common_width))
+                    }
+                }
+                BinaryOp::Mul => {
+                    if let (Some(left_bits), Some(right_bits)) =
+                        (left.to_bit_value_checked(), right.to_bit_value_checked())
+                    {
+                        Ok(Value::new_with_signed(
+                            left_bits.wrapping_mul(&right_bits, common_width),
+                            common_width,
+                            left.signed && right.signed,
+                        ))
+                    } else {
+                        Ok(Value::unknown(common_width))
+                    }
+                }
+            }
         }
         Expr::Ternary {
             cond,
@@ -2169,10 +2485,15 @@ fn eval_expr(
             when_false,
         } => {
             let result_width = expr_width(when_true, module)?.max(expr_width(when_false, module)?);
-            if eval_expr(cond, module, values, memories)?.truthy() {
-                Ok(eval_expr(when_true, module, values, memories)?.coerced_to(result_width))
-            } else {
-                Ok(eval_expr(when_false, module, values, memories)?.coerced_to(result_width))
+            let condition = eval_expr(cond, module, values, memories)?;
+            let when_true = eval_expr(when_true, module, values, memories)?;
+            let when_false = eval_expr(when_false, module, values, memories)?;
+            match condition.truthiness() {
+                LogicTruth::True => Ok(when_true.coerced_to(result_width)),
+                LogicTruth::False => Ok(when_false.coerced_to(result_width)),
+                LogicTruth::Unknown => {
+                    Ok(logic_ternary_merge(&when_true, &when_false, result_width))
+                }
             }
         }
     }
@@ -2193,31 +2514,18 @@ fn concat_values(parts: &[Value]) -> Result<Value> {
             .ok_or_else(|| Error::Unsupported("concatenation width exceeds host limits".into()))?;
     }
 
-    let mut bits = BitValue::zero();
+    let mut bits = LogicBits::zero();
     let mut shift = total_width;
     for part in parts {
         shift -= part.width;
-        bits = bits.bitor(&part.normalized_bits().shift_left(shift));
+        for offset in 0..part.width {
+            bits.set_bit(shift + offset, part.logic.bit(offset));
+        }
     }
-    Ok(Value::new(bits, total_width))
-}
-
-fn values_equal(left: &Value, right: &Value) -> bool {
-    let width = left.width.max(right.width);
-    left.coerced_to(width).normalized_bits() == right.coerced_to(width).normalized_bits()
-}
-
-fn compare_values(left: &Value, right: &Value) -> std::cmp::Ordering {
-    if left.signed && right.signed {
-        compare_signed_bits(
-            &left.normalized_bits(),
-            &right.normalized_bits(),
-            left.width,
-        )
-    } else {
-        left.normalized_bits()
-            .cmp_unsigned(&right.normalized_bits())
-    }
+    Ok(Value::from_logic(
+        LogicValue::new(bits, total_width),
+        total_width,
+    ))
 }
 
 fn compare_signed_bits(left: &BitValue, right: &BitValue, width: usize) -> std::cmp::Ordering {
@@ -2266,8 +2574,8 @@ fn resolve_lvalue(
         LValue::MemoryElement { memory, index } => Ok(ResolvedLValue::MemoryElement {
             memory: memory.clone(),
             index: eval_expr(index, module, values, memories)?
-                .normalized_bits()
-                .to_usize_checked()
+                .to_bit_value_checked()
+                .and_then(|bits| bits.to_usize_checked())
                 .ok_or_else(|| Error::Resolve("memory index exceeds host limits".into()))?,
         }),
     }
@@ -2356,23 +2664,24 @@ fn apply_resolved_lvalue(
                     name, module.name
                 ))
             })?;
-            let next = Value::new(
-                value.coerced_to(current.width).normalized_bits(),
-                current.width,
-            );
+            let coerced = value.coerced_to(current.width);
+            let next = Value::from_logic(coerced.logic, current.width);
             let changed = *current != next;
             *current = next;
             Ok(changed)
         }
         ResolvedLValue::Concat(items) => {
             let total_width = resolved_lvalue_width(lvalue, module)?;
-            let normalized = value.coerced_to(total_width).normalized_bits();
+            let normalized = value.coerced_to(total_width);
             let mut remaining_width = total_width;
             let mut changed = false;
             for item in items {
                 let item_width = resolved_lvalue_width(item, module)?;
                 remaining_width -= item_width;
-                let chunk = Value::new(normalized.slice(remaining_width, item_width), item_width);
+                let chunk = Value::from_logic(
+                    logic_slice(normalized.logic(), remaining_width, item_width),
+                    item_width,
+                );
                 changed |= apply_resolved_lvalue(item, chunk, module, values, memories)?;
             }
             Ok(changed)
@@ -2390,10 +2699,11 @@ fn apply_resolved_lvalue(
                     index, signal
                 )));
             }
-            let bit = value.coerced_to(1).normalized_bits().get_bit(0);
-            let mut bits = current.normalized_bits();
-            bits.set_bit(*index, bit);
-            let next = Value::new(bits, current.width);
+            let bit = value.coerced_to(1).logic().bit(0);
+            let next = Value::from_logic(
+                logic_replace_slice(current.logic(), *index, 1, &logic_value_from_bit(bit)),
+                current.width,
+            );
             let changed = *current != next;
             *current = next;
             Ok(changed)
@@ -2414,11 +2724,10 @@ fn apply_resolved_lvalue(
                 )));
             }
             let width = high - low + 1;
-            let mut bits = current.normalized_bits();
-            let cleared =
-                bits.bitand(&mask(width).shift_left(low).bitnot_with_width(current.width));
-            bits = cleared.bitor(&value.coerced_to(width).normalized_bits().shift_left(low));
-            let next = Value::new(bits, current.width);
+            let next = Value::from_logic(
+                logic_replace_slice(current.logic(), low, width, value.coerced_to(width).logic()),
+                current.width,
+            );
             let changed = *current != next;
             *current = next;
             Ok(changed)
@@ -2461,7 +2770,7 @@ fn stage_whole_signal_driver(
     object_layouts: &[RuntimeObjectLayout],
     net_drivers: &mut NetDriverTable,
 ) -> Result<()> {
-    let logic = LogicValue::from_bit_value_with_width(value.normalized_bits(), value.width);
+    let logic = value.coerced_to(binding.view_width).logic;
     stage_whole_signal_logic_driver(binding, logic, object_layouts, net_drivers)
 }
 
@@ -2492,8 +2801,7 @@ fn stage_partial_signal_driver(
     object_layouts: &[RuntimeObjectLayout],
     net_drivers: &mut NetDriverTable,
 ) -> Result<()> {
-    let logic =
-        LogicValue::from_bit_value_with_width(value.normalized_bits(), width).coerced_to(width);
+    let logic = value.coerced_to(width).logic;
     stage_partial_signal_logic_driver(binding, low, width, logic, object_layouts, net_drivers)
 }
 
@@ -2589,13 +2897,16 @@ fn apply_or_stage_resolved_lvalue(
         }
         ResolvedLValue::Concat(items) => {
             let total_width = resolved_lvalue_width(lvalue, module)?;
-            let normalized = value.coerced_to(total_width).normalized_bits();
+            let normalized = value.coerced_to(total_width);
             let mut remaining_width = total_width;
             let mut changed = false;
             for item in items {
                 let item_width = resolved_lvalue_width(item, module)?;
                 remaining_width -= item_width;
-                let chunk = Value::new(normalized.slice(remaining_width, item_width), item_width);
+                let chunk = Value::from_logic(
+                    logic_slice(normalized.logic(), remaining_width, item_width),
+                    item_width,
+                );
                 changed |= apply_or_stage_resolved_lvalue(
                     item,
                     chunk,
@@ -2610,105 +2921,6 @@ fn apply_or_stage_resolved_lvalue(
             Ok(changed)
         }
         _ => apply_resolved_lvalue(lvalue, value, module, values, memories),
-    }
-}
-
-fn apply_or_stage_resolved_lvalue_logic(
-    lvalue: &ResolvedLValue,
-    value: LogicValue,
-    module: &ModuleSummary,
-    state: &ModuleState,
-    values: &mut HashMap<String, Value>,
-    memories: &mut HashMap<String, MemoryState>,
-    object_layouts: &[RuntimeObjectLayout],
-    net_drivers: &mut NetDriverTable,
-) -> Result<bool> {
-    match lvalue {
-        ResolvedLValue::Signal(name)
-            if signal_storage(module, name).is_some_and(StorageKind::is_net) =>
-        {
-            let binding = state.signals.get(name).copied().ok_or_else(|| {
-                Error::Resolve(format!(
-                    "signal '{}' is not declared in '{}'",
-                    name, module.name
-                ))
-            })?;
-            stage_whole_signal_logic_driver(binding, value, object_layouts, net_drivers)?;
-            Ok(false)
-        }
-        ResolvedLValue::BitSelect { signal, index }
-            if signal_storage(module, signal).is_some_and(StorageKind::is_net) =>
-        {
-            let binding = state.signals.get(signal).copied().ok_or_else(|| {
-                Error::Resolve(format!(
-                    "signal '{}' is not declared in '{}'",
-                    signal, module.name
-                ))
-            })?;
-            stage_partial_signal_logic_driver(
-                binding,
-                *index,
-                1,
-                value.coerced_to(1),
-                object_layouts,
-                net_drivers,
-            )?;
-            Ok(false)
-        }
-        ResolvedLValue::PartSelect { signal, msb, lsb }
-            if signal_storage(module, signal).is_some_and(StorageKind::is_net) =>
-        {
-            let binding = state.signals.get(signal).copied().ok_or_else(|| {
-                Error::Resolve(format!(
-                    "signal '{}' is not declared in '{}'",
-                    signal, module.name
-                ))
-            })?;
-            let low = (*msb).min(*lsb);
-            let width = (*msb).max(*lsb) - low + 1;
-            stage_partial_signal_logic_driver(
-                binding,
-                low,
-                width,
-                value.coerced_to(width),
-                object_layouts,
-                net_drivers,
-            )?;
-            Ok(false)
-        }
-        ResolvedLValue::Concat(items) => {
-            let total_width = resolved_lvalue_width(lvalue, module)?;
-            let value = value.coerced_to(total_width);
-            let mut remaining_width = total_width;
-            let mut changed = false;
-            for item in items {
-                let item_width = resolved_lvalue_width(item, module)?;
-                remaining_width -= item_width;
-                let mut chunk_bits = LogicBits::zero();
-                for offset in 0..item_width {
-                    chunk_bits.set_bit(offset, value.bit(remaining_width + offset));
-                }
-                let logic_chunk = LogicValue::new(chunk_bits, item_width);
-                changed |= apply_or_stage_resolved_lvalue_logic(
-                    item,
-                    logic_chunk,
-                    module,
-                    state,
-                    values,
-                    memories,
-                    object_layouts,
-                    net_drivers,
-                )?;
-            }
-            Ok(changed)
-        }
-        _ => apply_resolved_lvalue(
-            lvalue,
-            Value::new(value.to_bit_value_lossy(), value.width()),
-            module,
-            values,
-            memories,
-        ),
     }
 }
 
@@ -2838,7 +3050,8 @@ mod tests {
             .unwrap_or_else(|| panic!("missing signal binding '{name}'"));
         super::read_binding(binding, &sim.persisted)
             .expect("read persisted binding")
-            .normalized_bits()
+            .to_bit_value_checked()
+            .expect("persisted value is 2-state")
             .to_u64_checked()
             .expect("persisted value fits in u64")
     }
@@ -2874,7 +3087,8 @@ mod tests {
             .unwrap_or_else(|| panic!("missing memory '{name}'"))
             .read(index, name)
             .expect("read memory")
-            .normalized_bits()
+            .to_bit_value_checked()
+            .expect("memory value is 2-state")
             .to_u64_checked()
             .expect("memory value fits in u64")
     }
@@ -3058,6 +3272,83 @@ mod tests {
                 .contains("resolved to four-state value 'x'"),
             "unexpected error: {error}"
         );
+    }
+
+    #[test]
+    fn eval_once_logic_merges_unknown_ternary_condition_bits() {
+        let design = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module top(output logic [1:0] merged); ",
+                    "wire maybe; ",
+                    "assign maybe = 1'b0; ",
+                    "assign maybe = 1'b1; ",
+                    "assign merged = maybe ? 2'b10 : 2'b11; ",
+                    "endmodule\n"
+                ),
+            )
+            .expect("compile ternary merge");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let logic_outputs = eval_once_logic(&mut sim, []);
+        assert_eq!(
+            logic_outputs.get("merged"),
+            Some(&LogicValue::from_logic_str("1x").expect("1x logic"))
+        );
+
+        let error = sim
+            .eval_once(BTreeMap::new())
+            .expect_err("public eval should reject merged x");
+        assert!(
+            error
+                .to_string()
+                .contains("resolved to four-state value '1x'"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn eval_once_applies_four_state_control_semantics_after_net_resolution() {
+        let design = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module top(",
+                    "output logic eq_guard, ",
+                    "output logic not_guard, ",
+                    "output logic case_default, ",
+                    "output logic ternary_guard, ",
+                    "output logic lt_guard",
+                    "); ",
+                    "wire maybe; ",
+                    "logic [1:0] merged; ",
+                    "assign maybe = 1'b0; ",
+                    "assign maybe = 1'b1; ",
+                    "assign merged = maybe ? 2'b10 : 2'b11; ",
+                    "always_comb begin ",
+                    "  if (maybe == 1'b0) eq_guard = 1'b1; else eq_guard = 1'b0; ",
+                    "  if (!maybe) not_guard = 1'b1; else not_guard = 1'b0; ",
+                    "  if (merged[0]) ternary_guard = 1'b1; else ternary_guard = 1'b0; ",
+                    "  if (maybe < 1'b1) lt_guard = 1'b1; else lt_guard = 1'b0; ",
+                    "  case (maybe) ",
+                    "    1'b0: case_default = 1'b0; ",
+                    "    1'b1: case_default = 1'b0; ",
+                    "    default: case_default = 1'b1; ",
+                    "  endcase ",
+                    "end ",
+                    "endmodule\n"
+                ),
+            )
+            .expect("compile four-state control");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let outputs = sim.eval_once(BTreeMap::new()).expect("eval");
+        assert_signal_eq!(outputs, "eq_guard", 0);
+        assert_signal_eq!(outputs, "not_guard", 0);
+        assert_signal_eq!(outputs, "case_default", 1);
+        assert_signal_eq!(outputs, "ternary_guard", 0);
+        assert_signal_eq!(outputs, "lt_guard", 0);
     }
 
     #[test]
