@@ -5,7 +5,6 @@ use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
 
-use crate::bit_value::BitValue;
 use crate::design::{CompiledDesign, DesignHierarchy, InstanceHierarchy};
 use crate::diag::{Error, Result};
 use crate::logic_value::{LogicPattern, LogicValue};
@@ -283,17 +282,18 @@ impl JsonTestSuite {
 fn run_sequential_step(
     sim: &mut crate::sim::SimulationSession,
     inputs: &BTreeMap<String, LogicValue>,
-) -> Result<BTreeMap<String, BitValue>> {
+) -> Result<BTreeMap<String, LogicValue>> {
     let runtime_inputs = lower_runtime_inputs(inputs)?;
 
     // The JSON corpus records one logical cycle per step and historically
     // represented that by sampling `clk=1` on each step.
     if runtime_inputs
         .get("clk")
+        .and_then(LogicValue::to_bit_value_checked)
         .is_some_and(|clock| !clock.is_zero())
     {
         let mut low_inputs = runtime_inputs.clone();
-        low_inputs.insert("clk".into(), BitValue::zero());
+        low_inputs.insert("clk".into(), LogicValue::zero(1));
         sim.step(low_inputs)?;
     }
 
@@ -520,13 +520,13 @@ fn collect_matching_instances(
 }
 
 fn compare_outputs(
-    actual: &BTreeMap<String, BitValue>,
+    actual: &BTreeMap<String, LogicValue>,
     expected: &BTreeMap<String, LogicPattern>,
     step: Option<usize>,
 ) -> Vec<JsonTestFailure> {
     let mut failures = Vec::new();
     for (signal, expected_value) in expected {
-        let actual_value = actual.get(signal).cloned().map(LogicValue::from);
+        let actual_value = actual.get(signal).cloned();
         if !actual_value
             .as_ref()
             .is_some_and(|actual_value| expected_value.matches(actual_value))
@@ -545,20 +545,20 @@ fn compare_outputs(
 fn collect_trace_values(
     sim: &mut crate::sim::SimulationSession,
     inputs: &BTreeMap<String, LogicValue>,
-    actual: &BTreeMap<String, BitValue>,
+    actual: &BTreeMap<String, LogicValue>,
     signals: &[String],
 ) -> Result<BTreeMap<String, LogicValue>> {
     let runtime_inputs = lower_runtime_inputs(inputs)?;
     let mut values = BTreeMap::new();
     for signal in signals {
         let value = if let Some(value) = actual.get(signal).cloned() {
-            LogicValue::from(value)
+            value
         } else if let Some((path, signal_name)) = signal.rsplit_once('.') {
             let instance_path = path
                 .split('.')
                 .filter(|segment| !segment.is_empty())
                 .collect::<Vec<_>>();
-            LogicValue::from(sim.read_signal(&runtime_inputs, &instance_path, signal_name)?)
+            sim.read_signal(&runtime_inputs, &instance_path, signal_name)?
         } else {
             return Err(Error::Resolve(format!(
                 "trace signal '{}' is not a top-level output; use '<instance>.<signal>' for hierarchical traces",
@@ -572,18 +572,8 @@ fn collect_trace_values(
 
 fn lower_runtime_inputs(
     inputs: &BTreeMap<String, LogicValue>,
-) -> Result<BTreeMap<String, BitValue>> {
-    let mut lowered = BTreeMap::new();
-    for (signal, value) in inputs {
-        let bits = value.to_bit_value_checked().ok_or_else(|| {
-            Error::Unsupported(format!(
-                "JSON test input '{}' uses four-state value '{}' but the current simulator input path is still 2-state",
-                signal, value
-            ))
-        })?;
-        lowered.insert(signal.clone(), bits);
-    }
-    Ok(lowered)
+) -> Result<BTreeMap<String, LogicValue>> {
+    Ok(inputs.clone())
 }
 
 fn build_report(cases: Vec<JsonTestCaseReport>, duration: std::time::Duration) -> JsonTestReport {
@@ -765,7 +755,7 @@ mod tests {
     use std::path::PathBuf;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-    use crate::{Compiler, Error, LogicPattern, LogicValue};
+    use crate::{Compiler, LogicPattern, LogicValue};
 
     use super::{JsonTestCaseReport, build_report};
 
@@ -830,6 +820,21 @@ mod tests {
 
         let report = design
             .run_json_file(repo.join("parts/testing/022-FourStateControl.json"))
+            .expect("run json tests");
+
+        assert!(report.all_passed());
+        assert_eq!(report.passed, report.total);
+    }
+
+    #[test]
+    fn run_json_file_passes_four_state_public_boundary_suite() {
+        let repo = repo_root();
+        let design = Compiler::new()
+            .compile_file(repo.join("parts/testing/023-FourStateBoundary.sv"))
+            .expect("compile four-state boundary");
+
+        let report = design
+            .run_json_file(repo.join("parts/testing/023-FourStateBoundary.json"))
             .expect("run json tests");
 
         assert!(report.all_passed());
@@ -1286,7 +1291,7 @@ mod tests {
     }
 
     #[test]
-    fn run_json_file_rejects_four_state_inputs_before_runtime_cutover() {
+    fn run_json_file_accepts_four_state_inputs_after_runtime_cutover() {
         let temp_dir = unique_temp_dir("json-test-four-state-input");
         let design = Compiler::new()
             .compile_str(
@@ -1294,29 +1299,38 @@ mod tests {
                 concat!(
                     "module top(",
                     "input logic inA, ",
-                    "output logic outY",
+                    "input logic inB, ",
+                    "output logic passA, ",
+                    "output logic eq_raw, ",
+                    "output tri floatZ",
                     "); ",
-                    "assign outY = inA; ",
+                    "assign passA = inA; ",
+                    "assign eq_raw = (inA == 1'b1); ",
                     "endmodule\n"
                 ),
             )
             .expect("compile top");
         let json_path = temp_dir.join("top.json");
-        fs::write(&json_path, "[{\"inA\":\"x\",\"expect\":{\"outY\":0}}]").expect("write json");
+        fs::write(
+            &json_path,
+            concat!(
+                "[{",
+                "\"inA\":\"x\",",
+                "\"inB\":\"z\",",
+                "\"expect\":{",
+                "\"passA\":\"x\",",
+                "\"eq_raw\":\"x\",",
+                "\"floatZ\":\"z\"",
+                "}",
+                "}]"
+            ),
+        )
+        .expect("write json");
 
-        let error = design
-            .run_json_file(&json_path)
-            .expect_err("four-state inputs should fail before runtime cutover");
+        let report = design.run_json_file(&json_path).expect("run json tests");
 
-        match error {
-            Error::Unsupported(message) => {
-                assert!(
-                    message.contains("JSON test input 'inA' uses four-state value 'x'"),
-                    "unexpected message: {message}"
-                );
-            }
-            other => panic!("unexpected error: {other}"),
-        }
+        assert!(report.all_passed());
+        assert_eq!(report.passed, report.total);
     }
 
     #[test]

@@ -1,0 +1,12 @@
+[
+  {
+    "inA": "x",
+    "inB": "z",
+    "expect": {
+      "passA": "x",
+      "eqRaw": "x",
+      "ternaryMix": "x",
+      "floatZ": "z"
+    }
+  }
+]

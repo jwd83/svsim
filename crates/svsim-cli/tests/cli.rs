@@ -60,6 +60,50 @@ fn cli_runs_json_regression_suite() {
 }
 
 #[test]
+fn cli_reports_four_state_values_in_json_regression_output() {
+    let temp_dir = unique_temp_dir("cli-json-four-state");
+    fs::write(
+        temp_dir.join("top.sv"),
+        concat!(
+            "module top(",
+            "input logic inA, ",
+            "output logic outY",
+            "); ",
+            "assign outY = inA; ",
+            "endmodule\n"
+        ),
+    )
+    .expect("write top.sv");
+    fs::write(
+        temp_dir.join("top.json"),
+        "[{\"inA\":\"x\",\"expect\":{\"outY\":0}}]",
+    )
+    .expect("write top.json");
+
+    let output = Command::new(svsim_bin())
+        .arg("--json-test")
+        .arg(temp_dir.join("top.json"))
+        .arg(temp_dir.join("top.sv"))
+        .output()
+        .expect("run svsim");
+
+    assert!(
+        !output.status.success(),
+        "expected mismatch report, stdout: {}, stderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let json: Value = serde_json::from_slice(&output.stdout).expect("parse stdout json");
+    assert_eq!(json["report"]["passed"], 0);
+    assert_eq!(json["report"]["total"], 1);
+    assert_eq!(
+        json["report"]["cases"][0]["failures"][0]["actual"],
+        Value::String("x".into())
+    );
+}
+
+#[test]
 fn cli_runs_json_regression_directory() {
     let temp_dir = unique_temp_dir("cli-json-test-dir");
     fs::write(

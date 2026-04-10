@@ -10,6 +10,23 @@ This plan is intentionally infrastructure-first. `sap2` is the integration
 target at the end of each major phase, but it starts as a non-gating auxiliary
 corpus. Public `inout` stays rejected until the full semantic slice is ready.
 
+## Status Snapshot
+
+- Phases 1 through 5 are now effectively landed for the zero-delay milestone:
+  four-state runtime values exist, structural elaboration/runtime cutover is in
+  place, net resolution is active, and expression/control evaluation preserves
+  `x` / `z`.
+- Phase 6 is partially landed:
+  - primary `SimulationSession` eval/step/read APIs are four-state-aware
+  - explicit `_2state` wrappers preserve the old fail-on-`x`/`z` behavior
+  - JSON tests, traces, failures, and CLI report output round-trip literal
+    `x` / `z`
+  - focused corpus coverage now includes `022-FourStateControl` and
+    `023-FourStateBoundary`
+- Public `inout` remains intentionally rejected. The remaining unlock work is
+  mostly Phase 7 integration and the final public `inout` removal decision once
+  the full unlock bar is satisfied.
+
 ## Locked Decisions
 
 - Keep `BitValue` as the numeric/host-facing 2-state type.
@@ -203,6 +220,10 @@ Additional non-gating checks when available:
 
 Use this document as the starting point for the next turn:
 
-1. stress-test the phase ordering
-2. identify the riskiest slice boundaries
-3. decide the first concrete implementation slice to actually land
+1. start Phase 7 with a minimal `parts/sap2` scaffold if it is not checked in
+   yet
+2. define the smallest harness-compatible `sap2` top contract that can reuse
+   the current `sap1` program corpus
+3. land the first internal shared-bus participant using real `inout` plus
+   focused floating/contention regression tests, while keeping public `inout`
+   rejected

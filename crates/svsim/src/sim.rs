@@ -156,7 +156,7 @@ impl SimulationSession {
         &mut self,
         instance_path: &[&str],
         memory_name: &str,
-        words: &[BitValue],
+        words: &[LogicValue],
     ) -> Result<()> {
         let hir = self.design.hir();
         let module_state = resolve_instance_path_mut(&mut self.state, instance_path)?;
@@ -178,12 +178,26 @@ impl SimulationSession {
             let index = memory_decl.index_range.low() + offset;
             memory_state.write(
                 index,
-                Value::new(word.clone(), memory_decl.element_width()),
+                Value::from_logic(word.clone(), memory_decl.element_width()),
                 memory_name,
             )?;
         }
 
         Ok(())
+    }
+
+    pub fn load_memory_words_2state(
+        &mut self,
+        instance_path: &[&str],
+        memory_name: &str,
+        words: &[BitValue],
+    ) -> Result<()> {
+        let logic_words = words
+            .iter()
+            .cloned()
+            .map(LogicValue::from)
+            .collect::<Vec<_>>();
+        self.load_memory_words(instance_path, memory_name, &logic_words)
     }
 
     pub fn load_memory_file(
@@ -226,7 +240,7 @@ impl SimulationSession {
         instance_path: &[&str],
         memory_name: &str,
         index: usize,
-    ) -> Result<BitValue> {
+    ) -> Result<LogicValue> {
         let hir = self.design.hir();
         let module_state = resolve_instance_path(&self.state, instance_path)?;
         let module = resolve_supported_module(hir, &module_state.module_name)?;
@@ -242,22 +256,25 @@ impl SimulationSession {
                 memory_name, module.name
             ))
         })?;
-        let value = memory_state.read(index, memory_name)?;
-        logic_to_public_bit_value(
-            value.logic(),
-            format!(
-                "memory '{}' word {} in '{}'",
-                memory_name, index, module.name
-            ),
-        )
+        Ok(memory_state.read(index, memory_name)?.logic().clone())
+    }
+
+    pub fn read_memory_word_2state(
+        &self,
+        instance_path: &[&str],
+        memory_name: &str,
+        index: usize,
+    ) -> Result<BitValue> {
+        let logic = self.read_memory_word(instance_path, memory_name, index)?;
+        logic_to_public_bit_value(&logic, format!("memory '{}' word {}", memory_name, index))
     }
 
     pub fn read_signal(
         &self,
-        inputs: &BTreeMap<String, BitValue>,
+        inputs: &BTreeMap<String, LogicValue>,
         instance_path: &[&str],
         signal_name: &str,
-    ) -> Result<BitValue> {
+    ) -> Result<LogicValue> {
         let hir = self.design.hir();
         let module = top_module(hir, self.top_module())?;
         let mut frame =
@@ -285,17 +302,24 @@ impl SimulationSession {
                     signal_name, instance_module.name
                 ))
             })?;
-        let logic = read_binding_logic(binding, &frame)?;
-        logic_to_public_bit_value(
-            &logic,
-            format!("signal '{}' in '{}'", signal_name, instance_module.name),
-        )
+        read_binding_logic(binding, &frame)
+    }
+
+    pub fn read_signal_2state(
+        &self,
+        inputs: &BTreeMap<String, BitValue>,
+        instance_path: &[&str],
+        signal_name: &str,
+    ) -> Result<BitValue> {
+        let logic_inputs = logic_inputs_from_public_bits(inputs);
+        let logic = self.read_signal(&logic_inputs, instance_path, signal_name)?;
+        logic_to_public_bit_value(&logic, format!("signal '{}'", signal_name))
     }
 
     pub fn eval_once(
         &mut self,
-        inputs: BTreeMap<String, BitValue>,
-    ) -> Result<BTreeMap<String, BitValue>> {
+        inputs: BTreeMap<String, LogicValue>,
+    ) -> Result<BTreeMap<String, LogicValue>> {
         let module = top_module(self.design.hir(), self.top_module())?;
         let mut frame =
             seed_runtime_frame(module, &self.state, &self.persisted, &self.objects, &inputs)?;
@@ -309,13 +333,21 @@ impl SimulationSession {
             Some(&inputs),
             &mut stack,
         )?;
-        collect_outputs(module, &self.state, &frame)
+        collect_outputs_logic(module, &self.state, &frame)
+    }
+
+    pub fn eval_once_2state(
+        &mut self,
+        inputs: BTreeMap<String, BitValue>,
+    ) -> Result<BTreeMap<String, BitValue>> {
+        let logic_outputs = self.eval_once(logic_inputs_from_public_bits(&inputs))?;
+        logic_outputs_to_public_bits(logic_outputs)
     }
 
     pub fn step(
         &mut self,
-        inputs: BTreeMap<String, BitValue>,
-    ) -> Result<BTreeMap<String, BitValue>> {
+        inputs: BTreeMap<String, LogicValue>,
+    ) -> Result<BTreeMap<String, LogicValue>> {
         let hir = self.design.hir();
         let module = top_module(hir, self.top_module())?;
         let mut pre_frame =
@@ -356,7 +388,15 @@ impl SimulationSession {
             Some(&inputs),
             &mut post_settle_stack,
         )?;
-        collect_outputs(module, &self.state, &post_frame)
+        collect_outputs_logic(module, &self.state, &post_frame)
+    }
+
+    pub fn step_2state(
+        &mut self,
+        inputs: BTreeMap<String, BitValue>,
+    ) -> Result<BTreeMap<String, BitValue>> {
+        let logic_outputs = self.step(logic_inputs_from_public_bits(&inputs))?;
+        logic_outputs_to_public_bits(logic_outputs)
     }
 }
 
@@ -751,7 +791,7 @@ fn settle_module(
     state: &ModuleState,
     frame: &mut [ObjectValue],
     object_layouts: &[RuntimeObjectLayout],
-    inputs: Option<&BTreeMap<String, BitValue>>,
+    inputs: Option<&BTreeMap<String, LogicValue>>,
     stack: &mut Vec<String>,
 ) -> Result<()> {
     let max_iterations = settle_iteration_budget(hir, state)?.max(1) * 8;
@@ -809,7 +849,7 @@ fn settle_module_pass(
     state: &ModuleState,
     frame: &mut [ObjectValue],
     object_layouts: &[RuntimeObjectLayout],
-    inputs: Option<&BTreeMap<String, BitValue>>,
+    inputs: Option<&BTreeMap<String, LogicValue>>,
     net_drivers: &mut NetDriverTable,
     stack: &mut Vec<String>,
 ) -> Result<bool> {
@@ -1154,7 +1194,7 @@ fn seed_runtime_frame(
     state: &ModuleState,
     persisted: &[ObjectValue],
     _object_layouts: &[RuntimeObjectLayout],
-    inputs: &BTreeMap<String, BitValue>,
+    inputs: &BTreeMap<String, LogicValue>,
 ) -> Result<Vec<ObjectValue>> {
     for name in inputs.keys() {
         if module.port(name).is_none() {
@@ -1415,7 +1455,7 @@ fn apply_external_inputs(
     state: &ModuleState,
     frame: &mut [ObjectValue],
     object_layouts: &[RuntimeObjectLayout],
-    inputs: &BTreeMap<String, BitValue>,
+    inputs: &BTreeMap<String, LogicValue>,
     net_drivers: &mut NetDriverTable,
 ) -> Result<bool> {
     let mut changed = false;
@@ -1431,11 +1471,11 @@ fn apply_external_inputs(
                 port.name, module.name
             ))
         })?;
-        let value = Value::new(
+        let value = Value::from_logic(
             inputs
                 .get(&port.name)
                 .cloned()
-                .unwrap_or_else(BitValue::zero),
+                .unwrap_or_else(|| LogicValue::zero(port.width())),
             port.width(),
         );
         changed |= apply_fixed_binding_drive(binding, value, frame, object_layouts, net_drivers)?;
@@ -1930,24 +1970,6 @@ enum ResolvedLValue {
     },
 }
 
-fn collect_outputs(
-    module: &ModuleSummary,
-    state: &ModuleState,
-    frame: &[ObjectValue],
-) -> Result<BTreeMap<String, BitValue>> {
-    let logic_outputs = collect_outputs_logic(module, state, frame)?;
-    let mut outputs = BTreeMap::new();
-
-    for (name, logic) in logic_outputs {
-        outputs.insert(
-            name.clone(),
-            logic_to_public_bit_value(&logic, format!("output '{}' on '{}'", name, module.name))?,
-        );
-    }
-
-    Ok(outputs)
-}
-
 fn collect_outputs_logic(
     module: &ModuleSummary,
     state: &ModuleState,
@@ -1972,12 +1994,36 @@ fn collect_outputs_logic(
     Ok(outputs)
 }
 
+fn logic_inputs_from_public_bits(
+    inputs: &BTreeMap<String, BitValue>,
+) -> BTreeMap<String, LogicValue> {
+    inputs
+        .iter()
+        .map(|(name, value)| (name.clone(), LogicValue::from(value.clone())))
+        .collect()
+}
+
+fn logic_outputs_to_public_bits(
+    logic_outputs: BTreeMap<String, LogicValue>,
+) -> Result<BTreeMap<String, BitValue>> {
+    let mut outputs = BTreeMap::new();
+
+    for (name, logic) in logic_outputs {
+        outputs.insert(
+            name.clone(),
+            logic_to_public_bit_value(&logic, format!("output '{}'", name))?,
+        );
+    }
+
+    Ok(outputs)
+}
+
 fn logic_to_public_bit_value(logic: &LogicValue, context: String) -> Result<BitValue> {
     logic
         .to_bit_value_checked()
         .ok_or_else(|| {
             Error::Unsupported(format!(
-                "{} resolved to four-state value '{}' before the public four-state API cutover",
+                "{} resolved to four-state value '{}' and cannot be represented through the explicit 2-state wrapper",
                 context, logic
             ))
         })
@@ -3010,31 +3056,31 @@ mod tests {
     use super::SimulationSession;
     use crate::{BitValue, Compiler, LogicValue};
 
-    fn bv(value: u64) -> BitValue {
-        BitValue::from(value)
+    fn lv(value: u64) -> LogicValue {
+        LogicValue::from(value)
     }
 
-    fn inputs<const N: usize>(pairs: [(String, u64); N]) -> BTreeMap<String, BitValue> {
+    fn inputs<const N: usize>(pairs: [(String, u64); N]) -> BTreeMap<String, LogicValue> {
         pairs
             .into_iter()
-            .map(|(name, value)| (name, bv(value)))
+            .map(|(name, value)| (name, lv(value)))
             .collect()
     }
 
-    fn words<const N: usize>(values: [u64; N]) -> Vec<BitValue> {
-        values.into_iter().map(bv).collect()
+    fn words<const N: usize>(values: [u64; N]) -> Vec<LogicValue> {
+        values.into_iter().map(lv).collect()
     }
 
     fn step_posedge<const N: usize>(
         sim: &mut SimulationSession,
         pairs: [(String, u64); N],
-    ) -> BTreeMap<String, BitValue> {
+    ) -> BTreeMap<String, LogicValue> {
         let mut low_inputs = inputs(pairs.clone());
-        low_inputs.insert("clk".into(), bv(0));
+        low_inputs.insert("clk".into(), lv(0));
         sim.step(low_inputs).expect("step low");
 
         let mut high_inputs = inputs(pairs);
-        high_inputs.insert("clk".into(), bv(1));
+        high_inputs.insert("clk".into(), lv(1));
         sim.step(high_inputs).expect("step high")
     }
 
@@ -3060,24 +3106,7 @@ mod tests {
         sim: &mut SimulationSession,
         pairs: [(String, u64); N],
     ) -> BTreeMap<String, LogicValue> {
-        let inputs = inputs(pairs);
-        let hir = sim.design.hir();
-        let module = super::top_module(hir, sim.top_module()).expect("top module");
-        let mut frame =
-            super::seed_runtime_frame(module, &sim.state, &sim.persisted, &sim.objects, &inputs)
-                .expect("seed frame");
-        let mut stack = Vec::new();
-        super::settle_module(
-            hir,
-            module,
-            &sim.state,
-            &mut frame,
-            &sim.objects,
-            Some(&inputs),
-            &mut stack,
-        )
-        .expect("settle module");
-        super::collect_outputs_logic(module, &sim.state, &frame).expect("collect logic outputs")
+        sim.eval_once(inputs(pairs)).expect("eval")
     }
 
     fn memory_u64(state: &super::ModuleState, name: &str, index: usize) -> u64 {
@@ -3103,7 +3132,27 @@ mod tests {
 
     macro_rules! assert_signal_eq {
         ($outputs:expr, $name:expr, $value:expr) => {
-            assert_eq!($outputs.get($name).cloned(), Some(bv($value)));
+            assert_eq!(
+                $outputs
+                    .get($name)
+                    .and_then(|value| value.to_bit_value_checked()),
+                Some(BitValue::from($value as u64))
+            );
+        };
+    }
+
+    macro_rules! assert_logic_eq {
+        ($actual:expr, $value:expr) => {
+            assert_eq!(
+                ($actual).to_bit_value_checked(),
+                Some(BitValue::from($value as u64))
+            );
+        };
+    }
+
+    macro_rules! assert_logic_bits_eq {
+        ($actual:expr, $value:expr) => {
+            assert_eq!(($actual).to_bit_value_checked(), Some($value));
         };
     }
 
@@ -3212,8 +3261,8 @@ mod tests {
         );
 
         let error = sim
-            .eval_once(BTreeMap::new())
-            .expect_err("public eval should reject z");
+            .eval_once_2state(BTreeMap::new())
+            .expect_err("2-state wrapper should reject z");
         assert!(
             error
                 .to_string()
@@ -3264,8 +3313,8 @@ mod tests {
         );
 
         let error = sim
-            .eval_once(BTreeMap::new())
-            .expect_err("public eval should reject x");
+            .eval_once_2state(BTreeMap::new())
+            .expect_err("2-state wrapper should reject x");
         assert!(
             error
                 .to_string()
@@ -3298,8 +3347,8 @@ mod tests {
         );
 
         let error = sim
-            .eval_once(BTreeMap::new())
-            .expect_err("public eval should reject merged x");
+            .eval_once_2state(BTreeMap::new())
+            .expect_err("2-state wrapper should reject merged x");
         assert!(
             error
                 .to_string()
@@ -4239,8 +4288,10 @@ endmodule
         assert_signal_eq!(outputs, "acc", 5);
         assert_signal_eq!(outputs, "ram_out", 5);
         assert_eq!(
-            sim.read_memory_word(&[], "ram", 0).expect("read ram"),
-            bv(5)
+            sim.read_memory_word(&[], "ram", 0)
+                .expect("read ram")
+                .to_bit_value_checked(),
+            Some(BitValue::from(5_u64))
         );
     }
 
@@ -4278,8 +4329,9 @@ endmodule
         assert_signal_eq!(outputs, "r0_out", 0x05);
         assert_eq!(
             sim.read_memory_word(&["fetch_unit"], "rom", 0)
-                .expect("read child rom"),
-            bv(0x05)
+                .expect("read child rom")
+                .to_bit_value_checked(),
+            Some(BitValue::from(0x05_u64))
         );
     }
 
@@ -4348,18 +4400,18 @@ endmodule
             .read_signal(&settled_inputs, &[], "src_value")
             .expect("read settled src_value");
 
-        assert_eq!(settled_instr, bv(177));
-        assert_eq!(settled_is_copy, bv(1));
-        assert_eq!(settled_src_sel, bv(6));
-        assert_eq!(settled_dst_sel, bv(1));
-        assert_eq!(settled_mux_sel, bv(6));
-        assert_eq!(settled_mux_in6, bv(10));
-        assert_eq!(settled_mux_hi, bv(10));
-        assert_eq!(settled_final_sel, bv(1));
-        assert_eq!(settled_final_in1, bv(10));
-        assert_eq!(settled_final_out, bv(10));
-        assert_eq!(settled_mux_out, bv(10));
-        assert_eq!(settled_src_value, bv(10));
+        assert_logic_eq!(settled_instr, 177);
+        assert_logic_eq!(settled_is_copy, 1);
+        assert_logic_eq!(settled_src_sel, 6);
+        assert_logic_eq!(settled_dst_sel, 1);
+        assert_logic_eq!(settled_mux_sel, 6);
+        assert_logic_eq!(settled_mux_in6, 10);
+        assert_logic_eq!(settled_mux_hi, 10);
+        assert_logic_eq!(settled_final_sel, 1);
+        assert_logic_eq!(settled_final_in1, 10);
+        assert_logic_eq!(settled_final_out, 10);
+        assert_logic_eq!(settled_mux_out, 10);
+        assert_logic_eq!(settled_src_value, 10);
     }
 
     #[test]
@@ -4627,18 +4679,21 @@ endmodule
 
         assert_eq!(
             sim.read_memory_word(&["fetch_unit"], "rom", 0)
-                .expect("read instruction 0"),
-            bv(0x05)
+                .expect("read instruction 0")
+                .to_bit_value_checked(),
+            Some(BitValue::from(0x05_u64))
         );
         assert_eq!(
             sim.read_memory_word(&["fetch_unit"], "rom", 1)
-                .expect("read instruction 1"),
-            bv(0x81)
+                .expect("read instruction 1")
+                .to_bit_value_checked(),
+            Some(BitValue::from(0x81_u64))
         );
         assert_eq!(
             sim.read_memory_word(&["fetch_unit"], "rom", 16)
-                .expect("read instruction 16"),
-            bv(0x9e)
+                .expect("read instruction 16")
+                .to_bit_value_checked(),
+            Some(BitValue::from(0x9e_u64))
         );
     }
 
@@ -4709,10 +4764,10 @@ endmodule
         let outputs = sim.eval_once(in_inputs.clone()).expect("eval");
 
         assert_signal_eq!(outputs, "out", 6);
-        assert_eq!(
+        assert_logic_eq!(
             sim.read_signal(&in_inputs, &["u_leaf"], "mirrored")
                 .expect("read child signal"),
-            BitValue::from(6_u64)
+            6
         );
     }
 
@@ -4768,10 +4823,19 @@ endmodule
             BitValue::from_prefixed_str("0x1234567890abcdef1234567890abcdef1234567890abcdef")
                 .expect("parse wide input");
         let outputs = sim
-            .eval_once(BTreeMap::from([("inA".into(), input.clone())]))
+            .eval_once(BTreeMap::from([(
+                "inA".into(),
+                LogicValue::from(input.clone()),
+            )]))
             .expect("eval");
 
-        assert_eq!(outputs.get("outY").cloned(), Some(input));
+        assert_logic_bits_eq!(
+            outputs
+                .get("outY")
+                .expect("wide output")
+                .clone(),
+            input
+        );
     }
 
     fn unique_temp_dir(name: &str) -> PathBuf {

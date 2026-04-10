@@ -1,7 +1,7 @@
 {
   "directory": "parts/sap1",
   "report": {
-    "duration_ms": 5472,
+    "duration_ms": 5520,
     "passed": 6,
     "total": 6,
     "suites": [
@@ -9,11 +9,11 @@
         "source_path": "parts/sap1/sap1.sv",
         "json_path": "parts/sap1/sap1_add3to42.json",
         "top_module": "machine",
-        "duration_ms": 5470,
+        "duration_ms": 5517,
         "passed": true,
         "report": {
-          "duration_ms": 5431,
-          "step_hz": 491,
+          "duration_ms": 5481,
+          "step_hz": 487,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -32,11 +32,11 @@
         "source_path": "parts/sap1/sap1.sv",
         "json_path": "parts/sap1/sap1_fib.json",
         "top_module": "machine",
-        "duration_ms": 898,
+        "duration_ms": 946,
         "passed": true,
         "report": {
-          "duration_ms": 876,
-          "step_hz": 316,
+          "duration_ms": 920,
+          "step_hz": 301,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -55,11 +55,11 @@
         "source_path": "parts/sap1/sap1.sv",
         "json_path": "parts/sap1/sap1_memory_traffic.json",
         "top_module": "machine",
-        "duration_ms": 435,
+        "duration_ms": 472,
         "passed": true,
         "report": {
-          "duration_ms": 406,
-          "step_hz": 280,
+          "duration_ms": 441,
+          "step_hz": 258,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -78,11 +78,11 @@
         "source_path": "parts/sap1/sap1.sv",
         "json_path": "parts/sap1/sap1_multiply.json",
         "top_module": "machine",
-        "duration_ms": 860,
+        "duration_ms": 904,
         "passed": true,
         "report": {
-          "duration_ms": 838,
-          "step_hz": 294,
+          "duration_ms": 882,
+          "step_hz": 280,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -101,11 +101,11 @@
         "source_path": "parts/sap1/sap1.sv",
         "json_path": "parts/sap1/sap1_self_modify_fetch.json",
         "top_module": "machine",
-        "duration_ms": 114,
+        "duration_ms": 139,
         "passed": true,
         "report": {
-          "duration_ms": 80,
-          "step_hz": 287,
+          "duration_ms": 97,
+          "step_hz": 237,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -124,11 +124,11 @@
         "source_path": "parts/sap1/sap1.sv",
         "json_path": "parts/sap1/sap1_test_jumps.json",
         "top_module": "machine",
-        "duration_ms": 521,
+        "duration_ms": 565,
         "passed": true,
         "report": {
-          "duration_ms": 499,
-          "step_hz": 264,
+          "duration_ms": 528,
+          "step_hz": 250,
           "passed": 1,
           "total": 1,
           "cases": [
