@@ -23,6 +23,13 @@ corpus. Public `inout` stays rejected until the full semantic slice is ready.
     `x` / `z`
   - focused corpus coverage now includes `022-FourStateControl` and
     `023-FourStateBoundary`
+- Phase 7 is now partially landed:
+  - internal whole-net `inout` leaf ports are allowed while top-level/public
+    `inout` remains rejected
+  - `parts/sap2/sap2.sv` now keeps the existing `sap1` harness-visible top
+    contract while moving internal bus producers onto shared `inout` drivers
+  - `parts/sap2` now includes runnable program suites plus a focused
+    floating/contention bus smoke regression
 - Public `inout` remains intentionally rejected. The remaining unlock work is
   mostly Phase 7 integration and the final public `inout` removal decision once
   the full unlock bar is satisfied.
@@ -220,10 +227,10 @@ Additional non-gating checks when available:
 
 Use this document as the starting point for the next turn:
 
-1. start Phase 7 with a minimal `parts/sap2` scaffold if it is not checked in
-   yet
-2. define the smallest harness-compatible `sap2` top contract that can reuse
-   the current `sap1` program corpus
-3. land the first internal shared-bus participant using real `inout` plus
-   focused floating/contention regression tests, while keeping public `inout`
-   rejected
+1. extend the `sap2` shared-bus structure beyond output-side bus drivers if we
+   want a closer import of the original machine partitioning
+2. decide whether to preserve the current undriven-net high-impedance pattern
+   for internal bus drivers or teach HDL literal lowering to carry `x` / `z`
+   digits natively
+3. keep public `inout` rejected until the remaining unlock-bar work is fully
+   satisfied

@@ -335,7 +335,10 @@ impl Compiler {
         }
 
         let design = CompiledDesign::new(self.search_paths.clone(), files, top_module);
-        validate_design(design.hir())?;
+        let top_module = design
+            .top_module()
+            .expect("compiled designs always carry a top module");
+        validate_design(design.hir(), top_module)?;
         Ok(design)
     }
 
@@ -1109,6 +1112,72 @@ mod tests {
             Error::Unsupported(message) => {
                 assert!(
                     message.contains("unsupported `inout` port 'io'"),
+                    "unexpected message: {message}"
+                );
+            }
+            other => panic!("unexpected error: {other}"),
+        }
+    }
+
+    #[test]
+    fn compile_str_allows_internal_inout_leaf_ports_behind_output_only_top() {
+        let design = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module bus_driver(",
+                    "input logic en, ",
+                    "input logic value, ",
+                    "inout wire bus",
+                    "); ",
+                    "wire float_bus; ",
+                    "assign bus = en ? value : float_bus; ",
+                    "endmodule\n",
+                    "module top(",
+                    "input logic en, ",
+                    "output wire out",
+                    "); ",
+                    "wire bus; ",
+                    "bus_driver u_driver(.en(en), .value(1'b1), .bus(bus)); ",
+                    "assign out = bus; ",
+                    "endmodule\n"
+                ),
+            )
+            .expect("internal inout leaf should compile");
+
+        assert_eq!(design.top_module(), Some("top"));
+    }
+
+    #[test]
+    fn compile_str_rejects_internal_inout_bound_to_non_net_target() {
+        let error = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module bus_driver(",
+                    "input logic en, ",
+                    "input logic value, ",
+                    "inout wire bus",
+                    "); ",
+                    "wire float_bus; ",
+                    "assign bus = en ? value : float_bus; ",
+                    "endmodule\n",
+                    "module top(",
+                    "input logic en, ",
+                    "output logic out",
+                    "); ",
+                    "logic bus; ",
+                    "bus_driver u_driver(.en(en), .value(1'b1), .bus(bus)); ",
+                    "assign out = bus; ",
+                    "endmodule\n"
+                ),
+            )
+            .expect_err("internal inout should require a parent net");
+
+        match error {
+            Error::Unsupported(message) => {
+                assert!(
+                    message.contains("require a parent net signal"),
                     "unexpected message: {message}"
                 );
             }

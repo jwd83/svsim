@@ -1120,7 +1120,7 @@ fn aliasable_parent_signal_name<'a>(
 
     match direction {
         PortDirection::Input => Some(name.as_str()),
-        PortDirection::Output
+        PortDirection::Output | PortDirection::Inout
             if signal_storage(parent_module, name).is_some_and(StorageKind::is_net) =>
         {
             Some(name.as_str())
@@ -3481,6 +3481,121 @@ mod tests {
             .eval_once(inputs([("in".into(), 1)]))
             .expect("eval width alias");
         assert_signal_eq!(outputs, "out", 0b0001);
+    }
+
+    #[test]
+    fn structural_runtime_aliases_internal_inout_bindings_to_parent_nets() {
+        let design = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module bus_driver(",
+                    "input logic en, ",
+                    "input logic [3:0] value, ",
+                    "inout wire [3:0] bus",
+                    "); ",
+                    "wire [3:0] float_bus; ",
+                    "assign bus = en ? value : float_bus; ",
+                    "endmodule\n",
+                    "module top(",
+                    "input logic en, ",
+                    "input logic [3:0] value, ",
+                    "output wire [3:0] out",
+                    "); ",
+                    "wire [3:0] bus; ",
+                    "bus_driver u_driver(.en(en), .value(value), .bus(bus)); ",
+                    "assign out = bus; ",
+                    "endmodule\n"
+                ),
+            )
+            .expect("compile internal inout alias fixture");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let top_bus = sim
+            .state
+            .signals
+            .get("bus")
+            .copied()
+            .expect("top bus binding");
+        let child_bus = child_state(&sim.state, "u_driver")
+            .state
+            .signals
+            .get("bus")
+            .copied()
+            .expect("child inout binding");
+
+        assert_eq!(top_bus.object_id, child_bus.object_id);
+        assert_eq!(top_bus.view_width, 4);
+        assert_eq!(child_bus.view_width, 4);
+
+        let floating = sim
+            .eval_once(inputs([("en".into(), 0), ("value".into(), 0b1010)]))
+            .expect("eval floating inout");
+        assert_eq!(
+            floating.get("out"),
+            Some(&LogicValue::from_logic_str("zzzz").expect("zzzz logic"))
+        );
+
+        let driven = sim
+            .eval_once(inputs([("en".into(), 1), ("value".into(), 0b1010)]))
+            .expect("eval driven inout");
+        assert_signal_eq!(driven, "out", 0b1010);
+    }
+
+    #[test]
+    fn eval_once_resolves_internal_inout_bus_contention_to_x() {
+        let design = Compiler::new()
+            .compile_str(
+                PathBuf::from("/virtual/top.sv"),
+                concat!(
+                    "module bus_driver(",
+                    "input logic en, ",
+                    "input logic value, ",
+                    "inout wire bus",
+                    "); ",
+                    "wire float_bus; ",
+                    "assign bus = en ? value : float_bus; ",
+                    "endmodule\n",
+                    "module top(",
+                    "input logic drive_low, ",
+                    "input logic drive_high, ",
+                    "output wire out",
+                    "); ",
+                    "wire bus; ",
+                    "bus_driver low(.en(drive_low), .value(1'b0), .bus(bus)); ",
+                    "bus_driver high(.en(drive_high), .value(1'b1), .bus(bus)); ",
+                    "assign out = bus; ",
+                    "endmodule\n"
+                ),
+            )
+            .expect("compile internal inout contention");
+        let mut sim = design.instantiate_top().expect("instantiate");
+
+        let floating = sim
+            .eval_once(inputs([("drive_low".into(), 0), ("drive_high".into(), 0)]))
+            .expect("eval floating bus");
+        assert_eq!(
+            floating.get("out"),
+            Some(&LogicValue::from_logic_str("z").expect("z logic"))
+        );
+
+        let low = sim
+            .eval_once(inputs([("drive_low".into(), 1), ("drive_high".into(), 0)]))
+            .expect("eval low bus");
+        assert_signal_eq!(low, "out", 0);
+
+        let high = sim
+            .eval_once(inputs([("drive_low".into(), 0), ("drive_high".into(), 1)]))
+            .expect("eval high bus");
+        assert_signal_eq!(high, "out", 1);
+
+        let conflicted = sim
+            .eval_once(inputs([("drive_low".into(), 1), ("drive_high".into(), 1)]))
+            .expect("eval conflicted bus");
+        assert_eq!(
+            conflicted.get("out"),
+            Some(&LogicValue::from_logic_str("x").expect("x logic"))
+        );
     }
 
     #[test]

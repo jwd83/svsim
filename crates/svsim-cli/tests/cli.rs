@@ -136,6 +136,31 @@ fn cli_runs_json_regression_directory() {
 }
 
 #[test]
+fn cli_runs_sap2_json_regression_directory() {
+    let repo = repo_root();
+    let output = Command::new(svsim_bin())
+        .arg("--json-test-dir")
+        .arg(repo.join("parts/sap2"))
+        .output()
+        .expect("run svsim");
+
+    assert!(
+        output.status.success(),
+        "stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let json: Value = serde_json::from_slice(&output.stdout).expect("parse stdout json");
+    assert_eq!(json["report"]["passed"], json["report"]["total"]);
+    assert!(
+        json["report"]["total"].as_u64().is_some_and(|total| total >= 2),
+        "unexpected sap2 suite count: {}",
+        json["report"]["total"]
+    );
+}
+
+#[test]
 fn cli_runs_compile_directory() {
     let temp_dir = unique_temp_dir("cli-compile-dir");
     fs::write(

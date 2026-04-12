@@ -1,0 +1,30 @@
+[
+  {
+    "drive_low": 0,
+    "drive_high": 0,
+    "expect": {
+      "bus_out": "z"
+    }
+  },
+  {
+    "drive_low": 1,
+    "drive_high": 0,
+    "expect": {
+      "bus_out": 0
+    }
+  },
+  {
+    "drive_low": 0,
+    "drive_high": 1,
+    "expect": {
+      "bus_out": 1
+    }
+  },
+  {
+    "drive_low": 1,
+    "drive_high": 1,
+    "expect": {
+      "bus_out": "x"
+    }
+  }
+]

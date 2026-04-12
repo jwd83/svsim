@@ -13,13 +13,13 @@ use crate::width::{
     sign_extend_bits,
 };
 
-pub(crate) fn validate_design(hir: &HirDesign) -> Result<()> {
+pub(crate) fn validate_design(hir: &HirDesign, top_module: &str) -> Result<()> {
     let mut validated = HashSet::new();
     let mut stack = Vec::new();
 
     for file in hir.files() {
         for module in &file.modules {
-            validate_module_recursive(hir, &module.name, &mut stack, &mut validated)?;
+            validate_module_recursive(hir, &module.name, top_module, &mut stack, &mut validated)?;
         }
     }
 
@@ -29,6 +29,7 @@ pub(crate) fn validate_design(hir: &HirDesign) -> Result<()> {
 fn validate_module_recursive(
     hir: &HirDesign,
     module_name: &str,
+    top_module: &str,
     stack: &mut Vec<String>,
     validated: &mut HashSet<String>,
 ) -> Result<()> {
@@ -47,7 +48,7 @@ fn validate_module_recursive(
     let module = hir
         .module(module_name)
         .ok_or_else(|| Error::Resolve(format!("module '{}' was not compiled", module_name)))?;
-    validate_module(hir, module)?;
+    validate_module(hir, module, top_module)?;
 
     stack.push(module_name.to_owned());
     for instance in &module.instantiations {
@@ -58,7 +59,7 @@ fn validate_module_recursive(
             ))
         })?;
         validate_instance(module, instance, child)?;
-        validate_module_recursive(hir, &instance.module_name, stack, validated)?;
+        validate_module_recursive(hir, &instance.module_name, top_module, stack, validated)?;
     }
     stack.pop();
 
@@ -66,8 +67,8 @@ fn validate_module_recursive(
     Ok(())
 }
 
-fn validate_module(hir: &HirDesign, module: &ModuleSummary) -> Result<()> {
-    validate_supported_port_directions(module)?;
+fn validate_module(hir: &HirDesign, module: &ModuleSummary, top_module: &str) -> Result<()> {
+    validate_supported_port_directions(module, top_module)?;
     validate_unique_declarations(module)?;
     validate_unique_instance_names(module)?;
     validate_runtime_widths(module)?;
@@ -199,15 +200,17 @@ fn validate_unique_instance_names(module: &ModuleSummary) -> Result<()> {
     Ok(())
 }
 
-fn validate_supported_port_directions(module: &ModuleSummary) -> Result<()> {
+fn validate_supported_port_directions(module: &ModuleSummary, top_module: &str) -> Result<()> {
     for port in &module.ports {
         match port.direction {
             PortDirection::Input | PortDirection::Output => {}
             PortDirection::Inout => {
-                return Err(Error::Unsupported(format!(
-                    "module '{}' uses unsupported `inout` port '{}'",
-                    module.name, port.name
-                )));
+                if module.name == top_module {
+                    return Err(Error::Unsupported(format!(
+                        "module '{}' uses unsupported `inout` port '{}'",
+                        module.name, port.name
+                    )));
+                }
             }
             PortDirection::Ref => {
                 return Err(Error::Unsupported(format!(
@@ -263,19 +266,27 @@ fn validate_instance(
         })?;
 
         validate_expr(&connection.expr, parent)?;
-        if matches!(port.direction, PortDirection::Output) {
+        if matches!(port.direction, PortDirection::Output | PortDirection::Inout) {
+            let connection_kind = match port.direction {
+                PortDirection::Output => "output",
+                PortDirection::Inout => "inout",
+                PortDirection::Input | PortDirection::Ref => unreachable!("guarded by match"),
+            };
             let lvalue = expr_to_lvalue(&connection.expr).ok_or_else(|| {
                 Error::Unsupported(format!(
-                    "instance '{}' connects output port '{}' to a non-lvalue expression",
-                    instance.instance_name, port.name
+                    "instance '{}' connects {} port '{}' to a non-lvalue expression",
+                    instance.instance_name, connection_kind, port.name
                 ))
             })?;
             validate_assignment_target(&lvalue, parent)?;
             if lvalue_contains_memory(&lvalue) {
                 return Err(Error::Unsupported(format!(
-                    "instance '{}' connects output port '{}' to a memory element, which is not supported",
-                    instance.instance_name, port.name
+                    "instance '{}' connects {} port '{}' to a memory element, which is not supported",
+                    instance.instance_name, connection_kind, port.name
                 )));
+            }
+            if matches!(port.direction, PortDirection::Inout) {
+                validate_inout_connection_target(&lvalue, parent, instance, port)?;
             }
         }
     }
@@ -294,6 +305,36 @@ fn validate_instance(
     }
 
     Ok(())
+}
+
+fn validate_inout_connection_target(
+    lvalue: &LValue,
+    parent: &ModuleSummary,
+    instance: &ModuleInstanceSummary,
+    port: &crate::hir::PortDecl,
+) -> Result<()> {
+    let LValue::Signal(signal) = lvalue else {
+        return Err(Error::Unsupported(format!(
+            "instance '{}' connects `inout` port '{}' to an unsupported target; only whole net signals are currently supported",
+            instance.instance_name, port.name
+        )));
+    };
+
+    if signal_storage(parent, signal).is_some_and(|storage| storage.is_net()) {
+        return Ok(());
+    }
+
+    Err(Error::Unsupported(format!(
+        "instance '{}' connects `inout` port '{}' to '{}', but internal `inout` ports currently require a parent net signal",
+        instance.instance_name, port.name, signal
+    )))
+}
+
+fn signal_storage(module: &ModuleSummary, signal: &str) -> Option<crate::hir::StorageKind> {
+    module
+        .port(signal)
+        .map(|port| port.storage)
+        .or_else(|| module.signal_decl(signal).map(|decl| decl.storage))
 }
 
 fn validate_stmt(stmt: &Stmt, module: &ModuleSummary, block_kind: &ProcBlockKind) -> Result<()> {

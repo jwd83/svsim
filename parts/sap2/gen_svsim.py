@@ -1,71 +1,67 @@
 #!/usr/bin/env python3
-"""Scaffold generator metadata for the future SAP-2 corpus."""
+"""Generate runnable SAP-2 svsim suites from the checked-in SAP-1 corpus."""
 
-import argparse
 import json
 import os
+import shutil
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-EXAMPLES_DIR = os.path.join(SCRIPT_DIR, "examples")
-SOURCE_FILE = os.path.join(SCRIPT_DIR, "sap2.sv")
-MICROCODE_FILE = os.path.join(SCRIPT_DIR, "sap2_microcode.txt")
+SAP1_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "sap1"))
+SAP2_SOURCE = "sap2.sv"
+SAP2_MICROCODE = "sap2_microcode.txt"
+
+PROGRAMS = [
+    "add3to42",
+    "fib",
+    "memory_traffic",
+    "multiply",
+    "self_modify_fetch",
+    "test_jumps",
+]
 
 
-def discover_examples():
-    return sorted(
-        os.path.splitext(name)[0]
-        for name in os.listdir(EXAMPLES_DIR)
-        if name.endswith(".s")
-    )
+def load_json(path):
+    with open(path) as handle:
+        return json.load(handle)
 
 
-def planned_artifacts(example_name):
-    return {
-        "example": os.path.join("examples", f"{example_name}.s"),
-        "ram_file": f"sap2_{example_name}_ram.txt",
-        "json_file": f"sap2_{example_name}.json",
-    }
+def write_json(path, value):
+    with open(path, "w") as handle:
+        json.dump(value, handle, indent=2)
+        handle.write("\n")
 
 
-def build_manifest():
-    return {
-        "source": os.path.basename(SOURCE_FILE),
-        "microcode": os.path.basename(MICROCODE_FILE),
-        "examples": [planned_artifacts(name) for name in discover_examples()],
-        "status": "scaffold",
-        "notes": [
-            "SAP-2 generation is intentionally deferred until the shared-bus core exists.",
-            "This script reserves artifact names and keeps the copied example corpus discoverable.",
-        ],
-    }
+def rewrite_suite(program_name):
+    source_suite_path = os.path.join(SAP1_DIR, f"sap1_{program_name}.json")
+    source_ram_path = os.path.join(SAP1_DIR, f"sap1_{program_name}_ram.txt")
+    target_suite_path = os.path.join(SCRIPT_DIR, f"sap2_{program_name}.json")
+    target_ram_name = f"sap2_{program_name}_ram.txt"
+    target_ram_path = os.path.join(SCRIPT_DIR, target_ram_name)
+
+    suite = load_json(source_suite_path)
+    suite["source"] = SAP2_SOURCE
+    for entry in suite.get("memory_init", []):
+        if entry.get("module") == "memory" and entry.get("memory") == "data":
+            entry["file"] = target_ram_name
+        elif entry.get("module") == "rom" and entry.get("memory") == "data":
+            entry["file"] = SAP2_MICROCODE
+
+    shutil.copyfile(source_ram_path, target_ram_path)
+    write_json(target_suite_path, suite)
+
+    return target_ram_path, target_suite_path
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Report the planned SAP-2 artifact layout."
-    )
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        help="emit the scaffold manifest as JSON",
-    )
-    args = parser.parse_args()
+    source_microcode_path = os.path.join(SAP1_DIR, "sap1_microcode.txt")
+    target_microcode_path = os.path.join(SCRIPT_DIR, SAP2_MICROCODE)
+    shutil.copyfile(source_microcode_path, target_microcode_path)
+    print(f"wrote {target_microcode_path}")
 
-    manifest = build_manifest()
-    if args.json:
-        print(json.dumps(manifest, indent=2))
-        return
-
-    print("SAP-2 scaffold manifest")
-    print(f"source: {manifest['source']}")
-    print(f"microcode: {manifest['microcode']}")
-    for note in manifest["notes"]:
-        print(f"note: {note}")
-    for example in manifest["examples"]:
-        print(
-            f"example: {example['example']} -> "
-            f"{example['ram_file']}, {example['json_file']}"
-        )
+    for program_name in PROGRAMS:
+        ram_path, json_path = rewrite_suite(program_name)
+        print(f"wrote {ram_path}")
+        print(f"wrote {json_path}")
 
 
 if __name__ == "__main__":

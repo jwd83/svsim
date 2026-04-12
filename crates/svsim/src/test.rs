@@ -873,6 +873,21 @@ mod tests {
     }
 
     #[test]
+    fn run_json_test_dir_passes_sap2_corpus() {
+        let repo = repo_root();
+        let report = Compiler::new()
+            .run_json_test_dir(repo.join("parts/sap2"))
+            .expect("run sap2 json directory");
+
+        assert!(
+            report.all_passed(),
+            "sap2 report:\n{}",
+            serde_json::to_string_pretty(&report).expect("serialize report")
+        );
+        assert_eq!(report.passed, report.total);
+    }
+
+    #[test]
     fn run_json_file_passes_picorv32_smoke_suite() {
         let repo = repo_root();
         let design = Compiler::new()
