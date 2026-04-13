@@ -10,6 +10,7 @@ The `parts/` tree is the compatibility surface for the rewrite. Different direct
 | [`../../parts/rv32i`](../../parts/rv32i) | 32-bit demo CPU green corpus | Compact RV32I-style core that exercises more realistic control, memory, and trap behavior. |
 | [`../../parts/picorv32`](../../parts/picorv32) | Real-world compile target plus curated runtime corpus | Upstream `picorv32.v` compiles; harnessed sample programs exercise a bounded executable slice. |
 | [`../../parts/sap1`](../../parts/sap1) | Imported design case study | Maintained SAP-1 port used to document current simulator friction. |
+| [`../../parts/sap2`](../../parts/sap2) | Auxiliary shared-bus runtime corpus | Runnable SAP-family follow-on that restores internal shared-bus structure with focused `inout` / floating / contention coverage. |
 | [`../../parts/simple8`](../../parts/simple8) | Teaching/demo CPU corpus | Tiny self-documenting CPU with a programmable harness. |
 | [`../../parts/failing`](../../parts/failing) | Negative corpus | Intentionally failing parser, compile, and JSON cases. |
 | [`../../parts/roms`](../../parts/roms) | ROM text-file conventions | Documents the plain-text ROM format used by harnessed designs. |
@@ -18,13 +19,16 @@ The `parts/` tree is the compatibility surface for the rewrite. Different direct
 
 - The official all-green compatibility surface is `parts/basic`, `parts/testing`, `parts/overture`, and `parts/rv32i`.
 - `parts/picorv32` is compile-green and also has a curated executable harness surface, but it is still best thought of as an advanced demo and stress target rather than the base compatibility contract.
-- `parts/sap1` and `parts/simple8` are valuable design examples without being the canonical gate for every change.
+- `parts/sap2` is a runnable auxiliary corpus that specifically targets the new four-state/internal-`inout` work; it is useful, but it is not yet part of the official green contract.
+- `parts/sap1` and `parts/simple8` remain valuable design examples without being the canonical gate for every change.
 
 ## Practical Commands
 
 ```text
 cargo run -q -p svsim-cli -- --compile-dir parts/basic --compile-dir parts/testing --compile-dir parts/overture --compile-dir parts/rv32i
-cargo run -q -p svsim-cli -- --json-test-dir parts/basic --json-test-dir parts/testing --json-test-dir parts/overture --json-test-dir parts/rv32i --json-test-dir parts/picorv32
+cargo run -q -p svsim-cli -- --json-test-dir parts/basic --json-test-dir parts/testing --json-test-dir parts/overture --json-test-dir parts/rv32i
+cargo run -q -p svsim-cli -- --json-test-dir parts/picorv32
+cargo run -q -p svsim-cli -- --json-test-dir parts/sap2
 cargo run -q -p svsim-cli -- --compile-dir parts/failing
 cargo run -q -p svsim-cli -- --json-test-dir parts/failing
 ```
@@ -35,5 +39,6 @@ cargo run -q -p svsim-cli -- --json-test-dir parts/failing
 - [../../parts/rv32i/README.md](../../parts/rv32i/README.md)
 - [../../parts/picorv32/README.md](../../parts/picorv32/README.md)
 - [../../parts/sap1/README.md](../../parts/sap1/README.md)
+- [../../parts/sap2/README.md](../../parts/sap2/README.md)
 - [../../parts/failing/README.md](../../parts/failing/README.md)
 - [../../parts/roms/roms.md](../../parts/roms/roms.md)

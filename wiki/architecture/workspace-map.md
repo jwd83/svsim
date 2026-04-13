@@ -11,6 +11,7 @@ The workspace is intentionally small. Most of the simulator lives in one core cr
 | [`../../crates/svsim-render`](../../crates/svsim-render) | Placeholder render crate. Current status is literally `"rendering deferred"`. |
 | [`../../parts`](../../parts) | Compatibility corpus, demo designs, harness assets, and negative tests. |
 | [`../../docs`](../../docs) | Plans, progress reports, and port-specific design notes. |
+| [`../../wiki`](../../wiki) | Persistent synthesized knowledge layer that summarizes and cross-links the code and corpus. |
 | [`../../ref`](../../ref) | Python reference implementation and historical planning context. |
 
 ## Main `svsim` Modules
@@ -20,9 +21,12 @@ The workspace is intentionally small. Most of the simulator lives in one core cr
 | [`../../crates/svsim/src/compiler.rs`](../../crates/svsim/src/compiler.rs) | Entry points for file/string compilation plus compile-dir and JSON-dir batch runs. |
 | [`../../crates/svsim/src/frontend`](../../crates/svsim/src/frontend) | `sv-parser` integration and lowering into owned HIR. |
 | [`../../crates/svsim/src/hir.rs`](../../crates/svsim/src/hir.rs) | The parser-independent executable model: modules, ports, memories, statements, expressions, and lvalues. |
-| [`../../crates/svsim/src/validate.rs`](../../crates/svsim/src/validate.rs) | Compile-time semantic checks and legacy ROM compatibility validation. |
-| [`../../crates/svsim/src/design.rs`](../../crates/svsim/src/design.rs) | `CompiledDesign`, hierarchy reporting, and runtime instantiation entry points. |
-| [`../../crates/svsim/src/sim.rs`](../../crates/svsim/src/sim.rs) | Combinational settle, sequential stepping, memory loading, and signal inspection. |
+| [`../../crates/svsim/src/validate.rs`](../../crates/svsim/src/validate.rs) | Compile-time semantic checks, including public `inout` rejection and internal whole-net `inout` binding rules. |
+| [`../../crates/svsim/src/design.rs`](../../crates/svsim/src/design.rs) | `CompiledDesign`, hierarchy reporting, elaboration access, and runtime instantiation entry points. |
+| [`../../crates/svsim/src/elaborate.rs`](../../crates/svsim/src/elaborate.rs) | Typed elaboration layer that turns HIR modules into runtime object shapes and instance bindings. |
+| [`../../crates/svsim/src/logic_value.rs`](../../crates/svsim/src/logic_value.rs) | Four-state runtime values, parsing, formatting, and wildcard expectation matching. |
+| [`../../crates/svsim/src/net_resolve.rs`](../../crates/svsim/src/net_resolve.rs) | Zero-delay per-bit net resolution and drive-strength handling. |
+| [`../../crates/svsim/src/sim.rs`](../../crates/svsim/src/sim.rs) | Structural runtime, combinational settle, sequential stepping, memory loading, net resolution, and signal inspection. |
 | [`../../crates/svsim/src/test.rs`](../../crates/svsim/src/test.rs) | JSON suite parsing, execution, tracing, and report types. |
 | [`../../crates/svsim/src/diag.rs`](../../crates/svsim/src/diag.rs) | Diagnostics and top-level error types. |
 | [`../../crates/svsim/src/width.rs`](../../crates/svsim/src/width.rs) | Width inference plus shared shift/sign-extension helpers. |

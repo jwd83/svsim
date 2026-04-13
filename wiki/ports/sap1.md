@@ -25,8 +25,14 @@ SAP-1 is less important as a target in itself than as a catalog of current simul
 
 If a future feature reduces the number of SAP-1-specific compromises, it is probably improving the product in a broadly useful way.
 
+## Related Progress
+
+- [sap2.md](./sap2.md) shows the first meaningful reduction in this friction: the simulator can now restore an internal shared bus with leaf `inout` drivers while keeping the harness-visible top contract stable.
+- That does not erase the original SAP-1 compromises, but it narrows one of the biggest ones.
+
 ## Sources
 
 - [../../docs/sap1-port-compromises.md](../../docs/sap1-port-compromises.md)
 - [../../parts/sap1/README.md](../../parts/sap1/README.md)
 - [../../parts/sap1/sap1.sv](../../parts/sap1/sap1.sv)
+- [../../parts/sap2/README.md](../../parts/sap2/README.md)

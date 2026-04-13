@@ -20,6 +20,12 @@ The repository has several CPU-shaped designs, and they serve different purposes
 - Acts as the main real-world compile target and a curated runtime stress target.
 - Useful when you want to know whether a change helps with actual open-source SystemVerilog instead of only repo-native teaching designs.
 
+## SAP-2
+
+- Lives in [`../../parts/sap2`](../../parts/sap2).
+- New runnable auxiliary corpus that keeps the harness-visible `sap1` contract while moving the internal machine back toward a shared-bus structure.
+- Best target when touching internal `inout`, net resolution, floating/contending buses, or the question "does this richer runtime still preserve the visible educational CPU behavior?"
+
 ## Simple8
 
 - Lives in [`../../parts/simple8`](../../parts/simple8).
@@ -30,12 +36,13 @@ The repository has several CPU-shaped designs, and they serve different purposes
 
 - Lives in [`../../parts/sap1`](../../parts/sap1).
 - Less about broad compatibility gating and more about documenting import friction and harness tradeoffs.
-- See [sap1.md](./sap1.md) for the key lessons.
+- See [sap1.md](./sap1.md) for the key lessons and [sap2.md](./sap2.md) for the first partial reversal of those compromises.
 
 ## Sources
 
 - [../../parts/overture](../../parts/overture)
 - [../../parts/rv32i/README.md](../../parts/rv32i/README.md)
 - [../../parts/picorv32/README.md](../../parts/picorv32/README.md)
+- [../../parts/sap2/README.md](../../parts/sap2/README.md)
 - [../../parts/simple8/simple8.sv](../../parts/simple8/simple8.sv)
 - [../../parts/sap1/README.md](../../parts/sap1/README.md)

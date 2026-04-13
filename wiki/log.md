@@ -8,3 +8,12 @@
 - Verified `cargo run -q -p svsim-cli -- --compile-dir parts/basic --compile-dir parts/testing --compile-dir parts/overture --compile-dir parts/rv32i`: pass (`136/136`).
 - Verified `cargo run -q -p svsim-cli -- --compile-dir parts/picorv32`: pass (`3/3`).
 - Verified `cargo run -q -p svsim-cli -- --json-test-dir parts/basic --json-test-dir parts/testing --json-test-dir parts/overture --json-test-dir parts/rv32i --json-test-dir parts/picorv32`: pass (`166/166`).
+
+## [2026-04-12] lint | four-state and sap2 wiki sync
+
+- Reviewed the recent four-state / internal-`inout` / `sap2` work against `plan.md`, the Rust sources, and the checked-in corpus docs.
+- Verified `cargo test`: pass (`168` `svsim` tests and `10` CLI tests; no failures).
+- Verified `cargo run -q -p svsim-cli -- --json-test-dir parts/basic --json-test-dir parts/testing --json-test-dir parts/overture --json-test-dir parts/rv32i`: pass (`155/155`).
+- Verified `cargo run -q -p svsim-cli -- --json-test-dir parts/picorv32`: pass (`13/13`).
+- Verified `cargo run -q -p svsim-cli -- --json-test-dir parts/sap2`: pass (`7/7`).
+- Updated the status, architecture, roadmap, and corpus pages to match the verified April 12 state and added dedicated `sap2` and milestone pages.
