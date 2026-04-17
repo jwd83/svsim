@@ -141,6 +141,17 @@ Exit:
 
 ### Slice 2: SAP-2 Register-Tile Partitioning
 
+**Status: landed 2026-04-16.** `register_tile`, `register_pc_tile`, and
+`register_instr_tile` now live in [`parts/sap2/sap2.sv`](./parts/sap2/sap2.sv)
+and absorb the former `reg_a_bus`, `pc_bus`, and `instr_bus` driver siblings.
+`machine` now instantiates 3 `bus_driver` instances (external, alu, mem) instead
+of 6. `register` is still used for the write-only `b` and `out_r` (which never
+drive the bus). Added [`parts/sap2/sap2_register_tile.{sv,json}`](./parts/sap2)
+covering en_write capture, en_read drive, floating bus, and contention.
+Verified: `cargo test` 178/178; `parts/basic+testing+overture+rv32i` 156/156;
+`parts/sap1` 6/6; `parts/simple8` 5/5; `parts/picorv32` 13/13; `parts/sap2`
+8/8 (the 7 program suites plus the new register-tile smoke).
+
 Once Slice 1 lands, fold the `bus_driver` siblings into the register tiles
 themselves so each register exposes both internal `value` (still consumed by
 the ALU and instruction decode) and a real `inout wire [7:0] bus` participation

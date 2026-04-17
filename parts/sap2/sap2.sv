@@ -92,6 +92,53 @@ module bus_driver(
     assign bus = en_read ? value : 8'bz;
 endmodule
 
+module register_tile(
+    inout wire [7:0] bus,
+    input wire clk,
+    input wire reset,
+    input wire en_write,
+    input wire en_read,
+    output reg [7:0] value
+);
+    always @(posedge clk)
+        if (reset) value <= 0;
+        else if (en_write) value <= bus;
+
+    assign bus = en_read ? value : 8'bz;
+endmodule
+
+module register_pc_tile(
+    inout wire [7:0] bus,
+    input wire clk,
+    input wire reset,
+    input wire en_write,
+    input wire en_read,
+    input wire en_increment_pc,
+    output reg [7:0] value
+);
+    always @(posedge clk)
+        if (reset) value <= 0;
+        else if (en_increment_pc) value <= value + 1;
+        else if (en_write) value <= bus;
+
+    assign bus = en_read ? value : 8'bz;
+endmodule
+
+module register_instr_tile(
+    inout wire [7:0] bus,
+    input wire clk,
+    input wire reset,
+    input wire en_write,
+    input wire en_read,
+    output reg [7:0] value
+);
+    always @(posedge clk)
+        if (reset) value <= 0;
+        else if (en_write) value <= bus;
+
+    assign bus = en_read ? { 4'b0, value[3:0] } : 8'bz;
+endmodule
+
 module machine(
     input wire clk,
     input wire reset,
@@ -139,9 +186,10 @@ module machine(
         .count(micro_counter)
     );
 
-    register a(
+    register_tile a(
         .bus(bus), .clk(clk), .reset(reset),
-        .en_write(en_write_a), .value(out_reg_a)
+        .en_write(en_write_a), .en_read(en_read_a),
+        .value(out_reg_a)
     );
     register b(
         .bus(bus), .clk(clk), .reset(reset),
@@ -151,13 +199,15 @@ module machine(
         .bus(bus), .clk(clk), .reset(reset),
         .en_write(en_write_out), .value(out_reg_out)
     );
-    register instr(
+    register_instr_tile instr(
         .bus(bus), .clk(clk), .reset(reset),
-        .en_write(en_write_instr), .value(out_reg_instr)
+        .en_write(en_write_instr), .en_read(en_read_instr),
+        .value(out_reg_instr)
     );
-    registerpc pc(
+    register_pc_tile pc(
         .bus(bus), .clk(clk), .reset(reset),
-        .en_write(en_write_pc), .en_increment_pc(en_increment_pc),
+        .en_write(en_write_pc), .en_read(en_read_pc),
+        .en_increment_pc(en_increment_pc),
         .value(out_reg_pc)
     );
 
@@ -189,24 +239,9 @@ module machine(
         .value(alu),
         .bus(bus)
     );
-    bus_driver instr_bus(
-        .en_read(en_read_instr),
-        .value({ 4'b0, out_reg_instr[3:0] }),
-        .bus(bus)
-    );
     bus_driver mem_bus(
         .en_read(en_read_mem),
         .value(out_mem),
-        .bus(bus)
-    );
-    bus_driver reg_a_bus(
-        .en_read(en_read_a),
-        .value(out_reg_a),
-        .bus(bus)
-    );
-    bus_driver pc_bus(
-        .en_read(en_read_pc),
-        .value(out_reg_pc),
         .bus(bus)
     );
 

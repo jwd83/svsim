@@ -1,0 +1,130 @@
+{
+  "source": "sap2_register_tile.sv",
+  "test_cases": [
+    {
+      "name": "Reset clears value; no drivers on bus leaves it floating",
+      "sequence": [
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 1,
+            "en_write_tile": 0,
+            "en_read_tile": 0,
+            "en_read_ext": 0,
+            "ext_value": 0
+          },
+          "expected": {
+            "value_out": 0,
+            "bus_out": "zzzzzzzz"
+          }
+        }
+      ]
+    },
+    {
+      "name": "External drive plus en_write_tile latches the bus into the tile",
+      "sequence": [
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 1,
+            "en_write_tile": 0,
+            "en_read_tile": 0,
+            "en_read_ext": 0,
+            "ext_value": 0
+          },
+          "expected": {
+            "value_out": 0
+          }
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_write_tile": 1,
+            "en_read_tile": 0,
+            "en_read_ext": 1,
+            "ext_value": 165
+          },
+          "expected": {
+            "value_out": 165,
+            "bus_out": 165
+          }
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_write_tile": 0,
+            "en_read_tile": 0,
+            "en_read_ext": 0,
+            "ext_value": 0
+          },
+          "expected": {
+            "value_out": 165,
+            "bus_out": "zzzzzzzz"
+          }
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_write_tile": 0,
+            "en_read_tile": 1,
+            "en_read_ext": 0,
+            "ext_value": 0
+          },
+          "expected": {
+            "value_out": 165,
+            "bus_out": 165
+          }
+        }
+      ]
+    },
+    {
+      "name": "Contention between tile and external driver mixes to x on mismatching bits",
+      "sequence": [
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 1,
+            "en_write_tile": 0,
+            "en_read_tile": 0,
+            "en_read_ext": 0,
+            "ext_value": 0
+          },
+          "expected": {
+            "value_out": 0
+          }
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_write_tile": 1,
+            "en_read_tile": 0,
+            "en_read_ext": 1,
+            "ext_value": 165
+          },
+          "expected": {
+            "value_out": 165,
+            "bus_out": 165
+          }
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_write_tile": 0,
+            "en_read_tile": 1,
+            "en_read_ext": 1,
+            "ext_value": 85
+          },
+          "expected": {
+            "value_out": 165,
+            "bus_out": "xxxx0101"
+          }
+        }
+      ]
+    }
+  ]
+}
