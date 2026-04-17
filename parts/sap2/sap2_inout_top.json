@@ -1,0 +1,158 @@
+{
+  "source": "sap2_inout_top.sv",
+  "test_cases": [
+    {
+      "name": "Harness drives bus into reg_a, then releases and reads back via tile",
+      "sequence": [
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 1,
+            "en_write_a": 0,
+            "en_read_a": 0,
+            "en_write_b": 0,
+            "en_read_b": 0,
+            "bus": "zzzzzzzz"
+          },
+          "expected": {
+            "reg_a": 0,
+            "reg_b": 0,
+            "bus": "zzzzzzzz"
+          }
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_write_a": 1,
+            "en_read_a": 0,
+            "en_write_b": 0,
+            "en_read_b": 0,
+            "bus": 165
+          },
+          "expected": {
+            "reg_a": 165,
+            "reg_b": 0,
+            "bus": 165
+          }
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_write_a": 0,
+            "en_read_a": 1,
+            "en_write_b": 0,
+            "en_read_b": 0,
+            "bus": "zzzzzzzz"
+          },
+          "expected": {
+            "reg_a": 165,
+            "reg_b": 0,
+            "bus": 165
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tile-to-tile transfer over the shared inout bus",
+      "sequence": [
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 1,
+            "en_write_a": 0,
+            "en_read_a": 0,
+            "en_write_b": 0,
+            "en_read_b": 0,
+            "bus": "zzzzzzzz"
+          },
+          "expected": {
+            "reg_a": 0,
+            "reg_b": 0
+          }
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_write_a": 1,
+            "en_read_a": 0,
+            "en_write_b": 0,
+            "en_read_b": 0,
+            "bus": 60
+          },
+          "expected": {
+            "reg_a": 60,
+            "reg_b": 0
+          }
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_write_a": 0,
+            "en_read_a": 1,
+            "en_write_b": 1,
+            "en_read_b": 0,
+            "bus": "zzzzzzzz"
+          },
+          "expected": {
+            "reg_a": 60,
+            "reg_b": 60,
+            "bus": 60
+          }
+        }
+      ]
+    },
+    {
+      "name": "Harness contention with a tile driving the bus produces x bits",
+      "sequence": [
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 1,
+            "en_write_a": 0,
+            "en_read_a": 0,
+            "en_write_b": 0,
+            "en_read_b": 0,
+            "bus": "zzzzzzzz"
+          },
+          "expected": {
+            "reg_a": 0
+          }
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_write_a": 1,
+            "en_read_a": 0,
+            "en_write_b": 0,
+            "en_read_b": 0,
+            "bus": 165
+          },
+          "expected": {
+            "reg_a": 165,
+            "bus": 165
+          }
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_write_a": 0,
+            "en_read_a": 1,
+            "en_write_b": 0,
+            "en_read_b": 0,
+            "bus": 85
+          },
+          "expected": {
+            "reg_a": 165,
+            "bus": "xxxx0101"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -41,7 +41,7 @@ These hooks are why the project can keep the library API explicit while still dr
 
 - The runtime is cycle-stepped, not a full event-driven waveform simulator.
 - Only the supported `always_comb` and `always_ff @(posedge ...)` style procedural surface is executed.
-- Public/top-level `inout` is still intentionally rejected.
+- Public/top-level `inout` is supported as of 2026-04-16. A JSON test step may drive an `inout` input as either a two-state number (a contender, e.g. `"bus": 165`) or as `"8'bz"` / `"zzzzzzzz"` to release the bus; omitting the input entirely is equivalent to releasing it. Observed `inout` ports are reported back with their resolved four-state value after settle.
 - Internal `inout` currently only works for whole-net parent bindings; it is not a general arbitrary-lvalue feature.
 - Gate/switch primitives and pull devices are still deferred even though zero-delay net resolution now exists.
 - Timing controls, richer testbench semantics, and more general event controls are still outside the supported subset.

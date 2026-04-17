@@ -179,6 +179,27 @@ Exit:
 
 ### Slice 3: Open The Public `inout` Boundary
 
+**Status: landed 2026-04-16.** `validate_supported_port_directions` no longer
+rejects top-level `inout`. In `sim.rs`, `apply_external_inputs` now stages
+harness-provided values for `Inout` ports (default `z` when omitted = harness
+released), and `collect_outputs_logic` surfaces `Inout` ports in the post-settle
+output map. The JSON harness required no format change: `LogicValue`'s
+deserializer already accepted four-state strings, so tests can drive
+`"bus": "8'bz"` to release or `"bus": 165` to contend. Added
+[`parts/testing/025-TopLevelInout.{sv,json}`](./parts/testing) (1-bit top-level
+`inout` with release / drive-low / drive-high / contention coverage) and
+[`parts/sap2/sap2_inout_top.{sv,json}`](./parts/sap2) (CPU-shaped sibling that
+exposes the 8-bit bus directly to the harness). Updated
+[`docs/sap1-port-compromises.md`](./docs/sap1-port-compromises.md),
+[`wiki/architecture/runtime-and-state.md`](./wiki/architecture/runtime-and-state.md),
+[`wiki/testing/corpus-map.md`](./wiki/testing/corpus-map.md),
+[`wiki/roadmap/open-edges.md`](./wiki/roadmap/open-edges.md), and
+[`wiki/status/current-state.md`](./wiki/status/current-state.md). Verified:
+`cargo test` 178/178; `parts/basic+testing+overture+rv32i` 157/157 (includes
+new 025); `parts/sap1` 6/6; `parts/simple8` 5/5; `parts/picorv32` 13/13;
+`parts/sap2` 9/9 (the 7 program suites plus the `sap2_register_tile` and
+`sap2_inout_top` smokes).
+
 This is the meaningful "unlock" step. The unlock bar is satisfied; the work
 left is wiring a small JSON harness syntax for external drivers and updating
 runtime + validation to allow top-level `inout`.

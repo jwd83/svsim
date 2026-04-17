@@ -1100,23 +1100,15 @@ mod tests {
     }
 
     #[test]
-    fn compile_str_errors_on_unsupported_inout_port_direction() {
-        let error = Compiler::new()
+    fn compile_str_allows_top_level_inout_port() {
+        let design = Compiler::new()
             .compile_str(
                 PathBuf::from("/virtual/top.sv"),
-                "module top(inout logic io); endmodule\n",
+                "module top(inout wire io); endmodule\n",
             )
-            .expect_err("inout ports should fail validation");
+            .expect("top-level inout should compile");
 
-        match error {
-            Error::Unsupported(message) => {
-                assert!(
-                    message.contains("unsupported `inout` port 'io'"),
-                    "unexpected message: {message}"
-                );
-            }
-            other => panic!("unexpected error: {other}"),
-        }
+        assert_eq!(design.top_module(), Some("top"));
     }
 
     #[test]

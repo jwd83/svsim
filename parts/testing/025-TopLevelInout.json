@@ -1,0 +1,65 @@
+[
+  {
+    "internal_en": 0,
+    "internal_value": 0,
+    "bus": "z",
+    "expect": {
+      "bus": "z"
+    }
+  },
+  {
+    "internal_en": 0,
+    "internal_value": 0,
+    "bus": 0,
+    "expect": {
+      "bus": 0
+    }
+  },
+  {
+    "internal_en": 0,
+    "internal_value": 0,
+    "bus": 1,
+    "expect": {
+      "bus": 1
+    }
+  },
+  {
+    "internal_en": 1,
+    "internal_value": 0,
+    "bus": "z",
+    "expect": {
+      "bus": 0
+    }
+  },
+  {
+    "internal_en": 1,
+    "internal_value": 1,
+    "bus": "z",
+    "expect": {
+      "bus": 1
+    }
+  },
+  {
+    "internal_en": 1,
+    "internal_value": 1,
+    "bus": 0,
+    "expect": {
+      "bus": "x"
+    }
+  },
+  {
+    "internal_en": 1,
+    "internal_value": 1,
+    "bus": 1,
+    "expect": {
+      "bus": 1
+    }
+  },
+  {
+    "internal_en": 0,
+    "internal_value": 0,
+    "expect": {
+      "bus": "z"
+    }
+  }
+]

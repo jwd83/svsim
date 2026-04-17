@@ -59,6 +59,18 @@ Long term target:
 
 ### 2. We replaced the shared `inout` bus with an explicit mux
 
+> **Update (2026-04-16, Slice 3 of [`plan-next.md`](/Users/jared/projects/svsim/plan-next.md)):**
+> Top-level `inout` ports are now supported. The JSON harness can drive a bus
+> input either as a two-state number (a contender) or as `"8'bz"` / `"zzzzzzzz"`
+> (released), and observed inout ports are reported back with their resolved
+> four-state value. See
+> [`parts/testing/025-TopLevelInout.{sv,json}`](/Users/jared/projects/svsim/parts/testing)
+> for the focused feature test and
+> [`parts/sap2/sap2_inout_top.{sv,json}`](/Users/jared/projects/svsim/parts/sap2)
+> for a CPU-shaped example. The maintained `sap1.sv` and `sap2.sv` still use
+> their internal bus conventions so the existing green contract does not flip,
+> but the simulator no longer forces that choice.
+
 Ben Eater-style designs naturally lean on a shared bus. The old Verilog used an
 `inout` bus model. The maintained port in
 [`sap1.sv`](/Users/jared/projects/svsim/parts/sap1/sap1.sv) uses a plain wire
@@ -240,7 +252,8 @@ instead of:
 
 The most useful simulator/frontend improvements for reducing port friction are:
 
-- `inout` port support and net resolution
+- ~~`inout` port support and net resolution~~ (landed 2026-04-16; top-level
+  `inout` is now supported via the release-vs-drive JSON convention)
 - better support for `initial` constructs
 - support for standard memory initialization idioms such as `$readmemh`
 - support for ordered port connections

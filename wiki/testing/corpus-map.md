@@ -10,7 +10,7 @@ The `parts/` tree is the compatibility surface for the rewrite. Different direct
 | [`../../parts/rv32i`](../../parts/rv32i) | 32-bit demo CPU green corpus | Compact RV32I-style core that exercises more realistic control, memory, and trap behavior. |
 | [`../../parts/picorv32`](../../parts/picorv32) | Real-world compile target plus curated runtime corpus | Upstream `picorv32.v` compiles; harnessed sample programs exercise a bounded executable slice. |
 | [`../../parts/sap1`](../../parts/sap1) | Imported design case study | Maintained SAP-1 port used to document current simulator friction. |
-| [`../../parts/sap2`](../../parts/sap2) | Auxiliary shared-bus runtime corpus | Runnable SAP-family follow-on that restores internal shared-bus structure with focused `inout` / floating / contention coverage. |
+| [`../../parts/sap2`](../../parts/sap2) | Auxiliary shared-bus runtime corpus | Runnable SAP-family follow-on that restores internal shared-bus structure with focused `inout` / floating / contention coverage. `sap2_register_tile.{sv,json}` isolates the register-tile partitioning and `sap2_inout_top.{sv,json}` exposes the bus as a top-level `inout` to prove the public-`inout` boundary. |
 | [`../../parts/simple8`](../../parts/simple8) | Teaching/demo CPU corpus | Tiny self-documenting CPU with a programmable harness. |
 | [`../../parts/failing`](../../parts/failing) | Negative corpus | Intentionally failing parser, compile, and JSON cases. |
 | [`../../parts/roms`](../../parts/roms) | ROM text-file conventions | Documents the plain-text ROM format used by harnessed designs. |

@@ -1469,7 +1469,7 @@ fn apply_external_inputs(
     for port in module
         .ports
         .iter()
-        .filter(|port| matches!(port.direction, PortDirection::Input))
+        .filter(|port| matches!(port.direction, PortDirection::Input | PortDirection::Inout))
     {
         let binding = state.signals.get(&port.name).copied().ok_or_else(|| {
             Error::Resolve(format!(
@@ -1477,13 +1477,17 @@ fn apply_external_inputs(
                 port.name, module.name
             ))
         })?;
-        let value = Value::from_logic(
-            inputs
-                .get(&port.name)
-                .cloned()
-                .unwrap_or_else(|| LogicValue::zero(port.width())),
-            port.width(),
-        );
+        let provided = inputs.get(&port.name).cloned();
+        if matches!(port.direction, PortDirection::Inout) && provided.is_none() {
+            // Omitted inout = harness is not driving. Don't stage anything;
+            // internal drivers alone determine the resolved value.
+            continue;
+        }
+        let default_value = match port.direction {
+            PortDirection::Inout => LogicValue::all_z(port.width()),
+            _ => LogicValue::zero(port.width()),
+        };
+        let value = Value::from_logic(provided.unwrap_or(default_value), port.width());
         changed |= apply_fixed_binding_drive(binding, value, frame, object_layouts, net_drivers)?;
     }
 
@@ -1986,7 +1990,7 @@ fn collect_outputs_logic(
     for port in module
         .ports
         .iter()
-        .filter(|port| matches!(port.direction, PortDirection::Output))
+        .filter(|port| matches!(port.direction, PortDirection::Output | PortDirection::Inout))
     {
         let binding = state.signals.get(&port.name).copied().ok_or_else(|| {
             Error::Resolve(format!(

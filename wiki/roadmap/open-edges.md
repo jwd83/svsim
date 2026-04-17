@@ -4,13 +4,12 @@ The project is healthy, but it is not "done." The most important gaps are no lon
 
 ## Near-Term Bounded Targets
 
-- Decide when, or whether, to remove the intentional public/top-level `inout` rejection now that the internal runtime slice and `sap2` auxiliary corpus are working.
-- Extend the `sap2` shared-bus structure beyond the current leaf-driver slice if a closer import of the original machine partitioning is worth the added complexity.
-- Decide whether HDL literal lowering should carry explicit `x` / `z` digits natively instead of leaning on floated nets for some internal-bus patterns.
+- ~~Decide when, or whether, to remove the intentional public/top-level `inout` rejection now that the internal runtime slice and `sap2` auxiliary corpus are working.~~ (resolved 2026-04-16; public top-level `inout` is now supported, see [`../../plan-next.md`](../../plan-next.md) Slice 3.)
+- ~~Extend the `sap2` shared-bus structure beyond the current leaf-driver slice if a closer import of the original machine partitioning is worth the added complexity.~~ (resolved 2026-04-16; register tiles fold the bus drivers into the register modules, see [`../../plan-next.md`](../../plan-next.md) Slice 2.)
+- ~~Decide whether HDL literal lowering should carry explicit `x` / `z` digits natively instead of leaning on floated nets for some internal-bus patterns.~~ (resolved 2026-04-16; native four-state literals landed with [`../../plan-next.md`](../../plan-next.md) Slice 1.)
 
 ## Language And Runtime Gaps
 
-- Public/top-level `inout` is still intentionally rejected.
 - Internal `inout` support is still narrow: only whole parent net bindings are accepted today.
 - `ref` ports remain unsupported.
 - Gate/switch primitives and pull devices (`tran`, `bufif`, `pullup`, and friends) are still deferred.

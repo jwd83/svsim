@@ -143,6 +143,14 @@ impl LogicValue {
         Self::new(LogicBits::zero(), width)
     }
 
+    pub fn all_z(width: usize) -> Self {
+        let mut bits = LogicBits::zero();
+        for index in 0..width.max(1) {
+            bits.set_bit(index, LogicBit::Z);
+        }
+        Self::new(bits, width)
+    }
+
     pub fn from_bit_value_with_width(bits: BitValue, width: usize) -> Self {
         Self::new(LogicBits::from_bit_value(bits), width)
     }

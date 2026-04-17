@@ -201,17 +201,10 @@ fn validate_unique_instance_names(module: &ModuleSummary) -> Result<()> {
 }
 
 fn validate_supported_port_directions(module: &ModuleSummary, top_module: &str) -> Result<()> {
+    let _ = top_module;
     for port in &module.ports {
         match port.direction {
-            PortDirection::Input | PortDirection::Output => {}
-            PortDirection::Inout => {
-                if module.name == top_module {
-                    return Err(Error::Unsupported(format!(
-                        "module '{}' uses unsupported `inout` port '{}'",
-                        module.name, port.name
-                    )));
-                }
-            }
+            PortDirection::Input | PortDirection::Output | PortDirection::Inout => {}
             PortDirection::Ref => {
                 return Err(Error::Unsupported(format!(
                     "module '{}' uses unsupported `ref` port '{}'",
