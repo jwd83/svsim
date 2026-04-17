@@ -11,6 +11,7 @@ The `parts/` tree is the compatibility surface for the rewrite. Different direct
 | [`../../parts/picorv32`](../../parts/picorv32) | Real-world compile target plus curated runtime corpus | Upstream `picorv32.v` compiles; harnessed sample programs exercise a bounded executable slice. |
 | [`../../parts/sap1`](../../parts/sap1) | Imported design case study | Maintained SAP-1 port used to document current simulator friction. |
 | [`../../parts/sap2`](../../parts/sap2) | Auxiliary shared-bus runtime corpus | Runnable SAP-family follow-on that restores internal shared-bus structure with focused `inout` / floating / contention coverage. `sap2_register_tile.{sv,json}` isolates the register-tile partitioning and `sap2_inout_top.{sv,json}` exposes the bus as a top-level `inout` to prove the public-`inout` boundary. |
+| [`../../parts/sap3`](../../parts/sap3) | Richer SAP sketch | Extends the SAP-2 shared-bus CPU with AND/OR/XOR ops, a memory-mapped output port at address `0x10`, and a 20-bit microcode word. Exists to prove the simulator side of the SAP port story is complete — no simulator changes were required to run it. |
 | [`../../parts/simple8`](../../parts/simple8) | Teaching/demo CPU corpus | Tiny self-documenting CPU with a programmable harness. |
 | [`../../parts/failing`](../../parts/failing) | Negative corpus | Intentionally failing parser, compile, and JSON cases. |
 | [`../../parts/roms`](../../parts/roms) | ROM text-file conventions | Documents the plain-text ROM format used by harnessed designs. |
@@ -29,6 +30,7 @@ cargo run -q -p svsim-cli -- --compile-dir parts/basic --compile-dir parts/testi
 cargo run -q -p svsim-cli -- --json-test-dir parts/basic --json-test-dir parts/testing --json-test-dir parts/overture --json-test-dir parts/rv32i
 cargo run -q -p svsim-cli -- --json-test-dir parts/picorv32
 cargo run -q -p svsim-cli -- --json-test-dir parts/sap2
+cargo run -q -p svsim-cli -- --json-test-dir parts/sap3
 cargo run -q -p svsim-cli -- --compile-dir parts/failing
 cargo run -q -p svsim-cli -- --json-test-dir parts/failing
 ```
@@ -40,5 +42,6 @@ cargo run -q -p svsim-cli -- --json-test-dir parts/failing
 - [../../parts/picorv32/README.md](../../parts/picorv32/README.md)
 - [../../parts/sap1/README.md](../../parts/sap1/README.md)
 - [../../parts/sap2/README.md](../../parts/sap2/README.md)
+- [../../parts/sap3/README.md](../../parts/sap3/README.md)
 - [../../parts/failing/README.md](../../parts/failing/README.md)
 - [../../parts/roms/roms.md](../../parts/roms/roms.md)

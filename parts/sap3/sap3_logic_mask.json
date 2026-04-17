@@ -1,0 +1,419 @@
+{
+  "source": "sap3.sv",
+  "memory_init": [
+    {
+      "module": "memory",
+      "memory": "data",
+      "file": "sap3_logic_mask_ram.txt"
+    },
+    {
+      "module": "rom",
+      "memory": "data",
+      "file": "sap3_microcode.txt"
+    }
+  ],
+  "test_cases": [
+    {
+      "name": "Exercises AND, OR, and XOR against a base value and emits each result",
+      "description": "Logic AND/OR/XOR",
+      "sequence": [
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 1,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {
+            "out_reg_out": 5
+          }
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {
+            "out_reg_out": 245
+          }
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {
+            "out_reg_out": 74
+          }
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {}
+        },
+        {
+          "inputs": {
+            "clk": 1,
+            "reset": 0,
+            "en_read_external": 0,
+            "external_value": 0
+          },
+          "expected": {
+            "halted": 1,
+            "out_reg_out": 74
+          }
+        }
+      ]
+    }
+  ]
+}

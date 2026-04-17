@@ -240,20 +240,34 @@ Exit:
 
 ### Slice 4 (Optional): SAP-3 Sketch
 
-A SAP-3 corpus is only worth opening if Slices 1-3 do not already feel like
-"meaningfully moved." If they do not:
+**Status: landed 2026-04-17.** Added [`parts/sap3`](./parts/sap3/) as a
+richer CPU sketch on top of the existing simulator surface. The simulator
+itself was not touched; the slice lives entirely in the corpus. Changes
+versus [`parts/sap2/sap2.sv`](./parts/sap2/sap2.sv):
 
-- Add `parts/sap3/` with a more faithful Ben Eater SAP-2 instruction set
-  (additional opcodes, extended microcode width, and at minimum a 16-byte
-  user-program window plus an output-port style memory-mapped device).
-- Reuse the existing register-tile and `bus_driver` modules from `sap2.sv` -
-  the simulator capability surface should not need to grow further for this.
-- Generate the JSON program suites the same way `parts/sap2/gen_svsim.py`
-  does today.
+- Three new opcodes (`AND = 0xB`, `OR = 0xC`, `XOR = 0xD`) served by a new
+  `alu` module that takes `alu_op_and` / `alu_op_or` / `alu_op_xor` control
+  signals next to the existing `en_subtraction`.
+- The dedicated `out_r` register is gone; the `memory` module now owns an
+  internal `out_port` register exposed at address `0x10` so `OUT` lowers to
+  "select output port, then bus-write A". The address register widens from
+  4 to 5 bits and the top bit selects the port.
+- Microcode width grows from 16 to 20 bits to carry `alu_op_and`,
+  `alu_op_or`, `alu_op_xor`, and `en_select_output_port`. The four-bit
+  opcode space and 8-cycle micro counter are unchanged.
+- `register_tile`, `register_pc_tile`, `register_instr_tile`, and
+  `bus_driver` are carried over unchanged from `sap2.sv`.
 
-A SAP-3 slice does not require any simulator changes if Slices 1-3 land first.
-That is the test for whether it is worth doing: if the only thing left is "add
-a richer corpus", the simulator side of the SAP port story is complete.
+Added [`parts/sap3/gen_svsim.py`](./parts/sap3/gen_svsim.py) as a single
+generator that owns the microcode, assembles `.s` sources in
+[`parts/sap3/examples`](./parts/sap3/examples/), simulates the CPU
+cycle-by-cycle, and emits JSON suites in the existing shape. Four programs
+are generated: `add3to42`, `fib` (ported from SAP-1/-2), `logic_mask` and
+`parity` (exercising AND / OR / XOR).
+
+Verified: `cargo test --workspace` 178/178; `parts/basic+testing+overture+rv32i`
+157/157; `parts/sap1` 6/6; `parts/sap2` 9/9; `parts/simple8` 5/5;
+`parts/picorv32` 13/13; `parts/sap3` 4/4.
 
 ## Validation Commands
 

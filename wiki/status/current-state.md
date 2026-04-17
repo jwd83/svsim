@@ -1,13 +1,13 @@
 # Current State
 
-Snapshot date: 2026-04-16
+Snapshot date: 2026-04-17
 
 ## Verified Today
 
 - `cargo test`: pass. The workspace runs `168` `svsim` tests and `10` CLI tests without failures.
 - Official executable green corpus: `157/157` across `parts/basic`, `parts/testing`, `parts/overture`, and `parts/rv32i` (includes `024-FourStateLiterals` and `025-TopLevelInout`).
-- Auxiliary executable corpora: `13/13` in `parts/picorv32`, `9/9` in `parts/sap2` (program suites plus `sap2_bus_semantics`, `sap2_register_tile`, `sap2_inout_top`), `6/6` in `parts/sap1`, and `5/5` in `parts/simple8`.
-- Combined executable coverage from the commands below: `190/190`.
+- Auxiliary executable corpora: `13/13` in `parts/picorv32`, `9/9` in `parts/sap2` (program suites plus `sap2_bus_semantics`, `sap2_register_tile`, `sap2_inout_top`), `6/6` in `parts/sap1`, `5/5` in `parts/simple8`, and `4/4` in the new `parts/sap3` sketch (AND/OR/XOR plus memory-mapped output port at `0x10`, 20-bit microcode, no simulator changes required).
+- Combined executable coverage from the commands below: `194/194`.
 
 ## What That Means
 
@@ -27,6 +27,7 @@ cargo run -q -p svsim-cli -- --json-test-dir parts/basic --json-test-dir parts/t
 cargo run -q -p svsim-cli -- --json-test-dir parts/picorv32
 cargo run -q -p svsim-cli -- --json-test-dir parts/sap1
 cargo run -q -p svsim-cli -- --json-test-dir parts/sap2
+cargo run -q -p svsim-cli -- --json-test-dir parts/sap3
 cargo run -q -p svsim-cli -- --json-test-dir parts/simple8
 ```
 
