@@ -89,9 +89,7 @@ module bus_driver(
     input wire [7:0] value,
     inout wire [7:0] bus
 );
-    wire [7:0] float_bus;
-
-    assign bus = en_read ? value : float_bus;
+    assign bus = en_read ? value : 8'bz;
 endmodule
 
 module machine(

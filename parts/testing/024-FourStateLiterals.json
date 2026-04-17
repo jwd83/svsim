@@ -1,0 +1,15 @@
+[
+  {
+    "expect": {
+      "all_x": "xxxxxxxx",
+      "all_z": "zzzzzzzz",
+      "explicit_x": "xxxx",
+      "explicit_z": "zzzz",
+      "mixed_bin": "1x0z",
+      "hex_all_x": "xxxxxxxx",
+      "hex_mixed": 165,
+      "concat_xz": "xxxxzzzz",
+      "hex_extended": "xxxxxxxxxxxx0001"
+    }
+  }
+]

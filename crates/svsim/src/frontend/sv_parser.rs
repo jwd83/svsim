@@ -28,6 +28,7 @@ use crate::hir::{
     PortDirection as HirPortDirection, ProcBlock, ProcBlockKind, SignalDecl, SourceFile, Stmt,
     StorageKind, UnaryOp,
 };
+use crate::logic_value::{LogicBit, LogicBits};
 use crate::width::{
     arithmetic_shift_right_bits, mask, minimum_width, shift_left_bits, shift_right_bits,
     sign_extend_bits,
@@ -569,8 +570,14 @@ fn lower_constant_primary_to_expr(
             };
             let count = count_lit
                 .bits
-                .to_usize_checked()
-                .ok_or_else(|| unsupported("replication count exceeds host limits", None))?;
+                .to_bit_value_checked()
+                .and_then(|bits| bits.to_usize_checked())
+                .ok_or_else(|| {
+                    unsupported(
+                        "replication count must be a two-state literal within host limits",
+                        None,
+                    )
+                })?;
             let mut exprs = Vec::new();
             for expr in inner.nodes.1.1.nodes.0.nodes.1.contents() {
                 exprs.push(lower_constant_expression_to_expr(
@@ -2124,7 +2131,7 @@ fn substitute_expr_ident(expr: &Expr, name: &str, replacement: &Expr) -> Expr {
 
 fn expr_from_const_eval_value(value: &ConstEvalValue) -> Expr {
     let literal = Expr::Literal(NumericLiteral {
-        bits: value.normalized_bits(),
+        bits: LogicBits::from_bit_value(value.normalized_bits()),
         width: Some(value.width),
     });
     if value.signed {
@@ -2798,9 +2805,10 @@ fn lower_literal(
         sv_parser::PrimaryLiteral::UnbasedUnsizedLiteral(literal) => {
             let text = symbol_text(syntax_tree, &literal.nodes.0)?;
             let bits = match text.as_str() {
-                "'0" => BitValue::zero(),
-                "'1" => BitValue::one(),
-                "'x" | "'X" | "'z" | "'Z" => BitValue::zero(),
+                "'0" => LogicBits::from_bit_value(BitValue::zero()),
+                "'1" => LogicBits::from_bit_value(BitValue::one()),
+                "'x" | "'X" => LogicBits::filled(1, LogicBit::X),
+                "'z" | "'Z" => LogicBits::filled(1, LogicBit::Z),
                 _ => return Err(unsupported("unsupported unbased unsized literal", None)),
             };
             Ok(Expr::Literal(NumericLiteral { bits, width: None }))
@@ -2817,7 +2825,7 @@ fn lower_literal(
                 bits = bits.bitor(&BitValue::from(byte as u64));
             }
             Ok(Expr::Literal(NumericLiteral {
-                bits,
+                bits: LogicBits::from_bit_value(bits),
                 width: Some(width),
             }))
         }
@@ -2844,48 +2852,60 @@ fn lower_number(
                 let bits = BitValue::from_str_radix(&text.replace('_', ""), 10)
                     .map_err(|_| unsupported("failed to parse numeric literal", None))?;
                 Ok(NumericLiteral {
-                    bits,
+                    bits: LogicBits::from_bit_value(bits),
                     width: Some(32),
                 })
             }
-            sv_parser::DecimalNumber::BaseUnsigned(number) => Ok(NumericLiteral {
-                bits: parse_based_value(syntax_tree, &number.nodes.2.nodes.0, 10)?,
-                width: number
+            sv_parser::DecimalNumber::BaseUnsigned(number) => {
+                let width = number
                     .nodes
                     .0
                     .as_ref()
                     .map(|size| locate_usize(syntax_tree, &size.nodes.0.nodes.0))
-                    .transpose()?,
-            }),
+                    .transpose()?;
+                Ok(NumericLiteral {
+                    bits: parse_based_value(syntax_tree, &number.nodes.2.nodes.0, 10, width)?,
+                    width,
+                })
+            }
             _ => Err(unsupported("x/z decimal literals are not supported", None)),
         },
-        sv_parser::IntegralNumber::BinaryNumber(number) => Ok(NumericLiteral {
-            bits: parse_based_value(syntax_tree, &number.nodes.2.nodes.0, 2)?,
-            width: number
+        sv_parser::IntegralNumber::BinaryNumber(number) => {
+            let width = number
                 .nodes
                 .0
                 .as_ref()
                 .map(|size| locate_usize(syntax_tree, &size.nodes.0.nodes.0))
-                .transpose()?,
-        }),
-        sv_parser::IntegralNumber::OctalNumber(number) => Ok(NumericLiteral {
-            bits: parse_based_value(syntax_tree, &number.nodes.2.nodes.0, 8)?,
-            width: number
+                .transpose()?;
+            Ok(NumericLiteral {
+                bits: parse_based_value(syntax_tree, &number.nodes.2.nodes.0, 2, width)?,
+                width,
+            })
+        }
+        sv_parser::IntegralNumber::OctalNumber(number) => {
+            let width = number
                 .nodes
                 .0
                 .as_ref()
                 .map(|size| locate_usize(syntax_tree, &size.nodes.0.nodes.0))
-                .transpose()?,
-        }),
-        sv_parser::IntegralNumber::HexNumber(number) => Ok(NumericLiteral {
-            bits: parse_based_value(syntax_tree, &number.nodes.2.nodes.0, 16)?,
-            width: number
+                .transpose()?;
+            Ok(NumericLiteral {
+                bits: parse_based_value(syntax_tree, &number.nodes.2.nodes.0, 8, width)?,
+                width,
+            })
+        }
+        sv_parser::IntegralNumber::HexNumber(number) => {
+            let width = number
                 .nodes
                 .0
                 .as_ref()
                 .map(|size| locate_usize(syntax_tree, &size.nodes.0.nodes.0))
-                .transpose()?,
-        }),
+                .transpose()?;
+            Ok(NumericLiteral {
+                bits: parse_based_value(syntax_tree, &number.nodes.2.nodes.0, 16, width)?,
+                width,
+            })
+        }
     }
 }
 
@@ -3412,7 +3432,7 @@ fn const_eval_param_expr(expr: &Expr, params: &[ParameterDecl]) -> LowerResult<C
             })?;
             const_eval_param_expr(&param.default_value, params)
         }
-        Expr::Literal(literal) => Ok(const_eval_value_from_literal(literal)),
+        Expr::Literal(literal) => const_eval_value_from_literal(literal),
         Expr::Concat(exprs) => {
             let mut parts = Vec::with_capacity(exprs.len());
             for expr in exprs {
@@ -3671,11 +3691,17 @@ fn const_eval_param_value(expr: &Expr, params: &[ParameterDecl]) -> LowerResult<
         .ok_or_else(|| unsupported("constant value exceeds host limits", None))
 }
 
-fn const_eval_value_from_literal(literal: &NumericLiteral) -> ConstEvalValue {
+fn const_eval_value_from_literal(literal: &NumericLiteral) -> LowerResult<ConstEvalValue> {
     let width = literal
         .width
         .unwrap_or_else(|| minimum_width(&literal.bits));
-    ConstEvalValue::new(literal.bits.clone(), width)
+    let bits = literal.bits.to_bit_value_checked().ok_or_else(|| {
+        unsupported(
+            "x/z literals are not supported in constant parameter expressions",
+            None,
+        )
+    })?;
+    Ok(ConstEvalValue::new(bits, width))
 }
 
 fn concat_const_eval_values(parts: &[ConstEvalValue]) -> LowerResult<ConstEvalValue> {
@@ -3734,22 +3760,89 @@ fn parse_based_value(
     syntax_tree: &SyntaxTree,
     locate: &Locate,
     radix: u32,
-) -> LowerResult<BitValue> {
+    explicit_width: Option<usize>,
+) -> LowerResult<LogicBits> {
     let text = syntax_tree
         .get_str(locate)
         .ok_or_else(|| unsupported("failed to read numeric literal text", None))?;
-    let cleaned = coerce_unknown_digits_to_zero(&text.replace('_', ""));
-    BitValue::from_str_radix(&cleaned, radix)
-        .map_err(|_| unsupported("failed to parse numeric literal", None))
+    let cleaned: String = text.chars().filter(|ch| *ch != '_').collect();
+    if cleaned.is_empty() {
+        return Err(unsupported("numeric literal has no digits", None));
+    }
+
+    let bits_per_digit = match radix {
+        2 => 1,
+        8 => 3,
+        16 => 4,
+        10 => return parse_decimal_logic_bits(&cleaned, explicit_width),
+        _ => return Err(unsupported("unsupported numeric literal radix", None)),
+    };
+
+    let natural_width = cleaned.chars().count() * bits_per_digit;
+    let mut bits = LogicBits::zero();
+    for (digit_index, ch) in cleaned.chars().rev().enumerate() {
+        let base = digit_index * bits_per_digit;
+        match ch {
+            'x' | 'X' => {
+                for offset in 0..bits_per_digit {
+                    bits.set_bit(base + offset, LogicBit::X);
+                }
+            }
+            'z' | 'Z' | '?' => {
+                for offset in 0..bits_per_digit {
+                    bits.set_bit(base + offset, LogicBit::Z);
+                }
+            }
+            other => {
+                let digit = other.to_digit(radix).ok_or_else(|| {
+                    unsupported(
+                        format!("invalid digit '{}' in numeric literal", other),
+                        None,
+                    )
+                })?;
+                for offset in 0..bits_per_digit {
+                    if (digit >> offset) & 1 == 1 {
+                        bits.set_bit(base + offset, LogicBit::One);
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(target) = explicit_width {
+        if target > natural_width && natural_width > 0 {
+            let top = bits.bit(natural_width - 1);
+            if matches!(top, LogicBit::X | LogicBit::Z) {
+                for index in natural_width..target {
+                    bits.set_bit(index, top);
+                }
+            }
+        }
+        Ok(bits.truncate(target))
+    } else {
+        Ok(bits)
+    }
 }
 
-fn coerce_unknown_digits_to_zero(text: &str) -> String {
-    text.chars()
-        .map(|ch| match ch {
-            'x' | 'X' | 'z' | 'Z' | '?' => '0',
-            other => other,
-        })
-        .collect()
+fn parse_decimal_logic_bits(
+    cleaned: &str,
+    explicit_width: Option<usize>,
+) -> LowerResult<LogicBits> {
+    for ch in cleaned.chars() {
+        if matches!(ch, 'x' | 'X' | 'z' | 'Z' | '?') {
+            return Err(unsupported(
+                "x/z digits are not supported in decimal literals",
+                None,
+            ));
+        }
+    }
+    let bits = BitValue::from_str_radix(cleaned, 10)
+        .map_err(|_| unsupported("failed to parse numeric literal", None))?;
+    let bits = LogicBits::from_bit_value(bits);
+    Ok(match explicit_width {
+        Some(target) => bits.truncate(target),
+        None => bits,
+    })
 }
 
 fn parse_string_literal_bytes(text: &str) -> LowerResult<Vec<u8>> {
@@ -4252,7 +4345,11 @@ endmodule
         assert_eq!(module.continuous_assignments.len(), 1);
         match &module.continuous_assignments[0].expr {
             Expr::Literal(NumericLiteral { bits, .. }) => {
-                assert_eq!(bits.to_u64_checked(), Some(1));
+                assert_eq!(
+                    bits.to_bit_value_checked()
+                        .and_then(|bits| bits.to_u64_checked()),
+                    Some(1)
+                );
             }
             other => panic!("unexpected generated assignment: {other:?}"),
         }
@@ -4284,7 +4381,11 @@ endmodule
         assert_eq!(module.continuous_assignments.len(), 1);
         match &module.continuous_assignments[0].expr {
             Expr::Literal(NumericLiteral { bits, .. }) => {
-                assert_eq!(bits.to_u64_checked(), Some(1));
+                assert_eq!(
+                    bits.to_bit_value_checked()
+                        .and_then(|bits| bits.to_u64_checked()),
+                    Some(1)
+                );
             }
             other => panic!("unexpected generated assignment: {other:?}"),
         }
@@ -4402,16 +4503,24 @@ endmodule
             };
             match right.as_ref() {
                 Expr::Literal(NumericLiteral { bits, .. }) => {
-                    actual_increments.push(bits.to_u64_checked().expect("literal increment"));
+                    let value = bits
+                        .to_bit_value_checked()
+                        .and_then(|bits| bits.to_u64_checked())
+                        .expect("literal increment");
+                    actual_increments.push(value);
                 }
-                Expr::Unary { op, expr } if *op == crate::hir::UnaryOp::Signed => match expr
-                    .as_ref()
-                {
-                    Expr::Literal(NumericLiteral { bits, .. }) => {
-                        actual_increments.push(bits.to_u64_checked().expect("signed increment"));
+                Expr::Unary { op, expr } if *op == crate::hir::UnaryOp::Signed => {
+                    match expr.as_ref() {
+                        Expr::Literal(NumericLiteral { bits, .. }) => {
+                            let value = bits
+                                .to_bit_value_checked()
+                                .and_then(|bits| bits.to_u64_checked())
+                                .expect("signed increment");
+                            actual_increments.push(value);
+                        }
+                        other => panic!("unexpected signed increment expression: {other:?}"),
                     }
-                    other => panic!("unexpected signed increment expression: {other:?}"),
-                },
+                }
                 other => panic!("unexpected increment expression: {other:?}"),
             }
         }

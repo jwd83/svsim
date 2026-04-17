@@ -83,6 +83,19 @@ impl LogicBits {
         self.x_mask.is_zero() && self.z_mask.is_zero()
     }
 
+    pub fn bit_len(&self) -> usize {
+        self.ones
+            .bit_len()
+            .max(self.x_mask.bit_len())
+            .max(self.z_mask.bit_len())
+    }
+
+    pub fn truncate(&self, width: usize) -> Self {
+        let mut copy = self.clone();
+        copy.truncate_in_place(width);
+        copy
+    }
+
     pub fn bit(&self, index: usize) -> LogicBit {
         if self.x_mask.get_bit(index) {
             LogicBit::X
@@ -222,6 +235,20 @@ impl LogicPattern {
 
     fn logic_string(&self) -> String {
         render_logic_string(&self.bits, &self.wildcard_mask, self.width)
+    }
+}
+
+impl Serialize for LogicBits {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let width = self.bit_len().max(1);
+        if self.is_two_state() {
+            serialize_bit_value(&self.ones.truncate(width), serializer)
+        } else {
+            serializer.serialize_str(&render_logic_string(self, &BitValue::zero(), width))
+        }
     }
 }
 

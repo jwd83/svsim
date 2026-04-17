@@ -693,7 +693,7 @@ impl ConstValue {
 fn const_eval_expr(expr: &Expr) -> Option<ConstValue> {
     match expr {
         Expr::Ident(_) | Expr::MemoryRead { .. } => None,
-        Expr::Literal(literal) => Some(const_value_from_literal(literal)),
+        Expr::Literal(literal) => const_value_from_literal(literal),
         Expr::Concat(exprs) => {
             let mut parts = Vec::with_capacity(exprs.len());
             for expr in exprs {
@@ -905,11 +905,12 @@ fn const_eval_expr(expr: &Expr) -> Option<ConstValue> {
     }
 }
 
-fn const_value_from_literal(literal: &NumericLiteral) -> ConstValue {
+fn const_value_from_literal(literal: &NumericLiteral) -> Option<ConstValue> {
     let width = literal
         .width
         .unwrap_or_else(|| minimum_width(&literal.bits));
-    ConstValue::new(literal.bits.clone(), width)
+    let bits = literal.bits.to_bit_value_checked()?;
+    Some(ConstValue::new(bits, width))
 }
 
 fn compare_const_values(left: &ConstValue, right: &ConstValue) -> std::cmp::Ordering {

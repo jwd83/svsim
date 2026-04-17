@@ -1,6 +1,7 @@
 use crate::bit_value::BitValue;
 use crate::diag::{Error, Result};
 use crate::hir::{BinaryOp, Expr, ModuleSummary, UnaryOp};
+use crate::logic_value::LogicBits;
 
 pub(crate) fn expr_width(expr: &Expr, module: &ModuleSummary) -> Result<usize> {
     match expr {
@@ -97,7 +98,7 @@ pub(crate) fn expr_width(expr: &Expr, module: &ModuleSummary) -> Result<usize> {
     }
 }
 
-pub(crate) fn minimum_width(bits: &BitValue) -> usize {
+pub(crate) fn minimum_width(bits: &LogicBits) -> usize {
     bits.bit_len().max(1)
 }
 

@@ -154,7 +154,9 @@ fn cli_runs_sap2_json_regression_directory() {
     let json: Value = serde_json::from_slice(&output.stdout).expect("parse stdout json");
     assert_eq!(json["report"]["passed"], json["report"]["total"]);
     assert!(
-        json["report"]["total"].as_u64().is_some_and(|total| total >= 2),
+        json["report"]["total"]
+            .as_u64()
+            .is_some_and(|total| total >= 2),
         "unexpected sap2 suite count: {}",
         json["report"]["total"]
     );

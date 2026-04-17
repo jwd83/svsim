@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use serde::Serialize;
 
-use crate::bit_value::BitValue;
 use crate::diag::{Diagnostic, SourceSpan};
+use crate::logic_value::LogicBits;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct PackedRange {
@@ -168,7 +168,7 @@ impl MemoryDecl {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct NumericLiteral {
-    pub bits: BitValue,
+    pub bits: LogicBits,
     pub width: Option<usize>,
 }
 

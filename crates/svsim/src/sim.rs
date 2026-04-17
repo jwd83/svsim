@@ -1424,7 +1424,10 @@ fn replace_whole_signal_driver(
             binding.object_id
         ))
     })?;
-    let logic = value.coerced_to(binding.view_width).logic.coerced_to(object.width);
+    let logic = value
+        .coerced_to(binding.view_width)
+        .logic
+        .coerced_to(object.width);
     replace_object_driver(binding.object_id, logic, net_drivers);
     Ok(())
 }
@@ -1442,7 +1445,10 @@ fn apply_fixed_binding_drive(
             binding.object_id
         ))
     })?;
-    let logic = value.coerced_to(binding.view_width).logic.coerced_to(object.width);
+    let logic = value
+        .coerced_to(binding.view_width)
+        .logic
+        .coerced_to(object.width);
     if object.storage.is_net() {
         stage_object_driver(binding.object_id, logic, net_drivers);
         return Ok(false);
@@ -2549,7 +2555,7 @@ fn value_from_literal(literal: &NumericLiteral) -> Value {
     let width = literal
         .width
         .unwrap_or_else(|| minimum_width(&literal.bits));
-    Value::new(literal.bits.clone(), width)
+    Value::from_logic(LogicValue::new(literal.bits.clone(), width), width)
 }
 
 fn concat_values(parts: &[Value]) -> Result<Value> {
@@ -4944,13 +4950,7 @@ endmodule
             )]))
             .expect("eval");
 
-        assert_logic_bits_eq!(
-            outputs
-                .get("outY")
-                .expect("wide output")
-                .clone(),
-            input
-        );
+        assert_logic_bits_eq!(outputs.get("outY").expect("wide output").clone(), input);
     }
 
     fn unique_temp_dir(name: &str) -> PathBuf {

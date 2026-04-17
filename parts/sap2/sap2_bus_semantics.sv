@@ -5,9 +5,7 @@ module bus_driver(
     input wire value,
     inout wire bus
 );
-    wire float_bus;
-
-    assign bus = en_read ? value : float_bus;
+    assign bus = en_read ? value : 1'bz;
 endmodule
 
 module sap2_bus_semantics(
