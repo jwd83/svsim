@@ -1,3 +1,33 @@
+
+--- PLAN COMPLETE ---
+                                                                                      
+⏺ Deeper review complete. Additional findings beyond the pass-count confirmation:                                       
+                                                                                                                        
+  Reproducibility: python3 parts/sap3/gen_svsim.py regenerates sap3_microcode.txt and all four sap3_*.json suites       
+  byte-identical to what's checked in. No drift between source scripts and artifacts.                                   
+                                                                                                                        
+  Internal consistency:                                                                                                 
+  - Microcode bit layout in make_micro_instr.py:9-27 (19 signals, bit [0] reserved) matches the bus assignment at       
+  sap3.sv:279-300 (micro[19:1] unpacks into 19 wires).                                                                  
+  - ROM width = 20 bits (sap3.sv:63-69); micro_instr_counter still runs the 8-step cycle inherited from sap1/sap2.
+  - Microcode file is 513 lines, consistent with sap1 (513) and sap2 (513) — same trailing-newline convention, not a    
+  bug.                                                                                                                  
+  - All four new opcodes (AND/OR/XOR at 0xB/0xC/0xD, OUT at 0xE) have the right control-signal payloads; OUT is         
+  correctly "select port, then write bus."                                                                              
+                                                                                                                        
+  Example programs actually exercise the new features:
+  - logic_mask.s: one each of and/or/xor through memory operands plus three outs.                                       
+  - parity.s: xor + and + out (low-bit parity of 0x69 ^ 0x52).                                                          
+  - fib.s/add3to42.s: ported sap1/sap2 classics routed through the memory-mapped output port.                           
+                                                                                                                        
+  Wiki updates landed in slice 4:                                                                                       
+  - wiki/status/current-state.md bumped to 2026-04-17 with 4/4 sap3 row and combined 194/194.                           
+  - wiki/testing/corpus-map.md adds the sap3 row and regen command.                                                     
+                                                                                                                        
+  Clean diff discipline: only expected paths changed — parts/sap3/**, plan-next.md, the two wiki files, and the report  
+  JSONs (slice-4-testing follow-up). Simulator crates were untouched, confirming the "no simulator changes" claim.      
+                                                                                                                        
+  No follow-ups needed. Slice 4 is cleanly landed, reproducible, and consistent with plan-next.md:241-270.  
 # Next Plan: Finish The SAP Port Story
 
 This plan picks up where [`plan.md`](./plan.md) left off. The four-state /
