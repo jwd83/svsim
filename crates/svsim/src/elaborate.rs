@@ -1,6 +1,9 @@
+use std::collections::HashMap;
+
 use serde::Serialize;
 
 use crate::diag::{Error, Result, SourceSpan};
+use crate::expr_eval::{Value, eval_expr};
 use crate::hir::{
     Expr, HirDesign, LValue, MemoryDecl, ModuleInstanceSummary, ModuleSummary, PackedRange,
     ParameterDecl, PortDecl, PortDirection, SignalDecl, StorageKind, expr_to_lvalue,
@@ -30,6 +33,10 @@ pub struct ElaboratedInstance {
     pub instance_name: Option<String>,
     pub path: Vec<String>,
     pub parameters: Vec<ElaboratedParameter>,
+    /// Parameter values resolved against instance overrides, used to seed the
+    /// simulation runtime. Internal: not part of the serialized design.
+    #[serde(skip)]
+    pub(crate) parameter_values: HashMap<String, Value>,
     pub ports: Vec<ElaboratedPort>,
     pub nets: Vec<ElaboratedNet>,
     pub variables: Vec<ElaboratedVariable>,
@@ -102,7 +109,7 @@ pub struct ElaboratedPortBinding {
 pub(crate) fn elaborate_design(hir: &HirDesign, top_module: &str) -> Result<ElaboratedDesign> {
     let mut stack = Vec::new();
     Ok(ElaboratedDesign {
-        top: elaborate_instance(hir, top_module, None, Vec::new(), None, &mut stack)?,
+        top: elaborate_instance(hir, top_module, None, Vec::new(), None, None, &mut stack)?,
     })
 }
 
@@ -112,6 +119,7 @@ fn elaborate_instance(
     instance_name: Option<String>,
     path: Vec<String>,
     instance_summary: Option<&ModuleInstanceSummary>,
+    parent: Option<(&ModuleSummary, &HashMap<String, Value>)>,
     stack: &mut Vec<String>,
 ) -> Result<ElaboratedInstance> {
     if stack.iter().any(|name| name == module_name) {
@@ -128,6 +136,8 @@ fn elaborate_instance(
 
     stack.push(module_name.to_owned());
 
+    let parameter_values = elaborate_module_parameters(module, parent, instance_summary)?;
+
     let mut children = Vec::with_capacity(module.instantiations.len());
     for child in &module.instantiations {
         let mut child_path = path.clone();
@@ -138,6 +148,7 @@ fn elaborate_instance(
             Some(child.instance_name.clone()),
             child_path,
             Some(child),
+            Some((module, &parameter_values)),
             stack,
         )?);
     }
@@ -153,6 +164,7 @@ fn elaborate_instance(
             .iter()
             .map(|parameter| elaborate_parameter(parameter, instance_summary))
             .collect(),
+        parameter_values,
         ports: module.ports.iter().map(elaborate_port).collect(),
         nets: module
             .signals
@@ -170,6 +182,42 @@ fn elaborate_instance(
         bindings: elaborate_bindings(module, instance_summary),
         children,
     })
+}
+
+fn elaborate_module_parameters(
+    module: &ModuleSummary,
+    parent: Option<(&ModuleSummary, &HashMap<String, Value>)>,
+    instance: Option<&ModuleInstanceSummary>,
+) -> Result<HashMap<String, Value>> {
+    let empty_memories = HashMap::new();
+    let mut values = HashMap::new();
+
+    for param in &module.parameters {
+        let value = if let Some(override_expr) = instance.and_then(|instance| {
+            instance
+                .parameter_overrides
+                .iter()
+                .find(|override_expr| override_expr.parameter_name == param.name)
+        }) {
+            let (parent_module, parent_values) = parent.ok_or_else(|| {
+                Error::Resolve(format!(
+                    "parameter override for '{}' on '{}' is missing parent module context",
+                    param.name, module.name
+                ))
+            })?;
+            eval_expr(
+                &override_expr.expr,
+                parent_module,
+                parent_values,
+                &empty_memories,
+            )?
+        } else {
+            eval_expr(&param.default_value, module, &values, &empty_memories)?
+        };
+        values.insert(param.name.clone(), value.coerced_to(param.width()));
+    }
+
+    Ok(values)
 }
 
 fn elaborate_parameter(

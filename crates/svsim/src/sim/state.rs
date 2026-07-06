@@ -65,8 +65,6 @@ pub(super) fn instantiate_module_state(
     hir: &HirDesign,
     elaborated: &ElaboratedInstance,
     provided_ports: HashMap<String, SignalBinding>,
-    parent_module: Option<&ModuleSummary>,
-    parent_parameter_values: Option<&HashMap<String, Value>>,
     objects: &mut Vec<RuntimeObjectLayout>,
     stack: &mut Vec<String>,
 ) -> Result<ModuleState> {
@@ -79,27 +77,7 @@ pub(super) fn instantiate_module_state(
     }
 
     let module = resolve_supported_module(hir, &elaborated.module_name)?;
-    let instance_summary = match (parent_module, elaborated.instance_name.as_deref()) {
-        (Some(parent_module), Some(instance_name)) => Some(
-            parent_module
-                .instantiations
-                .iter()
-                .find(|instance| instance.instance_name == instance_name)
-                .ok_or_else(|| {
-                    Error::Resolve(format!(
-                        "instance '{}' does not exist under '{}'",
-                        instance_name, parent_module.name
-                    ))
-                })?,
-        ),
-        _ => None,
-    };
-    let parameter_values = elaborate_module_parameters(
-        module,
-        parent_module,
-        parent_parameter_values,
-        instance_summary,
-    )?;
+    let parameter_values = elaborated.parameter_values.clone();
 
     stack.push(elaborated.module_name.clone());
 
@@ -204,8 +182,6 @@ pub(super) fn instantiate_module_state(
                 hir,
                 child,
                 child_ports,
-                Some(module),
-                Some(&parameter_values),
                 objects,
                 stack,
             )?),
@@ -606,49 +582,6 @@ pub(super) fn build_clock_state_table(module: &ModuleSummary) -> HashMap<String,
     }
 
     clocks
-}
-
-pub(super) fn elaborate_module_parameters(
-    module: &ModuleSummary,
-    parent_module: Option<&ModuleSummary>,
-    parent_parameter_values: Option<&HashMap<String, Value>>,
-    instance: Option<&ModuleInstanceSummary>,
-) -> Result<HashMap<String, Value>> {
-    let empty_memories = HashMap::new();
-    let mut values = HashMap::new();
-
-    for param in &module.parameters {
-        let value = if let Some(override_expr) = instance.and_then(|instance| {
-            instance
-                .parameter_overrides
-                .iter()
-                .find(|override_expr| override_expr.parameter_name == param.name)
-        }) {
-            let parent_module = parent_module.ok_or_else(|| {
-                Error::Resolve(format!(
-                    "parameter override for '{}' on '{}' is missing parent module context",
-                    param.name, module.name
-                ))
-            })?;
-            let parent_values = parent_parameter_values.ok_or_else(|| {
-                Error::Resolve(format!(
-                    "parameter override for '{}' on '{}' is missing parent parameter values",
-                    param.name, module.name
-                ))
-            })?;
-            eval_expr(
-                &override_expr.expr,
-                parent_module,
-                parent_values,
-                &empty_memories,
-            )?
-        } else {
-            eval_expr(&param.default_value, module, &values, &empty_memories)?
-        };
-        values.insert(param.name.clone(), value.coerced_to(param.width()));
-    }
-
-    Ok(values)
 }
 
 pub(super) fn resolve_instance_path<'a>(

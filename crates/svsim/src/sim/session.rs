@@ -19,8 +19,6 @@ impl SimulationSession {
             design.hir(),
             &elaborated.top,
             HashMap::new(),
-            None,
-            None,
             &mut objects,
             &mut stack,
         )?;

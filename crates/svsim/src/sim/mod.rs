@@ -16,8 +16,8 @@ use crate::diag::{Error, Result};
 use crate::elaborate::{ElaboratedInstance, RuntimeObjectShape};
 use crate::expr_eval::{LogicTruth, MemoryState, Value, eval_expr, values_case_equal};
 use crate::hir::{
-    AssignmentKind, Expr, HirDesign, LValue, ModuleInstanceSummary, ModuleSummary, PortDirection,
-    ProcBlockKind, Stmt, StorageKind,
+    AssignmentKind, Expr, HirDesign, LValue, ModuleSummary, PortDirection, ProcBlockKind, Stmt,
+    StorageKind,
 };
 use crate::logic_ops::{logic_replace_slice, logic_slice, logic_value_from_bit};
 use crate::logic_value::{LogicBit, LogicBits, LogicValue};
