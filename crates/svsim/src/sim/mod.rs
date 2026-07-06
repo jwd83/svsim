@@ -19,8 +19,8 @@ use crate::hir::{
     NumericLiteral, PackedRange, PortDirection, ProcBlockKind, Stmt, StorageKind, UnaryOp,
 };
 use crate::logic_ops::{
-    logic_bit_and, logic_bit_not, logic_bit_or, logic_bit_xor, logic_replace_slice,
-    logic_sign_extend, logic_slice, logic_value_from_bit,
+    logic_bit_and, logic_bit_not, logic_bit_or, logic_bit_xor, logic_reduce_and, logic_reduce_or,
+    logic_reduce_xor, logic_replace_slice, logic_sign_extend, logic_slice, logic_value_from_bit,
 };
 use crate::logic_value::{LogicBit, LogicBits, LogicValue};
 use crate::net_resolve::{DriveStrengthPair, NetDriver, resolve_net};

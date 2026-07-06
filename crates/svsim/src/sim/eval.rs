@@ -140,19 +140,19 @@ pub(super) fn eval_expr(
                     1,
                 )),
                 UnaryOp::ReductionOr => Ok(Value::from_logic(
-                    logic_value_from_bit(logic_reduce_or(&value)),
+                    logic_value_from_bit(logic_reduce_or(value.logic())),
                     1,
                 )),
                 UnaryOp::ReductionAnd => Ok(Value::from_logic(
-                    logic_value_from_bit(logic_reduce_and(&value)),
+                    logic_value_from_bit(logic_reduce_and(value.logic())),
                     1,
                 )),
                 UnaryOp::ReductionNand => Ok(Value::from_logic(
-                    logic_value_from_bit(logic_bit_not(logic_reduce_and(&value))),
+                    logic_value_from_bit(logic_bit_not(logic_reduce_and(value.logic()))),
                     1,
                 )),
                 UnaryOp::ReductionXor => Ok(Value::from_logic(
-                    logic_value_from_bit(logic_reduce_xor(&value)),
+                    logic_value_from_bit(logic_reduce_xor(value.logic())),
                     1,
                 )),
                 UnaryOp::Signed => Ok(Value::from_logic_with_signed(value.logic, true)),

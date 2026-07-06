@@ -100,6 +100,54 @@ pub(crate) fn logic_replace_slice(
     LogicValue::new(bits, base.width())
 }
 
+pub(crate) fn logic_reduce_or(value: &LogicValue) -> LogicBit {
+    let mut saw_unknown = false;
+    for index in 0..value.width() {
+        match value.bit(index) {
+            LogicBit::One => return LogicBit::One,
+            LogicBit::Zero => {}
+            LogicBit::X | LogicBit::Z => saw_unknown = true,
+        }
+    }
+    if saw_unknown {
+        LogicBit::X
+    } else {
+        LogicBit::Zero
+    }
+}
+
+pub(crate) fn logic_reduce_and(value: &LogicValue) -> LogicBit {
+    let mut saw_unknown = false;
+    for index in 0..value.width() {
+        match value.bit(index) {
+            LogicBit::Zero => return LogicBit::Zero,
+            LogicBit::One => {}
+            LogicBit::X | LogicBit::Z => saw_unknown = true,
+        }
+    }
+    if saw_unknown {
+        LogicBit::X
+    } else {
+        LogicBit::One
+    }
+}
+
+pub(crate) fn logic_reduce_xor(value: &LogicValue) -> LogicBit {
+    let mut parity = false;
+    for index in 0..value.width() {
+        match value.bit(index) {
+            LogicBit::Zero => {}
+            LogicBit::One => parity = !parity,
+            LogicBit::X | LogicBit::Z => return LogicBit::X,
+        }
+    }
+    if parity {
+        LogicBit::One
+    } else {
+        LogicBit::Zero
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -223,5 +271,35 @@ mod tests {
             logic_replace_slice(&base, 0, 2, &logic("1111")),
             logic("00000011")
         );
+    }
+
+    #[test]
+    fn reduce_or_finds_any_one_and_reports_unknown_otherwise() {
+        assert_eq!(logic_reduce_or(&logic("0000")), Zero);
+        assert_eq!(logic_reduce_or(&logic("0010")), One);
+        // A known One dominates unknowns.
+        assert_eq!(logic_reduce_or(&logic("x1z0")), One);
+        assert_eq!(logic_reduce_or(&logic("x000")), X);
+        assert_eq!(logic_reduce_or(&logic("z000")), X);
+    }
+
+    #[test]
+    fn reduce_and_finds_any_zero_and_reports_unknown_otherwise() {
+        assert_eq!(logic_reduce_and(&logic("1111")), One);
+        assert_eq!(logic_reduce_and(&logic("1101")), Zero);
+        // A known Zero dominates unknowns.
+        assert_eq!(logic_reduce_and(&logic("x0z1")), Zero);
+        assert_eq!(logic_reduce_and(&logic("x111")), X);
+        assert_eq!(logic_reduce_and(&logic("z111")), X);
+    }
+
+    #[test]
+    fn reduce_xor_computes_parity_and_any_unknown_poisons_it() {
+        assert_eq!(logic_reduce_xor(&logic("0000")), Zero);
+        assert_eq!(logic_reduce_xor(&logic("0110")), Zero);
+        assert_eq!(logic_reduce_xor(&logic("0010")), One);
+        assert_eq!(logic_reduce_xor(&logic("1110")), One);
+        assert_eq!(logic_reduce_xor(&logic("1x11")), X);
+        assert_eq!(logic_reduce_xor(&logic("1z11")), X);
     }
 }

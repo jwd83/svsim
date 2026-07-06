@@ -149,46 +149,6 @@ pub(super) fn logic_value_from_ordering(ordering: Option<bool>) -> Value {
     }
 }
 
-pub(super) fn logic_reduce_or(value: &Value) -> LogicBit {
-    match value.truthiness() {
-        LogicTruth::False => LogicBit::Zero,
-        LogicTruth::True => LogicBit::One,
-        LogicTruth::Unknown => LogicBit::X,
-    }
-}
-
-pub(super) fn logic_reduce_and(value: &Value) -> LogicBit {
-    let mut saw_unknown = false;
-    for index in 0..value.width {
-        match value.logic.bit(index) {
-            LogicBit::Zero => return LogicBit::Zero,
-            LogicBit::One => {}
-            LogicBit::X | LogicBit::Z => saw_unknown = true,
-        }
-    }
-    if saw_unknown {
-        LogicBit::X
-    } else {
-        LogicBit::One
-    }
-}
-
-pub(super) fn logic_reduce_xor(value: &Value) -> LogicBit {
-    let mut parity = false;
-    for index in 0..value.width {
-        match value.logic.bit(index) {
-            LogicBit::Zero => {}
-            LogicBit::One => parity = !parity,
-            LogicBit::X | LogicBit::Z => return LogicBit::X,
-        }
-    }
-    if parity {
-        LogicBit::One
-    } else {
-        LogicBit::Zero
-    }
-}
-
 pub(super) fn logic_bitwise_binary(
     left: &Value,
     right: &Value,
