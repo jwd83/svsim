@@ -7,7 +7,7 @@ use crate::hir::{
     ModuleInstanceSummary, ModuleSummary, PortDirection, ProcBlockKind, Stmt, UnaryOp,
     expr_to_lvalue,
 };
-use crate::sim::memory::resolve_legacy_rom_data_path;
+use crate::sim::legacy_rom::resolve_legacy_rom_data_path;
 use crate::width::minimum_width;
 
 pub(crate) fn validate_design(hir: &HirDesign, top_module: &str) -> Result<()> {

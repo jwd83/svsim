@@ -24,12 +24,14 @@ use crate::logic_value::{LogicBit, LogicBits, LogicValue};
 use crate::net_resolve::{DriveStrengthPair, NetDriver, resolve_net};
 
 mod eval;
-pub(crate) mod memory;
+pub(crate) mod legacy_rom;
+mod memory;
 mod session;
 mod state;
 mod value;
 
 use eval::*;
+use legacy_rom::*;
 use memory::*;
 use state::*;
 use value::*;
