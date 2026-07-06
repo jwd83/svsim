@@ -33,7 +33,7 @@
 - For execution or state bugs: [architecture/runtime-and-state.md](./architecture/runtime-and-state.md)
 - For choosing regression targets: [testing/corpus-map.md](./testing/corpus-map.md)
 - For the completed four-state / `inout` / `sap2` milestone: [roadmap/inout-and-sap2-milestone.md](./roadmap/inout-and-sap2-milestone.md)
-- For the active architectural review campaign: [../plans/in-progress/architectural-review.md](../plans/in-progress/architectural-review.md)
+- For the completed architectural review campaign: [../plans/completed/2026-07-06-architectural-review.md](../plans/completed/2026-07-06-architectural-review.md)
 - For the latest verified status: [status/current-state.md](./status/current-state.md)
 
 ## Sources

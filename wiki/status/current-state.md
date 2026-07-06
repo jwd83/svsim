@@ -34,10 +34,13 @@ Snapshot date: 2026-07-06
   focused bus-semantics regressions.
 - Rendering is still intentionally deferred; the project is centered on
   structured compile and simulation results.
-- An architectural review campaign is active at
-  [../../plans/in-progress/architectural-review.md](../../plans/in-progress/architectural-review.md);
-  steps 1–4 are complete (corpus gate, doc truth-up, `sim/` module split, and
-  four-state primitives relocated to the value layer as `logic_ops.rs`).
+- The architectural review campaign is complete (all seven steps):
+  [../../plans/completed/2026-07-06-architectural-review.md](../../plans/completed/2026-07-06-architectural-review.md).
+  Highlights: green-corpus `cargo test` gate; `sim/` module split; four-state
+  primitives in `logic_ops.rs`; one shared expression evaluator
+  (`expr_eval.rs`) replacing the three divergent constant evaluators;
+  parameter values resolved during elaboration; legacy ROM shim isolated and
+  documented in `sim/legacy_rom.rs`.
 
 ## Commands Used
 
@@ -64,5 +67,5 @@ cargo test
 - [../../AGENTS.md](../../AGENTS.md)
 - [../../crates/svsim/tests/corpus_gate.rs](../../crates/svsim/tests/corpus_gate.rs)
 - [../../test.sh](../../test.sh)
-- [../../plans/in-progress/architectural-review.md](../../plans/in-progress/architectural-review.md)
+- [../../plans/completed/2026-07-06-architectural-review.md](../../plans/completed/2026-07-06-architectural-review.md)
 - [../../docs/rust-port-plan.md](../../docs/rust-port-plan.md)

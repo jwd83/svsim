@@ -32,3 +32,11 @@
 - `crates/svsim/src/sim.rs` (4,970 lines) is now the `crates/svsim/src/sim/` module directory: `mod.rs` (root), `session.rs`, `eval.rs`, `state.rs`, `memory.rs`, `value.rs`, `tests.rs`; wiki links updated from the old `sim.rs` path.
 - Four-state primitives (bit truth tables, reductions, slices, sign extension) moved from the sim runtime into crate-private `crates/svsim/src/logic_ops.rs` with 14 direct truth-table unit tests; `sim/eval.rs` is now a consumer.
 - Updated `architecture/workspace-map.md`, `sources/source-map.md`, and `status/current-state.md` to match.
+
+## [2026-07-06] lint | evaluator consolidation and campaign completion (architectural review steps 5-7)
+
+- Verified `cargo test`: pass (`201/201` — `182` `svsim` unit tests, `9` corpus gate tests, `10` CLI tests).
+- The three constant evaluators (validate's `ConstValue`, the frontend's `ConstEvalValue`, and runtime parameter evaluation) are consolidated onto one shared evaluator in `crates/svsim/src/expr_eval.rs`; net ~700 lines removed. The shared evaluator gained short-circuit `&&`/`||` (the historical frontend behavior picorv32's generate pruning relies on).
+- Parameter values are now resolved during elaboration and carried on `ElaboratedInstance`; `validate.rs` is validation-only (1,048 → 729 lines).
+- The legacy ROM shim is isolated in `crates/svsim/src/sim/legacy_rom.rs` with its `rom_<stem>` naming contract documented as do-not-extend.
+- The architectural review campaign is complete; the review moved to `plans/completed/2026-07-06-architectural-review.md` and wiki links were updated (workspace map, source map, overview, current state).

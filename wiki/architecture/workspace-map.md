@@ -11,7 +11,7 @@ The workspace is intentionally small. Most of the simulator lives in one core cr
 | [`../../crates/svsim-render`](../../crates/svsim-render) | Placeholder render crate. Current status is literally `"rendering deferred"`. |
 | [`../../parts`](../../parts) | Compatibility corpus, demo designs, harness assets, and negative tests. Green dirs are gated by [`corpus_gate.rs`](../../crates/svsim/tests/corpus_gate.rs). |
 | [`../../docs`](../../docs) | Progress reports, port-specific design notes, and generated corpus reports (`docs/tests/`). |
-| [`../../plans`](../../plans) | Plan lifecycle: `in-progress/` and `completed/`. The active architectural review lives here. |
+| [`../../plans`](../../plans) | Plan lifecycle: `in-progress/` and `completed/`, including the completed 2026-07-06 architectural review. |
 | [`../../wiki`](../../wiki) | Persistent synthesized knowledge layer that summarizes and cross-links the code and corpus. |
 
 ## Main `svsim` Modules
@@ -26,8 +26,9 @@ The workspace is intentionally small. Most of the simulator lives in one core cr
 | [`../../crates/svsim/src/elaborate.rs`](../../crates/svsim/src/elaborate.rs) | Typed elaboration layer that turns HIR modules into runtime object shapes and instance bindings. |
 | [`../../crates/svsim/src/logic_value.rs`](../../crates/svsim/src/logic_value.rs) | Four-state runtime values, parsing, formatting, and wildcard expectation matching. |
 | [`../../crates/svsim/src/logic_ops.rs`](../../crates/svsim/src/logic_ops.rs) | Crate-private four-state primitive operations (bit truth tables, reductions, slices, sign extension) with direct truth-table unit tests. |
+| [`../../crates/svsim/src/expr_eval.rs`](../../crates/svsim/src/expr_eval.rs) | The single shared HIR expression evaluator (`Value`, combinators, `eval_expr`, parameter resolution) used by the runtime, validation, frontend constant folding, and elaboration. |
 | [`../../crates/svsim/src/net_resolve.rs`](../../crates/svsim/src/net_resolve.rs) | Zero-delay per-bit net resolution and drive-strength handling. |
-| [`../../crates/svsim/src/sim/`](../../crates/svsim/src/sim/) | Structural runtime, split by responsibility: `session.rs` (public API + settle/step scheduler), `eval.rs` (expression/lvalue evaluation, driver staging), `state.rs` (hierarchical module state, bindings), `memory.rs` (memory files, legacy ROM shim), `value.rs` (four-state values and primitive ops). |
+| [`../../crates/svsim/src/sim/`](../../crates/svsim/src/sim/) | Structural runtime, split by responsibility: `session.rs` (public API + settle/step scheduler), `eval.rs` (expression/lvalue evaluation, driver staging), `state.rs` (hierarchical module state, bindings), `memory.rs` (memory files), `legacy_rom.rs` (documented `rom_*` compatibility shim), `value.rs` (runtime object values and public-bits boundary). |
 | [`../../crates/svsim/src/test.rs`](../../crates/svsim/src/test.rs) | JSON suite parsing, execution, tracing, and report types. |
 | [`../../crates/svsim/src/diag.rs`](../../crates/svsim/src/diag.rs) | Diagnostics and top-level error types. |
 | [`../../crates/svsim/src/width.rs`](../../crates/svsim/src/width.rs) | Width inference plus shared shift/sign-extension helpers. |

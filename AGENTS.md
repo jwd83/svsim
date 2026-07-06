@@ -13,7 +13,7 @@ oracle.
 - `parts/basic/`, `parts/testing/`, `parts/overture/`, `parts/rv32i/`, `parts/picorv32/`, `parts/sap1/`, `parts/sap2/`, `parts/sap3/`, `parts/simple8/`: SystemVerilog corpus and JSON expectations forming the all-green compatibility suite, enforced by `crates/svsim/tests/corpus_gate.rs`.
 - `parts/failing/`: intentionally failing negative corpus for compile/test failure coverage.
 - `docs/`: architecture notes, port compromises, progress reports, and generated corpus reports (`docs/tests/`).
-- `plans/`: plan lifecycle (`in-progress/`, `completed/`), including the active architectural review.
+- `plans/`: plan lifecycle (`in-progress/`, `completed/`).
 - `wiki/`: maintained knowledge base (architecture, status, testing, roadmap).
 
 Prefer adding new simulator code under `crates/svsim/src/` before splitting into more crates.

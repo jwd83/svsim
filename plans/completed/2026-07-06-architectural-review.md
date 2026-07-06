@@ -1,6 +1,7 @@
 # Architectural Review — svsim
 
-*Reviewed 2026-07-06 against `main` @ `94e5ef5`.*
+*Reviewed 2026-07-06 against `main` @ `94e5ef5`. Campaign completed
+2026-07-06: all seven steps done, full suite 201/201.*
 
 The Rust rewrite is in good structural health where it matters most: the compile
 pipeline (frontend → HIR → validate → elaborate → design) has clean, owned
@@ -326,11 +327,65 @@ would destabilize the corpus for no present-day gain.
    elaboration; delete `ConstValue` and the frontend's private folding once
    ported, with regression tests pinning today's accepted/rejected corpus
    behavior.
+
+   *Done 2026-07-06*, in 3 slice commits — and further than planned: instead
+   of a separate const-evaluator sharing primitives, constant contexts now
+   call the runtime evaluator itself, so const and runtime semantics cannot
+   diverge at all.
+   - `4e36f33` slice 1: promoted `Value`, its combinators, `MemoryState`, and
+     `eval_expr` into crate-level `expr_eval.rs`. `eval_expr`'s context is
+     just (module, name→value map, memories); const callers pass a
+     parameters-only module and empty memories.
+   - `dd405d6` slice 2: deleted validate's `ConstValue` evaluator (~300
+     lines); memory-index checking uses the shared evaluator with the same
+     skip-on-non-constant behavior and diagnostics. Failing-corpus rejection
+     behavior verified unchanged.
+   - `f362742` slice 3: deleted the frontend's `ConstEvalValue` evaluator
+     (~330 lines, plus ~80 lines of now-dead `width.rs` shift/mask helpers);
+     packed ranges, generate if/for elaboration, procedural loop unrolling,
+     and constant-conditional pruning all run through the shared evaluator.
+
+   Result: three evaluators → one; net ≈700 lines removed; full suite
+   201/201. Surprises: (a) the frontend evaluator **short-circuited**
+   `&&`/`||`, and picorv32's generate pruning depends on it — short-circuit
+   semantics were added to the shared evaluator (value-identical; errors in
+   the operand the left side decides away no longer propagate);
+   (b) parameter references now resolve declaration-ordered and
+   width-coerced (the runtime rule) instead of the frontend's recursive
+   uncoerced lookup — corpus showed no divergence.
 6. **Re-home elaboration:** move `elaborate_module_parameters` from `sim.rs`
    into `elaborate.rs` (resolved values on `ElaboratedDesign`), and move
    `resolve_legacy_rom_data_path` out of `validate.rs` next to the ROM shim.
+
+   *Done 2026-07-06*, in 2 commits:
+   - `eb61606`: parameter defaults and instance overrides are evaluated
+     during elaboration (parent context chained through the instance tree)
+     and stored on `ElaboratedInstance` as a crate-internal, serde-skipped
+     map; the sim runtime clones them instead of re-deriving at session
+     build. Serialized design output unchanged. Note: parameter-evaluation
+     errors now surface at elaboration time rather than session build —
+     corpus behavior identical.
+   - `361c1b3`: `resolve_legacy_rom_data_path` moved out of `validate.rs`
+     (validation imports it for the compile-time existence check).
+
+   Result: elaboration owns parameter values; `validate.rs` is
+   validation-only and has shrunk from 1,048 lines pre-campaign to 729.
 7. **Isolate the legacy ROM shim** in its own module with a short doc header
    stating the naming contract and its legacy status.
+
+   *Done 2026-07-06*, in 1 commit:
+   - `1f3209e`: `sim/legacy_rom.rs` now holds `LegacyRomState`, the
+     build/apply shim, and `resolve_legacy_rom_data_path`, with a doc header
+     stating the `rom_<stem>` naming contract, the `<stem>.txt` search
+     order, and its do-not-extend legacy status. `sim/memory.rs` is purely
+     memory-file parsing and table construction (134 lines).
+
+   Result: full workspace suite 201/201. **This was the final step — the
+   campaign is complete.** The review moves to
+   `plans/completed/2026-07-06-architectural-review.md`; remaining known
+   structural work (runtime interning for picorv32-scale simulation,
+   rendering) stays deliberately deferred and should get a fresh review
+   against the new baseline when scheduled.
 
 Deferred by design: runtime interning/performance work (risk 6) and any
 build-out of `svsim-render` — both wait until their milestones are actually

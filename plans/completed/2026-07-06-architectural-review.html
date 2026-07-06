@@ -124,7 +124,8 @@
 
 <h1>Architectural Review — svsim</h1>
 <p class="meta">Reviewed 2026-07-06 against <code>main</code> @ <code>94e5ef5</code> ·
-canonical copy: <code>plans/in-progress/architectural-review.md</code></p>
+canonical copy: <code>plans/completed/2026-07-06-architectural-review.md</code> ·
+<b style="color: var(--good)">campaign completed 2026-07-06 — all 7 steps done, suite 201/201</b></p>
 
 <div class="lede">
 <p><b>Executive summary.</b> The Rust rewrite is structurally healthy where it matters most:
@@ -273,13 +274,30 @@ proposed below should run heavy suites in release or a tiered mode.</p>
   <li><b>Consolidate constant evaluation into one shared HIR const-evaluator</b> used by
   <code>validate.rs</code>, frontend folding, and parameter elaboration; delete
   <code>ConstValue</code> and the frontend's private folding once ported, with regression tests
-  pinning today's accepted/rejected corpus behavior.</li>
+  pinning today's accepted/rejected corpus behavior.
+  <p class="done-note"><b>Done 2026-07-06</b> in 3 slices — further than planned: const contexts
+  now call the <i>runtime evaluator itself</i> (params-only module, empty memories), so const and
+  runtime semantics cannot diverge. <code>4e36f33</code> promoted <code>Value</code>/
+  <code>eval_expr</code> to crate-level <code>expr_eval.rs</code>; <code>dd405d6</code> deleted
+  validate's <code>ConstValue</code> (~300 lines); <code>f362742</code> deleted the frontend's
+  <code>ConstEvalValue</code> (~330 lines + dead width helpers). Surprise: the frontend evaluator
+  short-circuited <code>&amp;&amp;</code>/<code>||</code> and picorv32's generate pruning depends
+  on it — short-circuit was added to the shared evaluator (value-identical). Net &asymp;700 lines
+  removed; suite 201/201.</p></li>
   <li><b>Re-home elaboration:</b> move <code>elaborate_module_parameters</code> from
   <code>sim.rs</code> into <code>elaborate.rs</code> (resolved values on
   <code>ElaboratedDesign</code>); move <code>resolve_legacy_rom_data_path</code> out of
-  <code>validate.rs</code> next to the ROM shim.</li>
+  <code>validate.rs</code> next to the ROM shim.
+  <p class="done-note"><b>Done 2026-07-06</b>: <code>eb61606</code> — parameter defaults and
+  overrides resolved during elaboration (parent-chained through the instance tree), stored
+  serde-skipped on <code>ElaboratedInstance</code>; sim clones them. <code>361c1b3</code> — ROM
+  path resolution out of <code>validate.rs</code>, which is now validation-only (1,048 &rarr; 729
+  lines across the campaign).</p></li>
   <li><b>Isolate the legacy ROM shim</b> in its own module with a short doc header stating the
-  naming contract and its legacy status.</li>
+  naming contract and its legacy status.
+  <p class="done-note"><b>Done 2026-07-06</b>: <code>1f3209e</code> — <code>sim/legacy_rom.rs</code>
+  documents the <code>rom_&lt;stem&gt;</code> contract, the <code>&lt;stem&gt;.txt</code> search
+  order, and its do-not-extend status. Final step: <b>campaign complete</b>, suite 201/201.</p></li>
 </ol>
 <p>Deferred by design: runtime interning/performance work (rank 6) and any build-out of
 <code>svsim-render</code> — both wait until their milestones are actually scheduled.</p>
@@ -295,7 +313,7 @@ green&rdquo; means what it says.</p>
 
 <div class="footer">
 Generated 2026-07-06 · svsim architectural review · canonical markdown:
-<code>plans/in-progress/architectural-review.md</code>
+<code>plans/completed/2026-07-06-architectural-review.md</code>
 </div>
 
 </body>
