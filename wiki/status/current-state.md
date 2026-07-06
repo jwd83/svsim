@@ -8,7 +8,8 @@ Snapshot date: 2026-07-06
   direct four-state truth-table tests in `crates/svsim/src/logic_ops.rs`),
   `10` corpus gate tests (`crates/svsim/tests/corpus_gate.rs`: nine green
   directories plus `corpus_failing_stays_red` over the negative corpus), and
-  `10` CLI integration tests, in roughly two minutes of wall time.
+  `10` CLI integration tests, in roughly fifty seconds of wall time (down
+  from roughly two minutes before the second review's step 3).
 - Green corpus, now enforced directly by `cargo test`: `195/195` regression
   suites across all nine green `parts/` directories — `44` basic, `55`
   testing, `43` overture, `16` rv32i, `13` picorv32, `6` sap1, `9` sap2, `4`
@@ -32,6 +33,11 @@ Snapshot date: 2026-07-06
   at elaboration with a construct-naming diagnostic
   (`ModuleSummary::frozen_parameters`); runtime-only and default-equal
   overrides are unaffected.
+- Since the second review's step 3, the settle loop evaluates directly over
+  the indexed runtime frame (`ValueReader` seam, `FrameValues`/`OverlayValues`
+  readers, dirty-name commit) instead of rebuilding string-keyed value tables
+  per pass. Release-corpus runtime dropped ~3.3× (54.4 s → 16.7 s); e.g.
+  `regfile_8x8` 4 → 16 steps/s, sap2 programs ~300 → ~1,400 steps/s.
 - The workspace `Cargo.toml` builds the `svsim` package at `opt-level = 2`
   even in dev/test profiles; unoptimized simulation is ~9x slower and made
   the full suite impractical (unit tests dropped from ~130s to ~32s).

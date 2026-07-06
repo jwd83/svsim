@@ -285,6 +285,34 @@ incremental, and each converted call site is immediately useful.
    `expr_eval.rs` read signals through a small resolver seam over the indexed
    frame (const contexts keep the map-backed path). Record `step_hz`
    before/after from `./test.sh` reports.
+
+   *Done 2026-07-06*, in 4 commits:
+   - `caf3a41`: `ValueReader` trait in `expr_eval.rs`; `eval_expr` and
+     `resolve_lvalue` read through it (HashMap impl keeps const contexts
+     unchanged). Pure refactor.
+   - `55b606d`: `FrameValues` reader over the indexed frame;
+     `drive_child_inputs` evaluates through it (one table build per child
+     per pass gone); comb blocks execute in place instead of
+     clone-table-then-diff per block.
+   - `3d02697`: the settle pass drops its full value table entirely —
+     `OverlayValues` (copy-on-write overlay over the frame) serves reads,
+     writes seed only touched names, and `commit_overlay_to_frame` applies
+     the old sync's per-signal policy to dirty names plus precomputed
+     per-module net specials (variable-storage-on-net → replace driver;
+     procedural nets → stage-if-undriven — the load-bearing re-staging that
+     keeps untouched nets from floating to Z). Child output sinks apply
+     straight to the frame. `sync_instance_values_to_frame` survives only
+     for `step_module` and the legacy ROM path.
+   - (annotation commit): regenerated reports, review/wiki sync.
+
+   Result: full suite 206/206 after every slice; `cargo test` wall time
+   ~2 min → ~50 s. Release corpus (`./test.sh`) 54.4 s → 16.7 s. `step_hz`
+   before → after: `regfile_8x8` 4 → 16, `adder_cs_64bit` 1 → 5, sap1
+   395 → 1,577, sap2 307 → 1,418, sap3 298 → 1,316, picorv32 93 → 285.
+   The remaining dominant cost is the full-frame clone-and-compare
+   convergence check — step 4's target. Deliberately untouched:
+   `step_module`'s per-step tables (once per step, not per settle
+   iteration) and the legacy ROM path.
 4. **Replace clone-and-compare convergence.** Use the change tracking
    `settle_module_pass` already computes instead of full-frame
    `to_vec()` + deep compare; revisit the ×8 iteration budget with measured

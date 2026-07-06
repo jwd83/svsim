@@ -199,7 +199,14 @@ incrementally useful.</p>
       Full per-instance shapes (ranges as <code>Expr</code>) deliberately deferred.</div></li>
   <li><strong>Finish frame-native evaluation.</strong> Remove <code>build_instance_value_table</code> round-trips
       via a resolver seam over the indexed frame (const contexts keep the map path). Record
-      <code>step_hz</code> before/after.</li>
+      <code>step_hz</code> before/after.
+      <div class="note"><strong>Done 2026-07-06</strong> — <code>caf3a41</code> (ValueReader seam),
+      <code>55b606d</code> (FrameValues; frame-native child inputs; in-place comb execution),
+      <code>3d02697</code> (overlay-based settle pass: copy-on-write overlay + per-module net-special
+      commit replaces the full table build/sync; child sinks apply straight to the frame). Suite
+      206/206 after every slice. <code>cargo test</code> ~2 min → ~50 s; release corpus 54.4 s → 16.7 s.
+      <code>step_hz</code>: regfile_8x8 4→16, adder_cs_64bit 1→5, sap1 395→1,577, sap2 307→1,418,
+      sap3 298→1,316, picorv32 93→285. Remaining cost: clone-and-compare convergence (step 4).</div></li>
   <li><strong>Replace clone-and-compare convergence.</strong> Use the change tracking the pass already
       computes; revisit the ×8 budget with measured counts. Expect steps 3+4 to move the slowest
       suites by an order of magnitude.</li>

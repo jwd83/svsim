@@ -1,7 +1,7 @@
 {
   "directory": "parts/simple8",
   "report": {
-    "duration_ms": 40,
+    "duration_ms": 54,
     "passed": 5,
     "total": 5,
     "suites": [
@@ -9,11 +9,11 @@
         "source_path": "parts/simple8/simple8.sv",
         "json_path": "parts/simple8/simple8.json",
         "top_module": "simple8_cpu",
-        "duration_ms": 38,
+        "duration_ms": 47,
         "passed": true,
         "report": {
-          "duration_ms": 3,
-          "step_hz": 3666,
+          "duration_ms": 2,
+          "step_hz": 5500,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -32,11 +32,11 @@
         "source_path": "parts/simple8/simple8_programmable.sv",
         "json_path": "parts/simple8/demo_add_store.json",
         "top_module": "simple8_programmable",
-        "duration_ms": 39,
+        "duration_ms": 40,
         "passed": true,
         "report": {
-          "duration_ms": 1,
-          "step_hz": 7000,
+          "duration_ms": 3,
+          "step_hz": 2333,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -55,11 +55,11 @@
         "source_path": "parts/simple8/simple8_programmable.sv",
         "json_path": "parts/simple8/demo_countdown_branch.json",
         "top_module": "simple8_programmable",
-        "duration_ms": 28,
+        "duration_ms": 50,
         "passed": true,
         "report": {
-          "duration_ms": 3,
-          "step_hz": 4666,
+          "duration_ms": 5,
+          "step_hz": 2800,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -78,11 +78,11 @@
         "source_path": "parts/simple8/simple8_programmable.sv",
         "json_path": "parts/simple8/demo_fibonacci.json",
         "top_module": "simple8_programmable",
-        "duration_ms": 33,
+        "duration_ms": 53,
         "passed": true,
         "report": {
-          "duration_ms": 5,
-          "step_hz": 3800,
+          "duration_ms": 4,
+          "step_hz": 4750,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -101,11 +101,11 @@
         "source_path": "parts/simple8/simple8_programmable.sv",
         "json_path": "parts/simple8/demo_reset.json",
         "top_module": "simple8_programmable",
-        "duration_ms": 32,
+        "duration_ms": 40,
         "passed": true,
         "report": {
-          "duration_ms": 3,
-          "step_hz": 3333,
+          "duration_ms": 2,
+          "step_hz": 5000,
           "passed": 1,
           "total": 1,
           "cases": [
