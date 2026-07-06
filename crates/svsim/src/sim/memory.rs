@@ -245,3 +245,20 @@ pub(super) fn apply_legacy_rom_outputs(
     values.insert(legacy_rom.data_port.clone(), data);
     Ok(())
 }
+
+pub(crate) fn resolve_legacy_rom_data_path(
+    source_path: &Path,
+    rom_name: &str,
+) -> Option<std::path::PathBuf> {
+    let file_name = format!("{rom_name}.txt");
+    let mut candidates = Vec::new();
+    if let Some(source_dir) = source_path.parent() {
+        candidates.push(source_dir.join(&file_name));
+        candidates.push(source_dir.join("roms").join(&file_name));
+    }
+    if let Ok(current_dir) = std::env::current_dir() {
+        candidates.push(current_dir.join("roms").join(&file_name));
+    }
+
+    candidates.into_iter().find(|candidate| candidate.is_file())
+}

@@ -22,10 +22,9 @@ use crate::hir::{
 use crate::logic_ops::{logic_replace_slice, logic_slice, logic_value_from_bit};
 use crate::logic_value::{LogicBit, LogicBits, LogicValue};
 use crate::net_resolve::{DriveStrengthPair, NetDriver, resolve_net};
-use crate::validate::resolve_legacy_rom_data_path;
 
 mod eval;
-mod memory;
+pub(crate) mod memory;
 mod session;
 mod state;
 mod value;
