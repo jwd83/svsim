@@ -1,10 +1,12 @@
-//! Green-corpus gate: `cargo test` fails unless every JSON regression suite
-//! under the green `parts/` directories passes.
+//! Corpus gate: `cargo test` fails unless every JSON regression suite under
+//! the green `parts/` directories passes, and unless every suite in the
+//! intentional negative corpus (`parts/failing`) still fails with its
+//! expected diagnostic (`corpus_failing_stays_red`).
 //!
-//! `parts/failing` is the intentional negative corpus and `parts/roms` holds
-//! data assets only; both are deliberately excluded. `run_json_test_dir`
-//! errors when a directory contains no SystemVerilog/JSON pairs, so a moved
-//! or emptied corpus directory fails the gate instead of passing vacuously.
+//! `parts/roms` holds data assets only and is deliberately excluded.
+//! `run_json_test_dir` errors when a directory contains no
+//! SystemVerilog/JSON pairs, so a moved or emptied corpus directory fails
+//! the gate instead of passing vacuously.
 
 use std::path::PathBuf;
 
@@ -94,4 +96,93 @@ fn corpus_simple8_is_green() {
 #[test]
 fn corpus_testing_is_green() {
     assert_corpus_green("testing");
+}
+
+/// Every suite here must keep failing with a suite-level error containing
+/// the given fragment. Fragments avoid absolute paths and parser-internal
+/// positions so the assertions survive unrelated churn.
+const FAILING_SUITES_WITH_ERROR: &[(&str, &str)] = &[
+    (
+        "constant_memory_index_oob.json",
+        "memory index [2] is out of range for 'rom'",
+    ),
+    (
+        "duplicate_instance_names.json",
+        "declares instance 'u_dup' more than once",
+    ),
+    ("malformed_json.json", "failed to parse JSON test file"),
+    (
+        "missing_child_module.json",
+        "module 'missing_dependency' was not found",
+    ),
+    ("syntax_error.json", "failed to parse"),
+];
+
+/// Suites that compile and run but must keep failing on an expectation
+/// mismatch for the given signal.
+const FAILING_SUITES_WITH_MISMATCH: &[(&str, &str)] = &[("constant_one_mismatch.json", "outY")];
+
+#[test]
+fn corpus_failing_stays_red() {
+    let report = Compiler::new()
+        .run_json_test_dir(parts_dir("failing"))
+        .unwrap_or_else(|error| panic!("run parts/failing regression suites: {error}"));
+
+    let expected_count = FAILING_SUITES_WITH_ERROR.len() + FAILING_SUITES_WITH_MISMATCH.len();
+    let suite_names: Vec<String> = report
+        .suites
+        .iter()
+        .filter_map(|suite| suite.json_path.file_name())
+        .map(|name| name.to_string_lossy().into_owned())
+        .collect();
+    assert_eq!(
+        report.suites.len(),
+        expected_count,
+        "parts/failing suite set changed; update corpus_gate.rs to cover it: {suite_names:?}"
+    );
+
+    for suite in &report.suites {
+        assert!(
+            !suite.passed,
+            "negative suite {} unexpectedly passed; parts/failing must stay red",
+            suite.json_path.display()
+        );
+    }
+
+    let find_suite = |name: &str| {
+        report
+            .suites
+            .iter()
+            .find(|suite| suite.json_path.file_name().is_some_and(|file| file == name))
+            .unwrap_or_else(|| panic!("negative suite {name} is missing from parts/failing"))
+    };
+
+    for (name, fragment) in FAILING_SUITES_WITH_ERROR {
+        let suite = find_suite(name);
+        let error = suite
+            .error
+            .as_deref()
+            .unwrap_or_else(|| panic!("negative suite {name} has no suite-level error"));
+        assert!(
+            error.contains(fragment),
+            "negative suite {name} error drifted: expected fragment {fragment:?}, got {error:?}"
+        );
+    }
+
+    for (name, signal) in FAILING_SUITES_WITH_MISMATCH {
+        let suite = find_suite(name);
+        let suite_report = suite
+            .report
+            .as_ref()
+            .unwrap_or_else(|| panic!("negative suite {name} produced no case report"));
+        let mismatched = suite_report.cases.iter().any(|case| {
+            case.failures
+                .iter()
+                .any(|failure| failure.signal == *signal)
+        });
+        assert!(
+            mismatched,
+            "negative suite {name} no longer reports an expectation mismatch on '{signal}'"
+        );
+    }
 }
