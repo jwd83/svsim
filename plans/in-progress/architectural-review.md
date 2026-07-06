@@ -269,6 +269,32 @@ would destabilize the corpus for no present-day gain.
    `value.rs`, `eval.rs`, `state.rs`, `memory.rs`, `session.rs`, moving inline
    tests with their subjects. Public API (`SimulationSession` re-export)
    unchanged; behavior-preserving by construction, verified by the step-1 gate.
+
+   *Done 2026-07-06*, in 6 slice commits (each independently green —
+   `cargo test -p svsim` after every slice, full workspace suite at the end):
+   - `1a23287` slice 1: pure rename `sim.rs` → `sim/mod.rs`.
+   - `b91638b` slice 2: extract `sim/value.rs` (463 lines — Value/LogicTruth/
+     ObjectValue + four-state primitives + literal/concat helpers).
+   - `9da767f` slice 3: extract `sim/memory.rs` (283 — MemoryState, memory-file
+     parsing, legacy ROM shim).
+   - `1397652` slice 4: extract `sim/eval.rs` (686 — eval_expr, ResolvedLValue,
+     lvalue resolution, driver staging, staged-net resolution).
+   - `3c7cc8b` slice 5: extract `sim/state.rs` (694 — module-state types,
+     instantiation, parameter elaboration, bindings, frame sync, driver
+     analysis, instance paths).
+   - `796dec3` slice 6: extract `sim/session.rs` (958 — SimulationSession +
+     settle/step scheduler + statement execution) and `sim/tests.rs` (1,904);
+     `sim/mod.rs` reduced to a 40-line documented module root.
+
+   Result: full `cargo test` 187/187, wall time unchanged. Function bodies
+   untouched — the split is declarations, `pub(super)` visibility, and glob
+   re-imports (`use super::*;` in each submodule), so diffs are reviewable as
+   moves. Deviations: driver-staging primitives went to `eval.rs`/`state.rs`
+   rather than the session (they are write-path machinery); the inline test
+   module moved wholesale to `sim/tests.rs` instead of being split per subject
+   — tests target mostly the public session API, and steps 4/5 can migrate
+   truth-table tests when the primitives move. Wiki links to `src/sim.rs`
+   updated; completed plans left with their historical paths.
 4. **Move the four-state primitive operations into the value layer**
    (`logic_value.rs` or `logic_ops.rs`) with direct truth-table unit tests;
    `sim/eval.rs` becomes a consumer.

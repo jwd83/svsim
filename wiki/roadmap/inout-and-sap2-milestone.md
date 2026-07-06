@@ -50,5 +50,5 @@ This page answers one question: what actually landed from the zero-delay net-sem
 - [../../parts/sap2/sap2_bus_semantics.sv](../../parts/sap2/sap2_bus_semantics.sv)
 - [../../crates/svsim/src/logic_value.rs](../../crates/svsim/src/logic_value.rs)
 - [../../crates/svsim/src/elaborate.rs](../../crates/svsim/src/elaborate.rs)
-- [../../crates/svsim/src/sim.rs](../../crates/svsim/src/sim.rs)
+- [../../crates/svsim/src/sim/](../../crates/svsim/src/sim/)
 - [../../crates/svsim/src/validate.rs](../../crates/svsim/src/validate.rs)

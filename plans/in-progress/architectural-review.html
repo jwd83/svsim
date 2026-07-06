@@ -250,7 +250,16 @@ proposed below should run heavy suites in release or a tiered mode.</p>
   <li><b>Split <code>sim.rs</code> into a <code>sim/</code> module directory</b> along existing
   seams: <code>value.rs</code>, <code>eval.rs</code>, <code>state.rs</code>, <code>memory.rs</code>,
   <code>session.rs</code>, moving inline tests with their subjects. Public API unchanged;
-  behavior-preserving by construction, verified by the step-1 gate.</li>
+  behavior-preserving by construction, verified by the step-1 gate.
+  <p class="done-note"><b>Done 2026-07-06</b> in 6 slice commits, each independently green
+  (<code>1a23287</code> rename to <code>sim/mod.rs</code>; <code>b91638b</code>
+  <code>value.rs</code> 463; <code>9da767f</code> <code>memory.rs</code> 283;
+  <code>1397652</code> <code>eval.rs</code> 686; <code>3c7cc8b</code> <code>state.rs</code> 694;
+  <code>796dec3</code> <code>session.rs</code> 958 + <code>tests.rs</code> 1,904 with
+  <code>mod.rs</code> down to a 40-line documented root). Function bodies untouched —
+  declarations, <code>pub(super)</code>, and glob re-imports only. Full suite
+  <b>187/187</b>, wall time unchanged. Inline tests moved wholesale to
+  <code>sim/tests.rs</code>; per-subject test migration deferred to steps 4–5.</p></li>
   <li><b>Move the four-state primitive operations into the value layer</b>
   (<code>logic_value.rs</code> or <code>logic_ops.rs</code>) with direct truth-table unit tests;
   <code>sim/eval.rs</code> becomes a consumer.</li>

@@ -52,7 +52,7 @@ These hooks are why the project can keep the library API explicit while still dr
 - [../../crates/svsim/src/elaborate.rs](../../crates/svsim/src/elaborate.rs)
 - [../../crates/svsim/src/logic_value.rs](../../crates/svsim/src/logic_value.rs)
 - [../../crates/svsim/src/net_resolve.rs](../../crates/svsim/src/net_resolve.rs)
-- [../../crates/svsim/src/sim.rs](../../crates/svsim/src/sim.rs)
+- [../../crates/svsim/src/sim/](../../crates/svsim/src/sim/)
 - [../../crates/svsim/src/design.rs](../../crates/svsim/src/design.rs)
 - [../../crates/svsim/src/test.rs](../../crates/svsim/src/test.rs)
 - [../../crates/svsim/src/width.rs](../../crates/svsim/src/width.rs)
