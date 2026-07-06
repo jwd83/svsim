@@ -49,3 +49,10 @@
 - `test.bat` now regenerates all nine `docs/tests/` reports (it was missing sap2/sap3/simple8 — same drift class as the sap1-into-sap2 bug the first review caught in `test.sh`). Its `svsim.exe` invocation was correct all along: `svsim-cli` declares `[[bin]] name = "svsim"`.
 - `test-fails.sh` is documented as a manual failure-report inspector (not a gate) and was actually broken on the system Python 3.9 (`str | None` annotation); fixed.
 - `parts/failing/README.md` dropped stale `ref/pysvsim.py` and four-directory-corpus text; `AGENTS.md` and `wiki/testing/corpus-map.md` now describe the must-fail gate.
+
+## [2026-07-06] lint | frozen-parameter fence (second architectural review, step 2)
+
+- Verified `cargo test`: pass (`206/206` — `186` `svsim` unit tests, `10` corpus gate tests, `10` CLI tests).
+- The frontend records, per module, which parameters were consumed by lowering-time constant evaluation (`ModuleSummary::frozen_parameters`, serde-skipped, labeled by construct). Every freezing site funnels through `const_eval_param_expr`, so the recording is a single choke point; the freezing surface proved wider than the review had listed (constant-folded ordinary `if` conditions freeze parameters too, not just ranges/loops/generate).
+- Elaboration now rejects instance parameter overrides that would change a frozen parameter's value — directly or through a dependent `localparam` — naming the parameter, module, instance, and frozen construct. Default-equal overrides and runtime-only overrides stay allowed; picorv32's internal overrides pass the fence untouched.
+- `parts/failing` gained two gated must-fail suites (`param_override_frozen_range`, `param_override_frozen_loop`; 8 suites total) and `parts/testing` gained `param_override_ok` (55 suites; green corpus now `195/195`). `docs/tests/` reports regenerated.

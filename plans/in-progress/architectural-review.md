@@ -251,6 +251,35 @@ incremental, and each converted call site is immediately useful.
    unrolled loop bounds) when they differ from the default, with a
    parameter-and-construct-naming diagnostic; add `parts/failing` cases (now
    gated by step 1). Document the freeze in `hir.rs` and the wiki.
+
+   *Done 2026-07-06*, in 4 commits:
+   - `30c8894`: the frontend records frozen parameters per module. Every
+     lowering-time constant evaluation funnels through
+     `const_eval_param_expr`, which now records the parameters each
+     successful evaluation consumed, labeled by construct; the map lands
+     serde-skipped on `ModuleSummary::frozen_parameters` (HIR JSON output
+     unchanged). The freeze is documented on the field in `hir.rs`.
+   - `3e75b57`: `elaborate_module_parameters` resolves pure defaults whenever
+     an instance carries overrides and rejects any frozen parameter whose
+     value would change — directly or through a dependent `localparam` —
+     naming the parameter, module, instance, and frozen construct.
+     Default-equal and runtime-only overrides stay allowed.
+   - `206100e`: corpus coverage — `parts/failing` gains
+     `param_override_frozen_range` and `param_override_frozen_loop` (gated
+     must-fail, 8 suites), `parts/testing` gains `param_override_ok` (green
+     proof of allowed overrides); gate and CLI tables updated.
+   - (annotation commit): review/wiki sync and regenerated `docs/tests/`
+     reports.
+
+   Result: full suite 206/206 (186 unit + 10 gate + 10 CLI); green corpus
+   195/195. Surprises: (a) the freezing surface is wider than this review
+   listed — the frontend also constant-folds ordinary `if` conditions, so
+   those freeze parameters too; the choke-point design covered them for
+   free. (b) sv-parser mis-parses blocking assignments to bit-select lvalues
+   at block starts as declarations (pre-existing subset limitation,
+   discovered while writing tests; not addressed here). Deliberately out of
+   scope: representing ranges/bounds as `Expr` in HIR for true per-instance
+   shapes — wait for a real use case.
 3. **Finish frame-native evaluation.** Remove the per-pass/per-child
    `build_instance_value_table` round-trips by letting `sim/eval.rs` and
    `expr_eval.rs` read signals through a small resolver seam over the indexed

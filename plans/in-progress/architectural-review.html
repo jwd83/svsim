@@ -188,7 +188,15 @@ incrementally useful.</p>
       was fixed, not deleted; <code>test-fails.sh</code> kept as the failure-report inspector.</div></li>
   <li><strong>Fence the parameterization trap.</strong> Elaboration rejects overrides feeding frozen
       constructs unless equal to the default; add <code>parts/failing</code> cases (now gated); document
-      the freeze in <code>hir.rs</code> and the wiki.</li>
+      the freeze in <code>hir.rs</code> and the wiki.
+      <div class="note"><strong>Done 2026-07-06</strong> — <code>30c8894</code> records frozen parameters
+      at the <code>const_eval_param_expr</code> choke point (serde-skipped
+      <code>ModuleSummary::frozen_parameters</code>, construct-labeled); <code>3e75b57</code> rejects
+      value-changing overrides at elaboration (direct or via dependent localparams), naming parameter,
+      module, instance, and construct; <code>206100e</code> adds two gated must-fail suites plus a green
+      <code>param_override_ok</code> proof. Suite: 206/206, corpus 195/195. Surprise: constant-folded
+      ordinary <code>if</code> conditions also freeze parameters — covered free by the choke point.
+      Full per-instance shapes (ranges as <code>Expr</code>) deliberately deferred.</div></li>
   <li><strong>Finish frame-native evaluation.</strong> Remove <code>build_instance_value_table</code> round-trips
       via a resolver seam over the indexed frame (const contexts keep the map path). Record
       <code>step_hz</code> before/after.</li>
