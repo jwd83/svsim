@@ -336,16 +336,28 @@ impl MemoryState {
     }
 }
 
+/// Read seam for expression evaluation. The simulation runtime reads signal
+/// values straight from its indexed frame through this trait, while constant
+/// contexts (validation, frontend folding, elaboration) keep a plain map.
+pub(crate) trait ValueReader {
+    fn read_value(&self, name: &str) -> Option<Value>;
+}
+
+impl ValueReader for HashMap<String, Value> {
+    fn read_value(&self, name: &str) -> Option<Value> {
+        self.get(name).cloned()
+    }
+}
+
 pub(crate) fn eval_expr(
     expr: &Expr,
     module: &ModuleSummary,
-    values: &HashMap<String, Value>,
+    values: &impl ValueReader,
     memories: &HashMap<String, MemoryState>,
 ) -> Result<Value> {
     match expr {
         Expr::Ident(name) => values
-            .get(name)
-            .cloned()
+            .read_value(name)
             .ok_or_else(|| Error::Resolve(format!("signal '{}' is not declared", name))),
         Expr::Literal(literal) => Ok(value_from_literal(literal)),
         Expr::Concat(exprs) => {

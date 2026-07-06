@@ -14,7 +14,7 @@ use crate::bit_value::{BitValue, ParseBitValueError};
 use crate::design::CompiledDesign;
 use crate::diag::{Error, Result};
 use crate::elaborate::{ElaboratedInstance, RuntimeObjectShape};
-use crate::expr_eval::{LogicTruth, MemoryState, Value, eval_expr, values_case_equal};
+use crate::expr_eval::{LogicTruth, MemoryState, Value, ValueReader, eval_expr, values_case_equal};
 use crate::hir::{
     AssignmentKind, Expr, HirDesign, LValue, ModuleSummary, PortDirection, ProcBlockKind, Stmt,
     StorageKind,

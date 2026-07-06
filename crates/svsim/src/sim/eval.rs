@@ -46,7 +46,7 @@ pub(super) fn resolve_supported_module<'a>(
 pub(super) fn resolve_lvalue(
     lvalue: &LValue,
     module: &ModuleSummary,
-    values: &HashMap<String, Value>,
+    values: &impl ValueReader,
     memories: &HashMap<String, MemoryState>,
 ) -> Result<ResolvedLValue> {
     match lvalue {
