@@ -20,6 +20,7 @@ use sv_parser::{
 
 use crate::bit_value::BitValue;
 use crate::diag::{Diagnostic, Error, Result, SourceSpan};
+use crate::expr_eval::{Value, eval_expr, resolve_parameter_defaults};
 use crate::hir::{
     AssignmentKind, BinaryOp, CaseStmtItem, ContinuousAssign as HirContinuousAssign, Expr, LValue,
     MemoryDecl, ModuleDeclStyle, ModuleInstanceSummary, ModuleSummary,
@@ -29,10 +30,6 @@ use crate::hir::{
     StorageKind, UnaryOp,
 };
 use crate::logic_value::{LogicBit, LogicBits};
-use crate::width::{
-    arithmetic_shift_right_bits, mask, minimum_width, shift_left_bits, shift_right_bits,
-    sign_extend_bits,
-};
 
 type LowerResult<T> = std::result::Result<T, Diagnostic>;
 const PROCEDURAL_FOR_UNROLL_LIMIT: usize = 16_384;
@@ -1782,7 +1779,7 @@ fn lower_for_loop_initialization(
     init: &sv_parser::ForInitialization,
     module: &ModuleSummary,
     path: &Path,
-) -> LowerResult<(String, ConstEvalValue)> {
+) -> LowerResult<(String, Value)> {
     match init {
         sv_parser::ForInitialization::ListOfVariableAssignments(assignments) => {
             let assignments = assignments.nodes.0.contents();
@@ -1836,7 +1833,7 @@ fn lower_for_loop_variable_assignment(
     module: &ModuleSummary,
     path: &Path,
     context: &str,
-) -> LowerResult<(String, ConstEvalValue)> {
+) -> LowerResult<(String, Value)> {
     if symbol_text(syntax_tree, &assignment.nodes.1)? != "=" {
         return Err(unsupported(format!("{context} must use `=`"), None));
     }
@@ -1867,8 +1864,8 @@ fn lower_for_loop_step(
     module: &ModuleSummary,
     path: &Path,
     loop_var: &str,
-    loop_value: &ConstEvalValue,
-) -> LowerResult<ConstEvalValue> {
+    loop_value: &Value,
+) -> LowerResult<Value> {
     let assignments = step.nodes.0.contents();
     let [assignment] = assignments.as_slice() else {
         return Err(unsupported(
@@ -1903,18 +1900,17 @@ fn lower_for_loop_step(
                     None,
                 ));
             }
+            let loop_bits = loop_value.to_bit_value_checked().ok_or_else(|| {
+                unsupported("procedural `for` loops require two-state loop values", None)
+            })?;
             match symbol_text(syntax_tree, &op.nodes.0)?.as_str() {
-                "++" => Ok(normalize_for_loop_value(ConstEvalValue::new_with_signed(
-                    loop_value
-                        .normalized_bits()
-                        .wrapping_add(&BitValue::from(1u64), loop_value.width),
+                "++" => Ok(normalize_for_loop_value(Value::new_with_signed(
+                    loop_bits.wrapping_add(&BitValue::from(1u64), loop_value.width),
                     loop_value.width,
                     loop_value.signed,
                 ))),
-                "--" => Ok(normalize_for_loop_value(ConstEvalValue::new_with_signed(
-                    loop_value
-                        .normalized_bits()
-                        .wrapping_sub(&BitValue::from(1u64), loop_value.width),
+                "--" => Ok(normalize_for_loop_value(Value::new_with_signed(
+                    loop_bits.wrapping_sub(&BitValue::from(1u64), loop_value.width),
                     loop_value.width,
                     loop_value.signed,
                 ))),
@@ -1937,7 +1933,7 @@ fn lower_for_loop_operator_step(
     module: &ModuleSummary,
     path: &Path,
     loop_var: &str,
-) -> LowerResult<ConstEvalValue> {
+) -> LowerResult<Value> {
     if symbol_text(syntax_tree, &assignment.nodes.1.nodes.0)? != "=" {
         return Err(unsupported("procedural `for` loop step must use `=`", None));
     }
@@ -1966,7 +1962,7 @@ fn lower_const_eval_expression(
     expr: &Expression,
     module: &ModuleSummary,
     path: &Path,
-) -> LowerResult<ConstEvalValue> {
+) -> LowerResult<Value> {
     let lowered = lower_expression(syntax_tree, expr, module, path)?;
     const_eval_param_expr(&lowered, &module.parameters).map_err(|_| {
         unsupported(
@@ -1976,11 +1972,7 @@ fn lower_const_eval_expression(
     })
 }
 
-fn module_with_const_binding(
-    module: &ModuleSummary,
-    name: &str,
-    value: &ConstEvalValue,
-) -> ModuleSummary {
+fn module_with_const_binding(module: &ModuleSummary, name: &str, value: &Value) -> ModuleSummary {
     let mut module = module.clone();
     module.parameters.insert(
         0,
@@ -2002,7 +1994,7 @@ fn fold_loop_statements(statements: Vec<Stmt>) -> Stmt {
     }
 }
 
-fn normalize_for_loop_value(value: ConstEvalValue) -> ConstEvalValue {
+fn normalize_for_loop_value(value: Value) -> Value {
     value.coerced_to(value.width.max(32))
 }
 
@@ -2129,9 +2121,9 @@ fn substitute_expr_ident(expr: &Expr, name: &str, replacement: &Expr) -> Expr {
     }
 }
 
-fn expr_from_const_eval_value(value: &ConstEvalValue) -> Expr {
+fn expr_from_const_eval_value(value: &Value) -> Expr {
     let literal = Expr::Literal(NumericLiteral {
-        bits: LogicBits::from_bit_value(value.normalized_bits()),
+        bits: value.logic().bits().clone(),
         width: Some(value.width),
     });
     if value.signed {
@@ -3358,53 +3350,6 @@ fn lower_usize_constant_expression_with_params(
         .ok_or_else(|| unsupported("constant index exceeds host limits", None))
 }
 
-#[derive(Debug, Clone)]
-struct ConstEvalValue {
-    bits: BitValue,
-    width: usize,
-    signed: bool,
-}
-
-impl ConstEvalValue {
-    fn new(bits: BitValue, width: usize) -> Self {
-        Self::new_with_signed(bits, width, false)
-    }
-
-    fn new_with_signed(bits: BitValue, width: usize, signed: bool) -> Self {
-        Self {
-            bits: bits.truncate(width),
-            width,
-            signed,
-        }
-    }
-
-    fn normalized_bits(&self) -> BitValue {
-        self.bits.clone()
-    }
-
-    fn coerced_to(&self, width: usize) -> Self {
-        let width = width.max(1);
-        let bits = if self.signed {
-            sign_extend_bits(&self.normalized_bits(), self.width, width)
-        } else {
-            self.normalized_bits().truncate(width)
-        };
-        Self::new_with_signed(bits, width, self.signed)
-    }
-
-    fn truthy(&self) -> bool {
-        !self.bits.is_zero()
-    }
-
-    fn to_usize_checked(&self) -> Option<usize> {
-        let bits = self.normalized_bits();
-        if self.signed && self.width.max(1) > 0 && bits.get_bit(self.width.max(1) - 1) {
-            return None;
-        }
-        bits.to_usize_checked()
-    }
-}
-
 fn const_eval_module(params: &[ParameterDecl]) -> ModuleSummary {
     ModuleSummary {
         name: "<constant>".into(),
@@ -3421,339 +3366,18 @@ fn const_eval_module(params: &[ParameterDecl]) -> ModuleSummary {
     }
 }
 
-fn const_eval_param_expr(expr: &Expr, params: &[ParameterDecl]) -> LowerResult<ConstEvalValue> {
-    match expr {
-        Expr::Ident(name) => {
-            let param = params.iter().find(|p| p.name == *name).ok_or_else(|| {
-                unsupported(
-                    format!("parameter '{name}' not found for constant evaluation"),
-                    None,
-                )
-            })?;
-            const_eval_param_expr(&param.default_value, params)
-        }
-        Expr::Literal(literal) => const_eval_value_from_literal(literal),
-        Expr::Concat(exprs) => {
-            let mut parts = Vec::with_capacity(exprs.len());
-            for expr in exprs {
-                parts.push(const_eval_param_expr(expr, params)?);
-            }
-            concat_const_eval_values(&parts)
-        }
-        Expr::Repeat { count, expr } => {
-            let value = const_eval_param_expr(expr, params)?;
-            let values = vec![value; *count];
-            concat_const_eval_values(&values)
-        }
-        Expr::BitSelect { expr, index } => {
-            let value = const_eval_param_expr(expr, params)?;
-            if *index >= value.width {
-                return Err(unsupported(
-                    "bit select is out of range in constant expression",
-                    None,
-                ));
-            }
-            Ok(ConstEvalValue::new(
-                BitValue::from(value.normalized_bits().get_bit(*index)),
-                1,
-            ))
-        }
-        Expr::PartSelect { expr, msb, lsb } => {
-            let value = const_eval_param_expr(expr, params)?;
-            let low = (*msb).min(*lsb);
-            let high = (*msb).max(*lsb);
-            if high >= value.width {
-                return Err(unsupported(
-                    "part select is out of range in constant expression",
-                    None,
-                ));
-            }
-            let width = high - low + 1;
-            Ok(ConstEvalValue::new(
-                value.normalized_bits().slice(low, width),
-                width,
-            ))
-        }
-        Expr::Ternary {
-            cond,
-            when_true,
-            when_false,
-        } => {
-            let cond = const_eval_param_expr(cond, params)?;
-            let when_true = const_eval_param_expr(when_true, params)?;
-            let when_false = const_eval_param_expr(when_false, params)?;
-            let result_width = when_true.width.max(when_false.width);
-            if cond.truthy() {
-                Ok(when_true.coerced_to(result_width))
-            } else {
-                Ok(when_false.coerced_to(result_width))
-            }
-        }
-        Expr::Unary { op, expr } => {
-            let value = const_eval_param_expr(expr, params)?;
-            match op {
-                UnaryOp::BitNot => Ok(ConstEvalValue::new_with_signed(
-                    value.normalized_bits().bitnot_with_width(value.width),
-                    value.width,
-                    value.signed,
-                )),
-                UnaryOp::Negate => Ok(ConstEvalValue::new_with_signed(
-                    BitValue::zero().wrapping_sub(&value.normalized_bits(), value.width),
-                    value.width,
-                    value.signed,
-                )),
-                UnaryOp::LogicalNot => Ok(ConstEvalValue::new(
-                    BitValue::from(u64::from(!value.truthy())),
-                    1,
-                )),
-                UnaryOp::ReductionOr => Ok(ConstEvalValue::new(
-                    BitValue::from(u64::from(value.truthy())),
-                    1,
-                )),
-                UnaryOp::ReductionAnd => {
-                    let all_ones = mask(value.width);
-                    Ok(ConstEvalValue::new(
-                        BitValue::from(u64::from(
-                            value.normalized_bits().bitand(&all_ones) == all_ones,
-                        )),
-                        1,
-                    ))
-                }
-                UnaryOp::ReductionNand => {
-                    let all_ones = mask(value.width);
-                    Ok(ConstEvalValue::new(
-                        BitValue::from(u64::from(
-                            value.normalized_bits().bitand(&all_ones) != all_ones,
-                        )),
-                        1,
-                    ))
-                }
-                UnaryOp::ReductionXor => {
-                    let mut count = 0u32;
-                    let bits = value.normalized_bits();
-                    for index in 0..value.width {
-                        if !bits.slice(index, 1).is_zero() {
-                            count += 1;
-                        }
-                    }
-                    Ok(ConstEvalValue::new(
-                        BitValue::from(u64::from(count % 2 != 0)),
-                        1,
-                    ))
-                }
-                UnaryOp::Signed => Ok(ConstEvalValue::new_with_signed(
-                    value.normalized_bits(),
-                    value.width,
-                    true,
-                )),
-                UnaryOp::Unsigned => Ok(ConstEvalValue::new_with_signed(
-                    value.normalized_bits(),
-                    value.width,
-                    false,
-                )),
-            }
-        }
-        Expr::Binary { left, op, right } => {
-            if matches!(op, BinaryOp::LogicalAnd) {
-                let left = const_eval_param_expr(left, params)?;
-                if !left.truthy() {
-                    return Ok(ConstEvalValue::new(BitValue::zero(), 1));
-                }
-                let right = const_eval_param_expr(right, params)?;
-                return Ok(ConstEvalValue::new(
-                    BitValue::from(u64::from(right.truthy())),
-                    1,
-                ));
-            }
-            if matches!(op, BinaryOp::LogicalOr) {
-                let left = const_eval_param_expr(left, params)?;
-                if left.truthy() {
-                    return Ok(ConstEvalValue::new(BitValue::from(1_u64), 1));
-                }
-                let right = const_eval_param_expr(right, params)?;
-                return Ok(ConstEvalValue::new(
-                    BitValue::from(u64::from(right.truthy())),
-                    1,
-                ));
-            }
-            let mut left = const_eval_param_expr(left, params)?;
-            let mut right = const_eval_param_expr(right, params)?;
-            let common_width = left.width.max(right.width);
-            left = left.coerced_to(common_width);
-            right = right.coerced_to(common_width);
-            let (bits, width, signed) = match op {
-                BinaryOp::BitAnd => (
-                    left.normalized_bits().bitand(&right.normalized_bits()),
-                    common_width,
-                    left.signed && right.signed,
-                ),
-                BinaryOp::BitOr => (
-                    left.normalized_bits().bitor(&right.normalized_bits()),
-                    common_width,
-                    left.signed && right.signed,
-                ),
-                BinaryOp::BitXor => (
-                    left.normalized_bits().bitxor(&right.normalized_bits()),
-                    common_width,
-                    left.signed && right.signed,
-                ),
-                BinaryOp::ShiftLeft => (
-                    shift_left_bits(
-                        &left.normalized_bits(),
-                        &right.normalized_bits(),
-                        left.width,
-                    ),
-                    left.width,
-                    left.signed,
-                ),
-                BinaryOp::ShiftRight => (
-                    shift_right_bits(
-                        &left.normalized_bits(),
-                        &right.normalized_bits(),
-                        left.width,
-                    ),
-                    left.width,
-                    left.signed,
-                ),
-                BinaryOp::ArithmeticShiftRight => (
-                    arithmetic_shift_right_bits(
-                        &left.normalized_bits(),
-                        &right.normalized_bits(),
-                        left.width,
-                    ),
-                    left.width,
-                    left.signed,
-                ),
-                BinaryOp::LogicalAnd => unreachable!("handled before common-width coercion"),
-                BinaryOp::LogicalOr => unreachable!("handled before common-width coercion"),
-                BinaryOp::Eq => (
-                    BitValue::from(left.normalized_bits() == right.normalized_bits()),
-                    1,
-                    false,
-                ),
-                BinaryOp::NotEq => (
-                    BitValue::from(left.normalized_bits() != right.normalized_bits()),
-                    1,
-                    false,
-                ),
-                BinaryOp::Lt => (
-                    BitValue::from(compare_const_eval_values(&left, &right).is_lt()),
-                    1,
-                    false,
-                ),
-                BinaryOp::LtEq => (
-                    BitValue::from(!compare_const_eval_values(&left, &right).is_gt()),
-                    1,
-                    false,
-                ),
-                BinaryOp::Gt => (
-                    BitValue::from(compare_const_eval_values(&left, &right).is_gt()),
-                    1,
-                    false,
-                ),
-                BinaryOp::GtEq => (
-                    BitValue::from(!compare_const_eval_values(&left, &right).is_lt()),
-                    1,
-                    false,
-                ),
-                BinaryOp::Add => (
-                    left.normalized_bits()
-                        .wrapping_add(&right.normalized_bits(), common_width),
-                    common_width,
-                    left.signed && right.signed,
-                ),
-                BinaryOp::Sub => (
-                    left.normalized_bits()
-                        .wrapping_sub(&right.normalized_bits(), common_width),
-                    common_width,
-                    left.signed && right.signed,
-                ),
-                BinaryOp::Mul => (
-                    left.normalized_bits()
-                        .wrapping_mul(&right.normalized_bits(), common_width),
-                    common_width,
-                    left.signed && right.signed,
-                ),
-            };
-            Ok(ConstEvalValue::new_with_signed(bits, width, signed))
-        }
-        Expr::MemoryRead { .. } => Err(unsupported(
-            "expression is too complex for constant parameter evaluation",
-            None,
-        )),
-    }
+fn const_eval_param_expr(expr: &Expr, params: &[ParameterDecl]) -> LowerResult<Value> {
+    let module = const_eval_module(params);
+    let values = resolve_parameter_defaults(params, &module)
+        .map_err(|error| unsupported(error.to_string(), None))?;
+    eval_expr(expr, &module, &values, &HashMap::new())
+        .map_err(|error| unsupported(error.to_string(), None))
 }
 
-/// Evaluate an already-lowered HIR Expr to a usize, resolving parameter references.
 fn const_eval_param_value(expr: &Expr, params: &[ParameterDecl]) -> LowerResult<usize> {
     const_eval_param_expr(expr, params)?
         .to_usize_checked()
         .ok_or_else(|| unsupported("constant value exceeds host limits", None))
-}
-
-fn const_eval_value_from_literal(literal: &NumericLiteral) -> LowerResult<ConstEvalValue> {
-    let width = literal
-        .width
-        .unwrap_or_else(|| minimum_width(&literal.bits));
-    let bits = literal.bits.to_bit_value_checked().ok_or_else(|| {
-        unsupported(
-            "x/z literals are not supported in constant parameter expressions",
-            None,
-        )
-    })?;
-    Ok(ConstEvalValue::new(bits, width))
-}
-
-fn concat_const_eval_values(parts: &[ConstEvalValue]) -> LowerResult<ConstEvalValue> {
-    let mut total_width = 0usize;
-    for part in parts {
-        total_width = total_width
-            .checked_add(part.width)
-            .ok_or_else(|| unsupported("constant value exceeds host limits", None))?;
-    }
-    if total_width == 0 {
-        return Err(unsupported(
-            "expression is too complex for constant parameter evaluation",
-            None,
-        ));
-    }
-
-    let mut bits = BitValue::zero();
-    let mut shift = total_width;
-    for part in parts {
-        shift -= part.width;
-        bits = bits.bitor(&part.normalized_bits().shift_left(shift));
-    }
-
-    Ok(ConstEvalValue::new(bits, total_width))
-}
-
-fn compare_const_eval_values(left: &ConstEvalValue, right: &ConstEvalValue) -> std::cmp::Ordering {
-    if left.signed && right.signed {
-        compare_signed_const_eval_bits(
-            &left.normalized_bits(),
-            &right.normalized_bits(),
-            left.width,
-        )
-    } else {
-        left.normalized_bits()
-            .cmp_unsigned(&right.normalized_bits())
-    }
-}
-
-fn compare_signed_const_eval_bits(
-    left: &BitValue,
-    right: &BitValue,
-    width: usize,
-) -> std::cmp::Ordering {
-    let width = width.max(1);
-    let left = left.truncate(width);
-    let right = right.truncate(width);
-    match left.get_bit(width - 1).cmp(&right.get_bit(width - 1)) {
-        std::cmp::Ordering::Less => std::cmp::Ordering::Greater,
-        std::cmp::Ordering::Greater => std::cmp::Ordering::Less,
-        std::cmp::Ordering::Equal => left.cmp_unsigned(&right),
-    }
 }
 
 fn parse_based_value(

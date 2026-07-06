@@ -8,7 +8,9 @@ use std::collections::HashMap;
 
 use crate::bit_value::BitValue;
 use crate::diag::{Error, Result};
-use crate::hir::{BinaryOp, Expr, ModuleSummary, NumericLiteral, PackedRange, UnaryOp};
+use crate::hir::{
+    BinaryOp, Expr, ModuleSummary, NumericLiteral, PackedRange, ParameterDecl, UnaryOp,
+};
 use crate::logic_ops::{
     logic_bit_and, logic_bit_not, logic_bit_or, logic_bit_xor, logic_reduce_and, logic_reduce_or,
     logic_reduce_xor, logic_sign_extend, logic_slice, logic_value_from_bit,
@@ -79,6 +81,15 @@ impl Value {
 
     pub(crate) fn to_bit_value_checked(&self) -> Option<BitValue> {
         self.logic.to_bit_value_checked()
+    }
+
+    /// Two-state, non-negative conversion for host-side indexes and counts.
+    pub(crate) fn to_usize_checked(&self) -> Option<usize> {
+        let bits = self.to_bit_value_checked()?;
+        if self.signed && bits.get_bit(self.width.max(1) - 1) {
+            return None;
+        }
+        bits.to_usize_checked()
     }
 
     pub(crate) fn truthiness(&self) -> LogicTruth {
@@ -442,6 +453,27 @@ pub(crate) fn eval_expr(
             }
         }
         Expr::Binary { left, op, right } => {
+            // Logical operators short-circuit: when the left operand decides
+            // the result, the right operand is not evaluated. This lets
+            // constant folding prune guarded expressions that would not
+            // evaluate (the historical frontend behavior), and is value-
+            // identical for runtime operands.
+            if matches!(op, BinaryOp::LogicalAnd | BinaryOp::LogicalOr) {
+                let left_value = eval_expr(left, module, values, memories)?;
+                let bit = match (op, left_value.truthiness()) {
+                    (BinaryOp::LogicalAnd, LogicTruth::False) => LogicBit::Zero,
+                    (BinaryOp::LogicalOr, LogicTruth::True) => LogicBit::One,
+                    (BinaryOp::LogicalAnd, _) => {
+                        let right_value = eval_expr(right, module, values, memories)?;
+                        logical_and(&left_value, &right_value)
+                    }
+                    (_, _) => {
+                        let right_value = eval_expr(right, module, values, memories)?;
+                        logical_or(&left_value, &right_value)
+                    }
+                };
+                return Ok(Value::from_logic(logic_value_from_bit(bit), 1));
+            }
             let mut left = eval_expr(left, module, values, memories)?;
             let mut right = eval_expr(right, module, values, memories)?;
             let common_width = left.width.max(right.width);
@@ -543,4 +575,20 @@ pub(crate) fn eval_expr(
             }
         }
     }
+}
+
+/// Resolves parameter default values in declaration order, coercing each to
+/// its declared width — the same rule the runtime uses when no instance
+/// overrides are in play.
+pub(crate) fn resolve_parameter_defaults(
+    params: &[ParameterDecl],
+    module: &ModuleSummary,
+) -> Result<HashMap<String, Value>> {
+    let memories = HashMap::new();
+    let mut values = HashMap::new();
+    for param in params {
+        let value = eval_expr(&param.default_value, module, &values, &memories)?;
+        values.insert(param.name.clone(), value.coerced_to(param.width()));
+    }
+    Ok(values)
 }
