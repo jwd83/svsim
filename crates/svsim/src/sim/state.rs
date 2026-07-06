@@ -262,6 +262,33 @@ pub(super) fn signal_storage(module: &ModuleSummary, name: &str) -> Option<Stora
         .or_else(|| module.signal_decl(name).map(|signal| signal.storage))
 }
 
+/// Frame-backed `ValueReader`: reads signals straight from the indexed
+/// runtime frame and parameters from the instance's resolved values,
+/// mirroring the lookup precedence of `build_instance_value_table`
+/// (parameters shadow same-named signals).
+pub(super) struct FrameValues<'a> {
+    pub(super) module: &'a ModuleSummary,
+    pub(super) state: &'a ModuleState,
+    pub(super) frame: &'a [ObjectValue],
+}
+
+impl ValueReader for FrameValues<'_> {
+    fn read_value(&self, name: &str) -> Option<Value> {
+        if let Some(param) = self.module.parameter_decl(name) {
+            return Some(
+                self.state
+                    .parameter_values
+                    .get(name)
+                    .cloned()
+                    .unwrap_or_else(|| Value::zero(param.width()))
+                    .coerced_to(param.width()),
+            );
+        }
+        let binding = self.state.signals.get(name).copied()?;
+        read_binding(binding, self.frame).ok()
+    }
+}
+
 pub(super) fn read_binding(binding: SignalBinding, values: &[ObjectValue]) -> Result<Value> {
     let logic = read_binding_logic(binding, values)?;
     Ok(Value::from_logic(logic, binding.view_width))

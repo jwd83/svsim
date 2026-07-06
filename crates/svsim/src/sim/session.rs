@@ -444,11 +444,10 @@ fn settle_module_pass(
 
     for child_state in &state.children {
         let child = resolve_supported_module(hir, &child_state.state.module_name)?;
-        let parent_values = build_instance_value_table(module, state, frame)?;
         let drove_inputs = drive_child_inputs(
             module,
+            state,
             child_state,
-            &parent_values,
             &state.memories,
             frame,
             object_layouts,
@@ -645,8 +644,8 @@ fn apply_external_inputs(
 
 fn drive_child_inputs(
     parent_module: &ModuleSummary,
+    parent_state: &ModuleState,
     child_state: &ChildState,
-    parent_values: &HashMap<String, Value>,
     parent_memories: &HashMap<String, MemoryState>,
     frame: &mut [ObjectValue],
     object_layouts: &[RuntimeObjectLayout],
@@ -655,7 +654,12 @@ fn drive_child_inputs(
     let mut changed = false;
 
     for driver in &child_state.input_drivers {
-        let value = eval_expr(&driver.expr, parent_module, parent_values, parent_memories)?;
+        let parent_values = FrameValues {
+            module: parent_module,
+            state: parent_state,
+            frame,
+        };
+        let value = eval_expr(&driver.expr, parent_module, &parent_values, parent_memories)?;
         let binding = child_state
             .state
             .signals
@@ -743,13 +747,7 @@ fn execute_proc_block(
     memories: &HashMap<String, MemoryState>,
 ) -> Result<bool> {
     match kind {
-        ProcBlockKind::AlwaysComb => {
-            let mut next_values = values.clone();
-            execute_comb_stmt(body, module, &mut next_values, memories)?;
-            let changed = *values != next_values;
-            *values = next_values;
-            Ok(changed)
-        }
+        ProcBlockKind::AlwaysComb => execute_comb_stmt(body, module, values, memories),
         ProcBlockKind::AlwaysFf { .. } => Ok(false),
     }
 }
@@ -759,14 +757,15 @@ fn execute_comb_stmt(
     module: &ModuleSummary,
     values: &mut HashMap<String, Value>,
     memories: &HashMap<String, MemoryState>,
-) -> Result<()> {
+) -> Result<bool> {
     match stmt {
-        Stmt::Empty => Ok(()),
+        Stmt::Empty => Ok(false),
         Stmt::Block(statements) => {
+            let mut changed = false;
             for statement in statements {
-                execute_comb_stmt(statement, module, values, memories)?;
+                changed |= execute_comb_stmt(statement, module, values, memories)?;
             }
-            Ok(())
+            Ok(changed)
         }
         Stmt::Assign { kind, target, expr } => match kind {
             AssignmentKind::Blocking => {
@@ -779,8 +778,7 @@ fn execute_comb_stmt(
                     ));
                 }
                 let mut no_memories = HashMap::new();
-                apply_resolved_lvalue(&target, value, module, values, &mut no_memories)?;
-                Ok(())
+                apply_resolved_lvalue(&target, value, module, values, &mut no_memories)
             }
             AssignmentKind::Nonblocking => Err(Error::Unsupported(
                 "nonblocking assignments are only supported inside `always_ff` blocks".into(),
@@ -799,7 +797,7 @@ fn execute_comb_stmt(
             } else if let Some(else_branch) = else_branch {
                 execute_comb_stmt(else_branch, module, values, memories)
             } else {
-                Ok(())
+                Ok(false)
             }
         }
         Stmt::Case {
@@ -818,7 +816,7 @@ fn execute_comb_stmt(
             if let Some(default) = default {
                 execute_comb_stmt(default, module, values, memories)
             } else {
-                Ok(())
+                Ok(false)
             }
         }
     }
