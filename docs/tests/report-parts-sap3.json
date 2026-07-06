@@ -1,0 +1,102 @@
+{
+  "directory": "parts/sap3",
+  "report": {
+    "duration_ms": 10019,
+    "passed": 4,
+    "total": 4,
+    "suites": [
+      {
+        "source_path": "parts/sap3/sap3.sv",
+        "json_path": "parts/sap3/sap3_add3to42.json",
+        "top_module": "machine",
+        "duration_ms": 10017,
+        "passed": true,
+        "report": {
+          "duration_ms": 9978,
+          "step_hz": 291,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Repeatedly adds 3 starting from 42, writes to memory-mapped output port, halts at 0",
+              "description": "Add 3 to 42",
+              "steps": 2912,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/sap3/sap3.sv",
+        "json_path": "parts/sap3/sap3_fib.json",
+        "top_module": "machine",
+        "duration_ms": 1263,
+        "passed": true,
+        "report": {
+          "duration_ms": 1221,
+          "step_hz": 238,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Fibonacci sequence via memory-mapped output port halts when carry sets",
+              "description": "Fibonacci",
+              "steps": 291,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/sap3/sap3.sv",
+        "json_path": "parts/sap3/sap3_logic_mask.json",
+        "top_module": "machine",
+        "duration_ms": 269,
+        "passed": true,
+        "report": {
+          "duration_ms": 228,
+          "step_hz": 188,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Exercises AND, OR, and XOR against a base value and emits each result",
+              "description": "Logic AND/OR/XOR",
+              "steps": 43,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/sap3/sap3.sv",
+        "json_path": "parts/sap3/sap3_parity.json",
+        "top_module": "machine",
+        "duration_ms": 160,
+        "passed": true,
+        "report": {
+          "duration_ms": 131,
+          "step_hz": 167,
+          "passed": 1,
+          "total": 1,
+          "cases": [
+            {
+              "name": "Computes the low-bit parity of 0x69 ^ 0x52 via XOR then AND",
+              "description": "XOR parity",
+              "steps": 22,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      }
+    ]
+  }
+}

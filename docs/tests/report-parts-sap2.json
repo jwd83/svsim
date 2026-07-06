@@ -1,19 +1,19 @@
 {
-  "directory": "parts/sap1",
+  "directory": "parts/sap2",
   "report": {
-    "duration_ms": 5543,
-    "passed": 6,
-    "total": 6,
+    "duration_ms": 9304,
+    "passed": 9,
+    "total": 9,
     "suites": [
       {
-        "source_path": "parts/sap1/sap1.sv",
-        "json_path": "parts/sap1/sap1_add3to42.json",
+        "source_path": "parts/sap2/sap2.sv",
+        "json_path": "parts/sap2/sap2_add3to42.json",
         "top_module": "machine",
-        "duration_ms": 5542,
+        "duration_ms": 9300,
         "passed": true,
         "report": {
-          "duration_ms": 5518,
-          "step_hz": 483,
+          "duration_ms": 9252,
+          "step_hz": 288,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -29,14 +29,14 @@
         "error": null
       },
       {
-        "source_path": "parts/sap1/sap1.sv",
-        "json_path": "parts/sap1/sap1_fib.json",
+        "source_path": "parts/sap2/sap2.sv",
+        "json_path": "parts/sap2/sap2_fib.json",
         "top_module": "machine",
-        "duration_ms": 921,
+        "duration_ms": 1371,
         "passed": true,
         "report": {
-          "duration_ms": 897,
-          "step_hz": 308,
+          "duration_ms": 1325,
+          "step_hz": 209,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -52,14 +52,14 @@
         "error": null
       },
       {
-        "source_path": "parts/sap1/sap1.sv",
-        "json_path": "parts/sap1/sap1_memory_traffic.json",
+        "source_path": "parts/sap2/sap2.sv",
+        "json_path": "parts/sap2/sap2_memory_traffic.json",
         "top_module": "machine",
-        "duration_ms": 425,
+        "duration_ms": 720,
         "passed": true,
         "report": {
-          "duration_ms": 402,
-          "step_hz": 283,
+          "duration_ms": 683,
+          "step_hz": 166,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -75,14 +75,14 @@
         "error": null
       },
       {
-        "source_path": "parts/sap1/sap1.sv",
-        "json_path": "parts/sap1/sap1_multiply.json",
+        "source_path": "parts/sap2/sap2.sv",
+        "json_path": "parts/sap2/sap2_multiply.json",
         "top_module": "machine",
-        "duration_ms": 850,
+        "duration_ms": 1315,
         "passed": true,
         "report": {
-          "duration_ms": 816,
-          "step_hz": 302,
+          "duration_ms": 1267,
+          "step_hz": 194,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -98,14 +98,14 @@
         "error": null
       },
       {
-        "source_path": "parts/sap1/sap1.sv",
-        "json_path": "parts/sap1/sap1_self_modify_fetch.json",
+        "source_path": "parts/sap2/sap2.sv",
+        "json_path": "parts/sap2/sap2_self_modify_fetch.json",
         "top_module": "machine",
-        "duration_ms": 100,
+        "duration_ms": 190,
         "passed": true,
         "report": {
-          "duration_ms": 77,
-          "step_hz": 298,
+          "duration_ms": 136,
+          "step_hz": 169,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -121,14 +121,14 @@
         "error": null
       },
       {
-        "source_path": "parts/sap1/sap1.sv",
-        "json_path": "parts/sap1/sap1_test_jumps.json",
+        "source_path": "parts/sap2/sap2.sv",
+        "json_path": "parts/sap2/sap2_test_jumps.json",
         "top_module": "machine",
-        "duration_ms": 562,
+        "duration_ms": 794,
         "passed": true,
         "report": {
-          "duration_ms": 529,
-          "step_hz": 249,
+          "duration_ms": 759,
+          "step_hz": 173,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -136,6 +136,124 @@
               "name": "Exercises JNZ, JZ, JC, and JNC via decrement and underflow loops",
               "description": null,
               "steps": 132,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/sap2/sap2_bus_semantics.sv",
+        "json_path": "parts/sap2/sap2_bus_semantics.json",
+        "top_module": "sap2_bus_semantics",
+        "duration_ms": 3,
+        "passed": true,
+        "report": {
+          "duration_ms": 0,
+          "step_hz": 4000,
+          "passed": 4,
+          "total": 4,
+          "cases": [
+            {
+              "name": "Test 1",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 2",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 3",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Test 4",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/sap2/sap2_inout_top.sv",
+        "json_path": "parts/sap2/sap2_inout_top.json",
+        "top_module": "sap2_inout_top",
+        "duration_ms": 5,
+        "passed": true,
+        "report": {
+          "duration_ms": 1,
+          "step_hz": 9000,
+          "passed": 3,
+          "total": 3,
+          "cases": [
+            {
+              "name": "Harness drives bus into reg_a, then releases and reads back via tile",
+              "description": null,
+              "steps": 3,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Tile-to-tile transfer over the shared inout bus",
+              "description": null,
+              "steps": 3,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Harness contention with a tile driving the bus produces x bits",
+              "description": null,
+              "steps": 3,
+              "passed": true,
+              "failures": []
+            }
+          ]
+        },
+        "error": null
+      },
+      {
+        "source_path": "parts/sap2/sap2_register_tile.sv",
+        "json_path": "parts/sap2/sap2_register_tile.json",
+        "top_module": "sap2_register_tile",
+        "duration_ms": 18,
+        "passed": true,
+        "report": {
+          "duration_ms": 7,
+          "step_hz": 1142,
+          "passed": 3,
+          "total": 3,
+          "cases": [
+            {
+              "name": "Reset clears value; no drivers on bus leaves it floating",
+              "description": null,
+              "steps": 1,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "External drive plus en_write_tile latches the bus into the tile",
+              "description": null,
+              "steps": 4,
+              "passed": true,
+              "failures": []
+            },
+            {
+              "name": "Contention between tile and external driver mixes to x on mismatching bits",
+              "description": null,
+              "steps": 3,
               "passed": true,
               "failures": []
             }
