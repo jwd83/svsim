@@ -19,3 +19,11 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sv-parser = "0.13"
 thiserror = "2"
+
+# The test suite simulates whole corpus programs; unoptimized svsim is ~9x
+# slower, which makes `cargo test` unusable as the green-corpus gate.
+[profile.dev.package.svsim]
+opt-level = 2
+
+[profile.test.package.svsim]
+opt-level = 2
