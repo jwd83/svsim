@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Architectural Review — svsim (second review, 2026-07-06)</title>
+<style>
+  :root {
+    --ink: #1a1d21; --muted: #5c6570; --line: #d9dee4; --bg: #ffffff;
+    --accent: #0f5d8f; --good: #1d7a3e; --risk: #a33b3b; --chip: #f0f3f6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0 auto; max-width: 60rem; padding: 2.5rem 1.5rem 5rem;
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--ink); background: var(--bg);
+  }
+  header { border-bottom: 3px solid var(--ink); padding-bottom: 1rem; margin-bottom: 2rem; }
+  h1 { font-size: 1.7rem; margin: 0 0 .3rem; }
+  .meta { color: var(--muted); font-size: .95rem; }
+  h2 { font-size: 1.25rem; margin: 2.4rem 0 .8rem; padding-top: .6rem; border-top: 1px solid var(--line); }
+  h3 { font-size: 1.05rem; margin: 1.6rem 0 .5rem; }
+  code, .path { font: .88em/1.5 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    background: var(--chip); padding: .08em .35em; border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: .93rem; }
+  th, td { border: 1px solid var(--line); padding: .45rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--chip); }
+  .lead { font-size: 1.02rem; }
+  .good h3::before { content: "✓ "; color: var(--good); }
+  .risk h3 .rank { display: inline-block; background: var(--risk); color: #fff; border-radius: 4px;
+    font-size: .8rem; padding: .05rem .45rem; margin-right: .5rem; vertical-align: 2px; }
+  .label { font-weight: 600; color: var(--accent); }
+  .steps li { margin: .7rem 0; }
+  .steps li strong { color: var(--accent); }
+  .note { background: var(--chip); border-left: 4px solid var(--accent); padding: .7rem 1rem; margin: 1rem 0; }
+  .metric { font-variant-numeric: tabular-nums; }
+  footer { margin-top: 3rem; color: var(--muted); font-size: .88rem; border-top: 1px solid var(--line); padding-top: 1rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Architectural Review — svsim <span style="font-weight:400">(second review)</span></h1>
+  <div class="meta">Reviewed 2026-07-06 against <code>main</code> @ <code>1b08d69</code> · canonical copy: <code>plans/in-progress/architectural-review.md</code> · predecessor campaign: <code>plans/completed/2026-07-06-architectural-review.md</code></div>
+</header>
+
+<p class="lead">
+This review was taken immediately after the completed seven-step campaign. The debts of
+<em>organization</em> — the <code>sim.rs</code> god module, three divergent constant evaluators, an
+unverifiable corpus, untruthful docs — are gone. What remains expensive is different in kind:
+the <strong>runtime evaluation model</strong> is the dominant carrying cost (a release build simulates an
+8×8 register file at 4 steps/second and the test gate pays for it on every run), the
+<strong>parameterization story is split-brain</strong> (per-instance values exist at elaboration, but shapes
+and unrolled loops silently freeze lowering-time defaults), and the <strong>negative corpus is not
+gated at all</strong>. Order of attack: close the verification gap first, fence the parameterization
+trap, then finish the runtime's own half-completed migration to indexed frames before splitting
+the last monolith and threading spans through diagnostics.
+</p>
+
+<h2>Snapshot</h2>
+<table>
+  <tr><th>Metric</th><th>Value</th></tr>
+  <tr><td>Rust source</td><td class="metric">17,365 lines / 28 files (~11,650 production, ~5,715 test — 33%)</td></tr>
+  <tr><td>Largest code files (excl. inline tests)</td><td><code>frontend/sv_parser.rs</code> 3,563 · <code>sim/session.rs</code> 956 · <code>test.rs</code> 752 · <code>validate.rs</code> 729 · <code>logic_value.rs</code> 648 · <code>compiler.rs</code> 603</td></tr>
+  <tr><td>Test baseline</td><td><code>cargo test</code>: <strong>201/201 pass</strong> (182 unit · 9 corpus-gate · 10 CLI), ~2 min wall (dev/test <code>opt-level&nbsp;=&nbsp;2</code>)</td></tr>
+  <tr><td>Green corpus</td><td class="metric">194 suites across 9 gated <code>parts/</code> dirs; release-build total 59 s (<code>./test.sh</code>)</td></tr>
+  <tr><td>Negative corpus</td><td>6 suites in <code>parts/failing</code> — <strong>not gated</strong>; only the manual <code>test-fails.sh</code> runs them</td></tr>
+  <tr><td>Simulation speed (release, <code>step_hz</code>)</td><td>picorv32 65–128 Hz · sap1–3 ≈170–360 Hz · <code>regfile_8x8</code> <strong>4 Hz</strong> · <code>adder_cs_64bit</code> <strong>1 Hz</strong></td></tr>
+  <tr><td>Docs</td><td><code>wiki/</code> synced 2026-07-06 · <code>test.bat</code> stale · no root <code>README.md</code></td></tr>
+</table>
+<p>Simulation speed is now the binding constraint: it sets the price of the gate, forced picorv32
+to a curated subset, and caps corpus growth. The slowest suites are not the biggest designs —
+an 8×8 register file at 4&nbsp;Hz in release is an algorithmic signal, not a constant-factor one.</p>
+
+<h2>Structurally sound elements <span style="font-weight:400;color:var(--muted)">(do-not-break list)</span></h2>
+<div class="good">
+  <h3>The compile pipeline and its ownership boundaries</h3>
+  <p><code>sv-parser</code> types stop at <code>frontend/</code>; HIR is owned; <code>validate.rs</code> is validation-only;
+  elaboration owns parameter resolution. No layer reaches backward.</p>
+  <h3>One shared expression evaluator</h3>
+  <p><code>expr_eval.rs</code> is the only home of expression semantics; const contexts call the runtime
+  evaluator, so const/runtime cannot diverge. Short-circuit <code>&amp;&amp;</code>/<code>||</code> is deliberate and
+  load-bearing (picorv32 generate pruning).</p>
+  <h3>The corpus gate</h3>
+  <p><code>cargo test</code> is the single verification command; empty corpus dirs fail loudly; committed
+  reports are regenerable artifacts. Every step below stands on this.</p>
+  <h3>Four-state core, two-state host boundary</h3>
+  <p><code>LogicValue</code> inside, <code>BitValue</code> at JSON/CLI edges, converters isolated in <code>sim/value.rs</code>. Locked decision; still correct.</p>
+  <h3>The <code>sim/</code> split and <code>logic_ops.rs</code> truth tables</h3>
+  <p>Six focused files with <code>pub(super)</code> seams; the split pattern is proven and reused verbatim by step 5 below.</p>
+  <h3>Thin CLI</h3>
+  <p>242 lines of clap-based wrapping over library APIs, per <code>AGENTS.md</code>.</p>
+</div>
+
+<h2>Structural risks and costs <span style="font-weight:400;color:var(--muted)">(ranked by carrying cost)</span></h2>
+<div class="risk">
+
+<h3><span class="rank">1</span>The settle loop does quadratic work through string-keyed adapter tables</h3>
+<p><span class="label">Evidence.</span> <code>sim/session.rs:291</code>: iteration budget ∝ design size (summed
+recursively) × 8; each iteration <strong>clones the whole design frame</strong> (<code>frame.to_vec()</code>) and
+detects convergence by deep comparison — while the <code>changed</code> flag the pass already computes is
+discarded (<code>let _changed = …</code>). Each pass rebuilds <code>HashMap&lt;String, Value&gt;</code> tables from the
+indexed frame via <code>build_instance_value_table</code> (<code>sim/state.rs:341</code>) — once for the module
+(<code>session.rs:375</code>), <strong>twice more per child per pass</strong> (<code>:447</code>, <code>:471</code>), twice per step phase
+(<code>:498</code>, <code>:513</code>) — cloning every name and value each time. Measured: <code>regfile_8x8</code> 4 steps/s,
+<code>adder_cs_64bit</code> 1 step/s, release build; the two regfile suites alone are 22 s of the 59 s corpus.</p>
+<p><span class="label">Consequence.</span> Per-step cost grows ~quadratically with design size. The gate costs
+~2 minutes on every run; picorv32 stays a curated subset; larger designs are blocked.</p>
+<p><span class="label">Fix direction.</span> A <em>half-finished migration, not a redesign</em>: the indexed frame
+(<code>RuntimeObjectLayout</code>, <code>ObjectValue</code>) already exists as storage — the compute layer never adopted
+it. Let evaluation read/write the frame through a small resolver seam; replace clone-and-compare
+convergence with the existing change tracking. <code>step_hz</code> in <code>docs/tests/</code> is a built-in benchmark.
+<em>Not</em> needed: event scheduler, dependency graphs, or behavior change.</p>
+
+<h3><span class="rank">2</span>Split-brain parameterization: shapes and unrolled loops freeze defaults</h3>
+<p><span class="label">Evidence.</span> HIR stores selects/ranges as concrete <code>usize</code> (<code>hir.rs:210</code>);
+elaboration derives shapes from those frozen widths (<code>elaborate.rs:252</code>). Procedural <code>for</code> loops
+are fully unrolled at <em>lowering</em> time against <strong>default</strong> parameter values (<code>sv_parser.rs:1716</code>).
+Since the first campaign, parameter <em>values</em> are per-instance at elaboration — so an override
+affects expressions but not widths, memory shapes, or unrolled bodies. A module whose loop bound or
+port range depends on an overridden parameter silently simulates with the default. Only 3 corpus
+files use <code>#(</code> overrides today (value-only), so the trap is latent.</p>
+<p><span class="label">Consequence.</span> A silent-wrong-answer bug class directly on the corpus-growth path:
+importing any parameterized real-world core can trip it, and the failure is wrong results, not an error.</p>
+<p><span class="label">Fix direction.</span> Fence first: elaboration rejects overrides that feed frozen
+constructs (ranges, loop bounds) unless equal to the default, with a parameter-naming diagnostic;
+add negative-corpus cases. The full fix (ranges/bounds as <code>Expr</code>, resolved at elaboration) waits
+for a real use case — do not build it speculatively.</p>
+
+<h3><span class="rank">3</span>The negative corpus is not gated</h3>
+<p><span class="label">Evidence.</span> <code>parts/failing/</code> holds 6 intentional-failure suites; <code>corpus_gate.rs</code>
+excludes it and nothing in <code>cargo test</code> runs it — only the manual <code>test-fails.sh</code>. A regression
+that makes <code>duplicate_instance_names.sv</code> compile cleanly passes CI silently.</p>
+<p><span class="label">Consequence.</span> The entire diagnostic surface (<code>validate.rs</code>, frontend
+<code>unsupported()</code> paths) has no regression protection — the same "verification only when a human
+remembers" class as the first review's sap2-report finding.</p>
+<p><span class="label">Fix direction.</span> Add must-fail tests to <code>corpus_gate.rs</code> asserting each suite fails
+<em>and</em> the message still names the expected construct. Retire or thin <code>test-fails.sh</code>. An afternoon
+of work that protects steps 2, 4, and 6.</p>
+
+<h3><span class="rank">4</span><code>frontend/sv_parser.rs</code> is the last monolith — and hides an elaboration engine</h3>
+<p><span class="label">Evidence.</span> 3,563 production lines (next largest: 956), ~90 functions in five
+clusters: module/port/parameter lowering, statements, expressions/literals, span plumbing, and a
+<strong>loop-unrolling substitution engine</strong> (<code>substitute_stmt_ident</code>, <code>module_with_const_binding</code>, …,
+~lines 1960–2140) that exists because HIR cannot represent loops or dynamic selects — the mechanism
+behind risk 2.</p>
+<p><span class="label">Consequence.</span> Every language feature lands in one 3.5k-line file; the unroller's
+true nature (elaboration in exile) is invisible — which is how risk 2 stayed hidden.</p>
+<p><span class="label">Fix direction.</span> Mechanical split into <code>frontend/sv_parser/</code> using the proven
+<code>sim/</code> pattern, with <code>loop_unroll.rs</code> named for what it is and its doc header stating the
+default-freezing behavior. No behavior change, no new IR.</p>
+
+<h3><span class="rank">5</span>Diagnostics are stringly typed and often span-less</h3>
+<p><span class="label">Evidence.</span> <code>diag.rs</code> is 31 lines: three bare-<code>String</code> variants,
+<code>span: Option&lt;SourceSpan&gt;</code>. 58 of 163 <code>unsupported()</code> calls in the frontend pass <code>None</code>;
+every <code>Error::Resolve</code> from <code>width.rs</code>/<code>expr_eval.rs</code> carries no location; convergence failures
+name only the module.</p>
+<p><span class="label">Consequence.</span> Corpus debugging happens by grep; as imported cores grow,
+time-to-locate dominates time-to-fix.</p>
+<p><span class="label">Fix direction.</span> Not a framework: thread the <code>Locate</code> call sites already hold into
+the span-less calls; prefix evaluator/width errors with module + construct. Mechanical and
+incrementally useful.</p>
+
+<h3>Smaller frictions</h3>
+<ul>
+  <li><code>test.bat</code> is stale in exactly the class the first review fixed in <code>test.sh</code>: misses
+      sap2/sap3/simple8 and invokes <code>svsim.exe</code>, a binary the workspace doesn't produce. Fix or delete.</li>
+  <li><code>wiki/architecture/workspace-map.md:34</code> still credits <code>width.rs</code> with helpers deleted in the first campaign.</li>
+  <li>No root <code>README.md</code> — the repo has no human front door.</li>
+  <li>Zero doc-tests on a deliberately public API (~40 re-exported types).</li>
+  <li><code>compiler.rs</code> is 68% inline tests (1,303/1,906 lines) — acceptable, revisit only if it grows.</li>
+  <li><code>svsim-render</code> stays a 5-line placeholder by explicit decision.</li>
+</ul>
+</div>
+
+<h2>Recommended order of attack</h2>
+<ol class="steps">
+  <li><strong>Gate the negative corpus.</strong> Must-fail tests over <code>parts/failing</code> in
+      <code>corpus_gate.rs</code> (failure + stable diagnostic fragment); retire/thin <code>test-fails.sh</code>;
+      fix or delete <code>test.bat</code>.</li>
+  <li><strong>Fence the parameterization trap.</strong> Elaboration rejects overrides feeding frozen
+      constructs unless equal to the default; add <code>parts/failing</code> cases (now gated); document
+      the freeze in <code>hir.rs</code> and the wiki.</li>
+  <li><strong>Finish frame-native evaluation.</strong> Remove <code>build_instance_value_table</code> round-trips
+      via a resolver seam over the indexed frame (const contexts keep the map path). Record
+      <code>step_hz</code> before/after.</li>
+  <li><strong>Replace clone-and-compare convergence.</strong> Use the change tracking the pass already
+      computes; revisit the ×8 budget with measured counts. Expect steps 3+4 to move the slowest
+      suites by an order of magnitude.</li>
+  <li><strong>Split <code>frontend/sv_parser.rs</code></strong> into <code>module_structure.rs</code>, <code>statements.rs</code>,
+      <code>expressions.rs</code>, <code>literals.rs</code>, <code>loop_unroll.rs</code> using the <code>sim/</code> pattern.</li>
+  <li><strong>Thread spans through diagnostics.</strong> Convert the ~58 span-less <code>unsupported()</code> sites;
+      prefix evaluator/width errors with module + construct; verify against the gated negative corpus.</li>
+  <li><strong>Truth-up and close.</strong> Fix the stale <code>width.rs</code> wiki row, add a root
+      <code>README.md</code>, add doc examples to <code>Compiler</code>/<code>SimulationSession</code>, refresh
+      <code>./test.sh</code> reports (capturing new <code>step_hz</code>), move this review to <code>plans/completed/</code>.</li>
+</ol>
+
+<h2>Closing assessment</h2>
+<p>The first campaign paid down debts of <em>organization</em>; what remains are debts of
+<em>execution</em>: a runtime doing quadratic work through adapter tables it already has the machinery
+to avoid, a parameterization seam that will silently mis-simulate the first real parameterized core
+someone imports, and a diagnostic surface with no regression protection. The dominant risk is the
+runtime's cost curve — it taxes every test run and blocks corpus growth — but the best first move
+is the cheap verification and fencing work (steps 1–2), which makes the perf surgery (steps 3–4)
+safe. Expected payoff: a gate measured in seconds, silent-wrong turned into hard errors, and no
+production file over ~1,000 lines. None of this calls for new architecture — the design is right;
+the remaining work is finishing what the design already started.</p>
+
+<footer>
+  Canonical review: <code>plans/in-progress/architectural-review.md</code> — this HTML file is a companion
+  rendering. Verified baseline: <code>cargo test</code> 201/201 on 2026-07-06 @ <code>1b08d69</code>.
+</footer>
+
+</body>
+</html>
