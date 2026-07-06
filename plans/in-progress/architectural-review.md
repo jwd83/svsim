@@ -214,6 +214,26 @@ would destabilize the corpus for no present-day gain.
    included). Fix `test.sh` (sap2 typo, add sap3) or reduce it to a thin
    wrapper over the gate; regenerate the committed `docs/tests/` reports or
    remove them in favor of generated-on-demand output.
+
+   *Done 2026-07-06*, in 2 commits:
+   - `7a04e88`: added `crates/svsim/tests/corpus_gate.rs` — 9 tests, one per
+     green `parts/` dir via the public `run_json_test_dir` API; missing or
+     emptied dirs fail rather than passing vacuously. Also added
+     `opt-level = 2` profile overrides for the `svsim` package in dev/test
+     builds: unoptimized simulation is ~9x slower (sap3 alone ~100s debug vs
+     ~11s release), which would have made the gate a 10+ minute run.
+   - `7d387c1`: fixed `test.sh` (sap2 typo, added missing sap3 run,
+     `set -euo pipefail`, header pointing at the cargo gate) and regenerated
+     `docs/tests/` — sap2 now reports its real 9/9 suites (was sap1 data),
+     `report-parts-sap3.json` (4/4) is new.
+
+   Result: full `cargo test` = 187/187 passing (168 unit + 9 gate + 10 CLI)
+   in ~115s wall — faster than the previous 178-test baseline (~4 min pure
+   test time) despite the added gate, thanks to the profile override (unit
+   tests 130s→32s, CLI integration 92s→11s). Deviations: the snapshot's
+   "8 green part dirs" undercounted — there are 9. Deliberately out of scope:
+   `test.bat` remains stale (smaller frictions / step 2), and the committed
+   reports were kept-and-regenerated rather than removed.
 2. **Truth up the guidance docs.** Fix AGENTS.md (`ref/` absence, git-history
    note, test commands), refresh `wiki/architecture/workspace-map.md` and
    `wiki/status/current-state.md` against post-sap3 reality, and move root

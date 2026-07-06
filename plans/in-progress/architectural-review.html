@@ -107,6 +107,15 @@
     font-size: .95rem;
   }
   ol.attack b { display: block; margin-bottom: .15rem; }
+  .done-note {
+    margin: .6rem 0 0;
+    padding: .5rem .75rem;
+    border-left: 3px solid var(--good);
+    background: color-mix(in srgb, var(--good) 8%, transparent);
+    border-radius: 4px;
+    font-size: .9rem;
+  }
+  .done-note b { display: inline; color: var(--good); }
   .footer { margin-top: 3rem; color: var(--muted); font-size: .85rem; border-top: 1px solid var(--border); padding-top: 1rem; }
   ul.tight li { margin: .35rem 0; }
 </style>
@@ -217,7 +226,16 @@ proposed below should run heavy suites in release or a tiered mode.</p>
   Add a core-crate integration test that runs every green <code>parts/</code> dir through
   <code>run_json_test_dir</code> and asserts all-pass (sap2's 9 suites and sap3's 4 included).
   Fix <code>test.sh</code> (sap2 typo, add sap3) or reduce it to a thin wrapper; regenerate the
-  committed <code>docs/tests/</code> reports or remove them in favor of on-demand output.</li>
+  committed <code>docs/tests/</code> reports or remove them in favor of on-demand output.
+  <p class="done-note"><b>Done 2026-07-06</b> in commits <code>7a04e88</code> (gate:
+  <code>crates/svsim/tests/corpus_gate.rs</code>, 9 tests, one per green dir, plus
+  <code>opt-level&nbsp;=&nbsp;2</code> dev/test profile overrides for <code>svsim</code> —
+  unoptimized simulation is ~9&times; slower) and <code>7d387c1</code> (<code>test.sh</code>
+  repaired, reports regenerated: sap2 now truly 9/9, sap3 report added, 4/4). Full
+  <code>cargo test</code>: <b>187/187 in ~115s</b> — faster than the old 178-test baseline
+  (~4&nbsp;min) despite the added gate (unit tests 130s&rarr;32s, CLI 92s&rarr;11s). Note:
+  there are 9 green part dirs, not 8 as the snapshot said. <code>test.bat</code> left for
+  step&nbsp;2; committed reports kept-and-regenerated rather than removed.</p></li>
   <li><b>Truth up the guidance docs.</b> Fix AGENTS.md (<code>ref/</code> absence, git-history
   note, test commands), refresh the wiki workspace map and current-state pages against post-sap3
   reality, and move root plan files into the <code>plans/</code> lifecycle.</li>
