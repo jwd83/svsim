@@ -189,52 +189,6 @@ pub(super) fn logic_replace_slice(
     LogicValue::new(bits, base.width())
 }
 
-pub(super) fn normalize_unknown_bit(bit: LogicBit) -> LogicBit {
-    match bit {
-        LogicBit::Zero => LogicBit::Zero,
-        LogicBit::One => LogicBit::One,
-        LogicBit::X | LogicBit::Z => LogicBit::X,
-    }
-}
-
-pub(super) fn logic_bit_not(bit: LogicBit) -> LogicBit {
-    match bit {
-        LogicBit::Zero => LogicBit::One,
-        LogicBit::One => LogicBit::Zero,
-        LogicBit::X | LogicBit::Z => LogicBit::X,
-    }
-}
-
-pub(super) fn logic_bit_and(left: LogicBit, right: LogicBit) -> LogicBit {
-    match (normalize_unknown_bit(left), normalize_unknown_bit(right)) {
-        (LogicBit::Zero, _) | (_, LogicBit::Zero) => LogicBit::Zero,
-        (LogicBit::One, LogicBit::One) => LogicBit::One,
-        _ => LogicBit::X,
-    }
-}
-
-pub(super) fn logic_bit_or(left: LogicBit, right: LogicBit) -> LogicBit {
-    match (normalize_unknown_bit(left), normalize_unknown_bit(right)) {
-        (LogicBit::One, _) | (_, LogicBit::One) => LogicBit::One,
-        (LogicBit::Zero, LogicBit::Zero) => LogicBit::Zero,
-        _ => LogicBit::X,
-    }
-}
-
-pub(super) fn logic_bit_xor(left: LogicBit, right: LogicBit) -> LogicBit {
-    match (normalize_unknown_bit(left), normalize_unknown_bit(right)) {
-        (LogicBit::Zero, LogicBit::Zero) | (LogicBit::One, LogicBit::One) => LogicBit::Zero,
-        (LogicBit::Zero, LogicBit::One) | (LogicBit::One, LogicBit::Zero) => LogicBit::One,
-        _ => LogicBit::X,
-    }
-}
-
-pub(super) fn logic_value_from_bit(bit: LogicBit) -> LogicValue {
-    let mut bits = LogicBits::zero();
-    bits.set_bit(0, bit);
-    LogicValue::new(bits, 1)
-}
-
 pub(super) fn logic_value_from_ordering(ordering: Option<bool>) -> Value {
     match ordering {
         Some(true) => Value::from_logic(logic_value_from_bit(LogicBit::One), 1),

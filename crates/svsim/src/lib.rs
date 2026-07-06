@@ -5,6 +5,7 @@ pub mod diag;
 pub mod elaborate;
 pub mod frontend;
 pub mod hir;
+mod logic_ops;
 pub mod logic_value;
 mod net_resolve;
 pub mod sim;

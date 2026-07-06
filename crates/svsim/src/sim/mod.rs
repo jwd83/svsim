@@ -18,6 +18,9 @@ use crate::hir::{
     AssignmentKind, BinaryOp, Expr, HirDesign, LValue, ModuleInstanceSummary, ModuleSummary,
     NumericLiteral, PackedRange, PortDirection, ProcBlockKind, Stmt, StorageKind, UnaryOp,
 };
+use crate::logic_ops::{
+    logic_bit_and, logic_bit_not, logic_bit_or, logic_bit_xor, logic_value_from_bit,
+};
 use crate::logic_value::{LogicBit, LogicBits, LogicValue};
 use crate::net_resolve::{DriveStrengthPair, NetDriver, resolve_net};
 use crate::validate::resolve_legacy_rom_data_path;
