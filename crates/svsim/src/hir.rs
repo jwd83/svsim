@@ -361,6 +361,16 @@ pub struct ModuleSummary {
     pub proc_blocks: Vec<ProcBlock>,
     pub instantiations: Vec<ModuleInstanceSummary>,
     pub unsupported: Vec<Diagnostic>,
+    /// Parameters whose lowering-time default value is baked ("frozen") into
+    /// this module's HIR, mapped to a description of the first construct that
+    /// consumed them. Lowering runs once per module, before instantiation, so
+    /// declaration ranges, constant selects, replication counts, unrolled
+    /// `for` loops, pruned `if` branches, and generate conditions are all
+    /// evaluated with parameter *defaults*. Elaboration rejects instance
+    /// overrides that would change a frozen parameter's value, because the
+    /// already-lowered HIR could not reflect them.
+    #[serde(skip)]
+    pub frozen_parameters: std::collections::BTreeMap<String, String>,
 }
 
 impl ModuleSummary {

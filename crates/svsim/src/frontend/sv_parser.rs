@@ -1,4 +1,5 @@
-use std::collections::HashMap;
+use std::cell::RefCell;
+use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 
 use sv_parser::{
@@ -130,6 +131,7 @@ fn lower_ansi_module(
                 ))
             },
         )?;
+    let recording = FrozenParamRecording::begin();
     let mut module = ModuleSummary {
         name,
         style: ModuleDeclStyle::Ansi,
@@ -142,6 +144,7 @@ fn lower_ansi_module(
         proc_blocks: Vec::new(),
         instantiations: Vec::new(),
         unsupported: Vec::new(),
+        frozen_parameters: BTreeMap::new(),
     };
 
     if let Some(param_list) = decl.nodes.0.nodes.5.as_ref() {
@@ -173,6 +176,7 @@ fn lower_ansi_module(
         lower_non_port_module_item(syntax_tree, item, path, &mut module);
     }
 
+    module.frozen_parameters = recording.finish();
     Ok(module)
 }
 
@@ -190,6 +194,7 @@ fn lower_nonansi_module(
                 ))
             },
         )?;
+    let recording = FrozenParamRecording::begin();
     let mut module = ModuleSummary {
         name,
         style: ModuleDeclStyle::NonAnsi,
@@ -206,6 +211,7 @@ fn lower_nonansi_module(
                 .into(),
             span: Some(span_from_locate(path, locate)),
         }],
+        frozen_parameters: BTreeMap::new(),
     };
 
     for item in &decl.nodes.2 {
@@ -214,6 +220,7 @@ fn lower_nonansi_module(
         }
     }
 
+    module.frozen_parameters = recording.finish();
     Ok(module)
 }
 
@@ -751,7 +758,9 @@ fn lower_conditional_generate_construct(
                 module,
                 path,
             )
-            .and_then(|expr| const_eval_param_expr(&expr, &module.parameters));
+            .and_then(|expr| {
+                const_eval_param_expr(&expr, &module.parameters, "a generate `if` condition")
+            });
             match cond {
                 Ok(value) if value.truthy() => {
                     lower_generate_block(syntax_tree, &construct.nodes.2, path, module);
@@ -1184,9 +1193,14 @@ fn lower_unpacked_dimensions(
 ) -> LowerResult<Option<PackedRange>> {
     match unpacked_dimensions {
         [] => Ok(None),
-        [UnpackedDimension::Range(range)] => {
-            lower_constant_range(syntax_tree, &range.nodes.0.nodes.1, path, params).map(Some)
-        }
+        [UnpackedDimension::Range(range)] => lower_constant_range(
+            syntax_tree,
+            &range.nodes.0.nodes.1,
+            path,
+            params,
+            "an unpacked dimension",
+        )
+        .map(Some),
         [UnpackedDimension::Expression(_)] => Err(unsupported(
             "unsized unpacked dimensions are not supported yet",
             None,
@@ -1233,9 +1247,14 @@ fn lower_packed_dimensions(
 ) -> LowerResult<Option<PackedRange>> {
     match packed_dimensions {
         [] => Ok(None),
-        [sv_parser::PackedDimension::Range(range)] => {
-            lower_constant_range(syntax_tree, &range.nodes.0.nodes.1, path, params).map(Some)
-        }
+        [sv_parser::PackedDimension::Range(range)] => lower_constant_range(
+            syntax_tree,
+            &range.nodes.0.nodes.1,
+            path,
+            params,
+            "a packed declaration range",
+        )
+        .map(Some),
         _ => Err(unsupported(
             "multiple packed dimensions are not supported yet",
             None,
@@ -1746,7 +1765,13 @@ fn lower_for_loop_statement(
     for _ in 0..PROCEDURAL_FOR_UNROLL_LIMIT {
         let iteration_module = module_with_const_binding(module, &loop_var, &loop_value);
         let cond = lower_expression(syntax_tree, cond_expr, &iteration_module, path)?;
-        if !const_eval_param_expr(&cond, &iteration_module.parameters)?.truthy() {
+        if !const_eval_param_expr(
+            &cond,
+            &iteration_module.parameters,
+            "a procedural `for` loop bound",
+        )?
+        .truthy()
+        {
             return Ok(fold_loop_statements(statements));
         }
 
@@ -1964,7 +1989,12 @@ fn lower_const_eval_expression(
     path: &Path,
 ) -> LowerResult<Value> {
     let lowered = lower_expression(syntax_tree, expr, module, path)?;
-    const_eval_param_expr(&lowered, &module.parameters).map_err(|_| {
+    const_eval_param_expr(
+        &lowered,
+        &module.parameters,
+        "a procedural `for` loop control",
+    )
+    .map_err(|_| {
         unsupported(
             "procedural `for` loops require constant-bounded expressions",
             None,
@@ -2395,7 +2425,11 @@ fn lower_conditional_statement(
     }
 
     let cond = lower_cond_predicate(syntax_tree, &statement.nodes.2.nodes.1, module, path)?;
-    if let Ok(value) = const_eval_param_expr(&cond, &module.parameters) {
+    if let Ok(value) = const_eval_param_expr(
+        &cond,
+        &module.parameters,
+        "a constant-folded `if` condition",
+    ) {
         return if value.truthy() {
             lower_statement_or_null(syntax_tree, &statement.nodes.3, module, path)
         } else {
@@ -2444,7 +2478,11 @@ fn lower_conditional_else_chain(
     };
 
     let cond = lower_cond_predicate(syntax_tree, &predicate.nodes.1, module, path)?;
-    if let Ok(value) = const_eval_param_expr(&cond, &module.parameters) {
+    if let Ok(value) = const_eval_param_expr(
+        &cond,
+        &module.parameters,
+        "a constant-folded `if` condition",
+    ) {
         return if value.truthy() {
             lower_statement_or_null(syntax_tree, branch, module, path)
         } else {
@@ -2758,7 +2796,13 @@ fn lower_multiple_concatenation(
     path: &Path,
 ) -> LowerResult<Expr> {
     Ok(Expr::Repeat {
-        count: lower_usize_expression(syntax_tree, &concat.nodes.0.nodes.1.0, module, path)?,
+        count: lower_usize_expression(
+            syntax_tree,
+            &concat.nodes.0.nodes.1.0,
+            module,
+            path,
+            "a replication count",
+        )?,
         expr: Box::new(lower_concatenation(
             syntax_tree,
             &concat.nodes.0.nodes.1.1,
@@ -2935,7 +2979,13 @@ fn lower_expr_select(
         [index] => {
             expr = Expr::BitSelect {
                 expr: Box::new(expr),
-                index: lower_usize_expression(syntax_tree, &index.nodes.1, module, path)?,
+                index: lower_usize_expression(
+                    syntax_tree,
+                    &index.nodes.1,
+                    module,
+                    path,
+                    "a constant bit select",
+                )?,
             };
         }
         _ => {
@@ -3091,7 +3141,13 @@ fn lower_select_lvalue(
         [index] => {
             return Ok(LValue::BitSelect {
                 signal: name,
-                index: lower_usize_expression(syntax_tree, &index.nodes.1, module, path)?,
+                index: lower_usize_expression(
+                    syntax_tree,
+                    &index.nodes.1,
+                    module,
+                    path,
+                    "a constant bit select",
+                )?,
             });
         }
         _ => {
@@ -3232,6 +3288,7 @@ fn lower_constant_range(
     range: &ConstantRange,
     path: &Path,
     params: &[ParameterDecl],
+    frozen_construct: &str,
 ) -> LowerResult<PackedRange> {
     Ok(PackedRange {
         msb: lower_usize_constant_expression_with_params(
@@ -3239,12 +3296,14 @@ fn lower_constant_range(
             &range.nodes.0,
             path,
             params,
+            frozen_construct,
         )?,
         lsb: lower_usize_constant_expression_with_params(
             syntax_tree,
             &range.nodes.2,
             path,
             params,
+            frozen_construct,
         )?,
     })
 }
@@ -3278,12 +3337,19 @@ fn lower_part_select_range(
             lower_usize_constant_expression(syntax_tree, &range.nodes.2, path)?,
         )),
         PartSelectRange::IndexedRange(range) => {
-            let base = lower_usize_expression(syntax_tree, &range.nodes.0, module, path)?;
+            let base = lower_usize_expression(
+                syntax_tree,
+                &range.nodes.0,
+                module,
+                path,
+                "an indexed part select",
+            )?;
             let width = lower_usize_constant_expression_with_params(
                 syntax_tree,
                 &range.nodes.2,
                 path,
                 &module.parameters,
+                "an indexed part select",
             )?;
             if width == 0 {
                 return Err(unsupported(
@@ -3318,9 +3384,10 @@ fn lower_usize_expression(
     expr: &Expression,
     module: &ModuleSummary,
     path: &Path,
+    frozen_construct: &str,
 ) -> LowerResult<usize> {
     let lowered = lower_expression(syntax_tree, expr, module, path)?;
-    match const_eval_param_value(&lowered, &module.parameters) {
+    match const_eval_param_value(&lowered, &module.parameters, frozen_construct) {
         Ok(value) => Ok(value),
         Err(_) => Err(unsupported(
             "only constant bit and part select indices are supported",
@@ -3334,7 +3401,13 @@ fn lower_usize_constant_expression(
     expr: &ConstantExpression,
     path: &Path,
 ) -> LowerResult<usize> {
-    lower_usize_constant_expression_with_params(syntax_tree, expr, path, &[])
+    lower_usize_constant_expression_with_params(
+        syntax_tree,
+        expr,
+        path,
+        &[],
+        "a constant expression",
+    )
 }
 
 fn lower_usize_constant_expression_with_params(
@@ -3342,10 +3415,11 @@ fn lower_usize_constant_expression_with_params(
     expr: &ConstantExpression,
     path: &Path,
     params: &[ParameterDecl],
+    frozen_construct: &str,
 ) -> LowerResult<usize> {
     let module = const_eval_module(params);
     let lowered = lower_constant_expression_to_expr(syntax_tree, expr, &module, path)?;
-    const_eval_param_expr(&lowered, params)?
+    const_eval_param_expr(&lowered, params, frozen_construct)?
         .to_usize_checked()
         .ok_or_else(|| unsupported("constant index exceeds host limits", None))
 }
@@ -3363,19 +3437,111 @@ fn const_eval_module(params: &[ParameterDecl]) -> ModuleSummary {
         proc_blocks: Vec::new(),
         instantiations: Vec::new(),
         unsupported: Vec::new(),
+        frozen_parameters: BTreeMap::new(),
     }
 }
 
-fn const_eval_param_expr(expr: &Expr, params: &[ParameterDecl]) -> LowerResult<Value> {
+thread_local! {
+    /// Active per-module collector for `ModuleSummary::frozen_parameters`.
+    /// Installed by the module lowering drivers; single-threaded per module
+    /// because a module is always lowered on one thread, start to finish.
+    static FROZEN_PARAM_RECORDER: RefCell<Option<BTreeMap<String, String>>> =
+        const { RefCell::new(None) };
+}
+
+/// Scope marker for frozen-parameter recording while one module is lowered.
+struct FrozenParamRecording;
+
+impl FrozenParamRecording {
+    fn begin() -> Self {
+        FROZEN_PARAM_RECORDER.with(|recorder| *recorder.borrow_mut() = Some(BTreeMap::new()));
+        FrozenParamRecording
+    }
+
+    fn finish(self) -> BTreeMap<String, String> {
+        FROZEN_PARAM_RECORDER
+            .with(|recorder| recorder.borrow_mut().take())
+            .unwrap_or_default()
+    }
+}
+
+fn record_frozen_params(expr: &Expr, params: &[ParameterDecl], frozen_construct: &str) {
+    if params.is_empty() {
+        return;
+    }
+    let mut names = Vec::new();
+    collect_expr_param_refs(expr, params, &mut names);
+    if names.is_empty() {
+        return;
+    }
+    FROZEN_PARAM_RECORDER.with(|recorder| {
+        if let Some(map) = recorder.borrow_mut().as_mut() {
+            for name in names {
+                map.entry(name)
+                    .or_insert_with(|| frozen_construct.to_string());
+            }
+        }
+    });
+}
+
+fn collect_expr_param_refs(expr: &Expr, params: &[ParameterDecl], names: &mut Vec<String>) {
+    match expr {
+        Expr::Ident(name) => {
+            if params.iter().any(|param| param.name == *name) {
+                names.push(name.clone());
+            }
+        }
+        Expr::Literal(_) => {}
+        Expr::Concat(exprs) => {
+            for expr in exprs {
+                collect_expr_param_refs(expr, params, names);
+            }
+        }
+        Expr::Repeat { expr, .. } => collect_expr_param_refs(expr, params, names),
+        Expr::MemoryRead { index, .. } => collect_expr_param_refs(index, params, names),
+        Expr::BitSelect { expr, .. } => collect_expr_param_refs(expr, params, names),
+        Expr::PartSelect { expr, .. } => collect_expr_param_refs(expr, params, names),
+        Expr::Unary { expr, .. } => collect_expr_param_refs(expr, params, names),
+        Expr::Binary { left, right, .. } => {
+            collect_expr_param_refs(left, params, names);
+            collect_expr_param_refs(right, params, names);
+        }
+        Expr::Ternary {
+            cond,
+            when_true,
+            when_false,
+        } => {
+            collect_expr_param_refs(cond, params, names);
+            collect_expr_param_refs(when_true, params, names);
+            collect_expr_param_refs(when_false, params, names);
+        }
+    }
+}
+
+/// The single choke point for lowering-time constant evaluation. Every
+/// successful call bakes the result into HIR (or prunes/unrolls around it),
+/// so any parameter the expression references is recorded as frozen under
+/// the caller-supplied construct description.
+fn const_eval_param_expr(
+    expr: &Expr,
+    params: &[ParameterDecl],
+    frozen_construct: &str,
+) -> LowerResult<Value> {
     let module = const_eval_module(params);
     let values = resolve_parameter_defaults(params, &module)
         .map_err(|error| unsupported(error.to_string(), None))?;
-    eval_expr(expr, &module, &values, &HashMap::new())
-        .map_err(|error| unsupported(error.to_string(), None))
+    let value = eval_expr(expr, &module, &values, &HashMap::new())
+        .map_err(|error| unsupported(error.to_string(), None))?;
+    record_frozen_params(expr, params, frozen_construct);
+    Ok(value)
 }
 
-fn const_eval_param_value(expr: &Expr, params: &[ParameterDecl]) -> LowerResult<usize> {
-    const_eval_param_expr(expr, params)?
+fn const_eval_param_value(
+    expr: &Expr,
+    params: &[ParameterDecl],
+    frozen_construct: &str,
+) -> LowerResult<usize> {
+    const_eval_param_expr(expr, params, frozen_construct)?
         .to_usize_checked()
         .ok_or_else(|| unsupported("constant value exceeds host limits", None))
 }
@@ -3669,6 +3835,82 @@ mod tests {
         assert!(module.unsupported.is_empty());
         assert_eq!(module.ports.len(), 2);
         assert_eq!(module.continuous_assignments.len(), 1);
+    }
+
+    #[test]
+    fn parse_str_records_frozen_parameters_per_construct() {
+        let frontend = SvParserFrontend::default();
+        let source = frontend
+            .parse_str(
+                PathBuf::from("/virtual/design/frozen_probe.sv"),
+                r#"
+module frozen_probe #(
+    parameter WIDTH = 4,
+    parameter DEPTH = 8,
+    parameter N = 2,
+    parameter SEL = 1,
+    parameter GEN = 0,
+    parameter IDX = 1,
+    parameter REP = 2,
+    parameter OFFSET = 3
+) (
+    input  [WIDTH-1:0] a,
+    input  [3:0] data,
+    output logic [3:0] s,
+    output logic sel_out,
+    output gen_out,
+    output [1:0] r,
+    output [7:0] q
+);
+    logic [3:0] mem [0:DEPTH-1];
+    integer i;
+
+    assign r = {REP{1'b1}};
+    assign q = {4'b0000, data} + OFFSET;
+    wire picked = data[IDX];
+
+    generate
+        if (GEN) begin : g
+            assign gen_out = picked;
+        end else begin : h
+            assign gen_out = ~picked;
+        end
+    endgenerate
+
+    always_comb begin
+        s = 4'b0000;
+        for (i = 0; i < N; i = i + 1) begin
+            s = data;
+        end
+        if (SEL == 1) sel_out = 1'b1;
+        else sel_out = 1'b0;
+    end
+endmodule
+"#,
+            )
+            .expect("parse frozen probe");
+
+        assert_eq!(source.modules.len(), 1);
+        let module = &source.modules[0];
+        assert!(
+            module.unsupported.is_empty(),
+            "unexpected unsupported diagnostics: {:?}",
+            module.unsupported
+        );
+
+        let frozen = &module.frozen_parameters;
+        let get = |name: &str| frozen.get(name).map(String::as_str);
+        assert_eq!(get("WIDTH"), Some("a packed declaration range"));
+        assert_eq!(get("DEPTH"), Some("an unpacked dimension"));
+        assert_eq!(get("N"), Some("a procedural `for` loop bound"));
+        assert_eq!(get("SEL"), Some("a constant-folded `if` condition"));
+        assert_eq!(get("GEN"), Some("a generate `if` condition"));
+        assert_eq!(get("IDX"), Some("a constant bit select"));
+        assert_eq!(get("REP"), Some("a replication count"));
+        assert!(
+            !frozen.contains_key("OFFSET"),
+            "expression-only parameter must not be frozen: {frozen:?}"
+        );
     }
 
     #[test]
