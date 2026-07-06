@@ -11,7 +11,7 @@ oracle.
 - `crates/svsim-cli/`: thin CLI wrapper over `svsim`.
 - `crates/svsim-render/`: deferred rendering crate for truth-table and waveform output.
 - `parts/basic/`, `parts/testing/`, `parts/overture/`, `parts/rv32i/`, `parts/picorv32/`, `parts/sap1/`, `parts/sap2/`, `parts/sap3/`, `parts/simple8/`: SystemVerilog corpus and JSON expectations forming the all-green compatibility suite, enforced by `crates/svsim/tests/corpus_gate.rs`.
-- `parts/failing/`: intentionally failing negative corpus for compile/test failure coverage.
+- `parts/failing/`: intentionally failing negative corpus, gated as must-fail by `corpus_failing_stays_red` in `crates/svsim/tests/corpus_gate.rs`.
 - `docs/`: architecture notes, port compromises, progress reports, and generated corpus reports (`docs/tests/`).
 - `plans/`: plan lifecycle (`in-progress/`, `completed/`).
 - `wiki/`: maintained knowledge base (architecture, status, testing, roadmap).
@@ -46,7 +46,7 @@ Keep public APIs small and explicit. `sv-parser` types should stay inside the fr
 
 ## Testing Guidelines
 
-Use Rust unit tests alongside the code they cover. Name tests after behavior, for example `parse_file_collects_module_name`. Every `parts/` directory except `parts/failing` and `parts/roms` is golden green corpus, gated by `crates/svsim/tests/corpus_gate.rs`; use `parts/failing` for intentional negative coverage when you need to exercise failure paths.
+Use Rust unit tests alongside the code they cover. Name tests after behavior, for example `parse_file_collects_module_name`. Every `parts/` directory except `parts/failing` and `parts/roms` is golden green corpus, gated by `crates/svsim/tests/corpus_gate.rs`; `parts/failing` is the negative corpus, gated as must-fail by the same file (update its diagnostic-fragment tables when you change suites or messages there).
 
 ## Commit & Pull Request Guidelines
 

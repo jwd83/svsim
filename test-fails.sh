@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# Manual failure-report inspector: runs JSON suites (default: parts/failing)
+# and pretty-prints per-suite/per-case failures for debugging.
+# This is NOT the regression gate. `cargo test` gates both the green corpus
+# and the negative corpus (crates/svsim/tests/corpus_gate.rs,
+# corpus_failing_stays_red).
 set -euo pipefail
 
 if [[ $# -eq 0 ]]; then
@@ -46,7 +51,7 @@ def normalize_directories(payload: dict) -> list[dict]:
     return [{"directory": payload.get("directory", "<unknown>"), "report": report}]
 
 
-def pluralize(count: int, singular: str, plural: str | None = None) -> str:
+def pluralize(count: int, singular: str, plural=None) -> str:
     if count == 1:
         return singular
     return plural or f"{singular}s"
