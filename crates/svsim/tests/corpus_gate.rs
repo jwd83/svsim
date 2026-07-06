@@ -115,6 +115,14 @@ const FAILING_SUITES_WITH_ERROR: &[(&str, &str)] = &[
         "missing_child_module.json",
         "module 'missing_dependency' was not found",
     ),
+    (
+        "param_override_frozen_loop.json",
+        "parameter 'N' of module 'loop_leaf' is frozen into a procedural `for` loop bound",
+    ),
+    (
+        "param_override_frozen_range.json",
+        "parameter 'WIDTH' of module 'frozen_leaf' is frozen into a packed declaration range",
+    ),
     ("syntax_error.json", "failed to parse"),
 ];
 

@@ -13,6 +13,8 @@ test in the same change.
 - `malformed_json.sv` + `malformed_json.json`: successful compile with an intentionally broken JSON test file.
 - `duplicate_instance_names.sv` + `duplicate_instance_names.json`: compile failure from repeated instance names in the same module.
 - `constant_memory_index_oob.sv` + `constant_memory_index_oob.json`: compile failure from a constant memory access outside the declared array bounds.
+- `param_override_frozen_range.sv` + `param_override_frozen_range.json`: elaboration failure from a non-default override of a parameter frozen into a port range at lowering time.
+- `param_override_frozen_loop.sv` + `param_override_frozen_loop.json`: elaboration failure from a non-default override of a parameter frozen into an unrolled `for` loop bound.
 
 To inspect the failure reports by hand:
 

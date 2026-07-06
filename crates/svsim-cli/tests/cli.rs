@@ -400,10 +400,10 @@ fn cli_reports_expected_failures_for_failing_corpus() {
 
     let json: Value = serde_json::from_slice(&output.stdout).expect("parse stdout json");
     assert_eq!(json["report"]["passed"], 0);
-    assert_eq!(json["report"]["total"], 6);
+    assert_eq!(json["report"]["total"], 8);
 
     let suites = json["report"]["suites"].as_array().expect("suite array");
-    assert_eq!(suites.len(), 6);
+    assert_eq!(suites.len(), 8);
 
     let constant_one_mismatch = suites
         .iter()
