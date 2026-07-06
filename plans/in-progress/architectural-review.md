@@ -12,8 +12,9 @@ on is quietly broken (`test.sh` never actually tests `parts/sap2`, and
 `parts/sap3` is untested by any script). The recommended order of attack is:
 fix verification first so every later change is provable, then split `sim.rs`
 along its existing seams, then consolidate the three parallel expression
-evaluators. Related plans: [`plan.md`](../../plan.md) (sap2/inout campaign,
-mostly landed), [`plan-sap3.done.md`](../../plan-sap3.done.md) (completed).
+evaluators. Related plans: [`plan-sap2-inout.md`](../completed/plan-sap2-inout.md)
+(sap2/inout campaign, landed) and [`plan-sap3.md`](../completed/plan-sap3.md)
+(completed) — both moved from the repo root into the plans lifecycle in step 2.
 
 ## Snapshot
 
@@ -239,6 +240,31 @@ would destabilize the corpus for no present-day gain.
    `wiki/status/current-state.md` against post-sap3 reality, and move root
    plan files into the `plans/` lifecycle (`plan-sap3.done.md` →
    `plans/completed/`).
+
+   *Done 2026-07-06*, in 1 commit:
+   - AGENTS.md: removed the absent-`ref/` references and the "no usable Git
+     history" claim; documented the 9-dir gated green corpus, the corpus gate
+     as the gating check, `test.sh`'s report-regeneration role, and the
+     dev/test `opt-level = 2` override.
+   - Plans lifecycle: `plan.md` → `plans/completed/plan-sap2-inout.md`,
+     `plan-sap3.done.md` → `plans/completed/plan-sap3.md` (rewrote the 35
+     relative links inside the latter for the new location).
+   - Wiki: refreshed `status/current-state.md` (2026-07-06 verified snapshot),
+     `architecture/workspace-map.md`, `overview.md`, `index.md`,
+     `testing/corpus-map.md`, `sources/source-map.md`,
+     `architecture/compiler-pipeline.md`, `ports/sap2.md`, and the
+     `inout`/`sap2` milestone page (dated completion update); appended a
+     `log.md` entry per wiki convention.
+
+   Result: docs-only change; test baseline unchanged from step 1 (187/187).
+   Surprises: the wiki was *ahead* of this review in one place — public
+   top-level `inout` is supported (verified: `025-TopLevelInout` and
+   `sap2_inout_top` sit in the gated corpus, and `validate.rs` no longer
+   rejects it), so `plan.md`'s campaign was complete rather than "mostly
+   landed" and moved to `completed/`, not `in-progress/`. Also fixed three
+   dangling links to a renamed `plan-next.md` in `roadmap/open-edges.md`.
+   Deliberately untouched: `docs/progress/*` and prior `wiki/log.md` entries
+   (historical/append-only), and `test.bat`.
 3. **Split `sim.rs` into a `sim/` module directory** along existing seams:
    `value.rs`, `eval.rs`, `state.rs`, `memory.rs`, `session.rs`, moving inline
    tests with their subjects. Public API (`SimulationSession` re-export)

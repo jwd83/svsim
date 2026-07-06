@@ -4,7 +4,7 @@
 
 - [overview.md](./overview.md): what `svsim` is, what it is trying to become, and how to approach the repo.
 - [status/current-state.md](./status/current-state.md): the latest verified repository snapshot captured by this wiki.
-- [roadmap/inout-and-sap2-milestone.md](./roadmap/inout-and-sap2-milestone.md): the current four-state / internal-`inout` / `sap2` milestone and what is still intentionally locked.
+- [roadmap/inout-and-sap2-milestone.md](./roadmap/inout-and-sap2-milestone.md): the completed four-state / `inout` / `sap2` milestone and what each snapshot held back.
 - [sources/source-map.md](./sources/source-map.md): the raw-source inventory this wiki is built from.
 - [log.md](./log.md): append-only maintenance history for the wiki itself.
 
@@ -26,5 +26,5 @@
 
 ## Status And Roadmap
 
-- [roadmap/inout-and-sap2-milestone.md](./roadmap/inout-and-sap2-milestone.md): the active milestone summary derived from `plan.md`, recent code, and verified command output.
+- [roadmap/inout-and-sap2-milestone.md](./roadmap/inout-and-sap2-milestone.md): the completed milestone summary derived from [../plans/completed/plan-sap2-inout.md](../plans/completed/plan-sap2-inout.md), the code, and verified command output.
 - [roadmap/open-edges.md](./roadmap/open-edges.md): the main unsupported constructs, architecture gaps, and next bounded follow-ups.

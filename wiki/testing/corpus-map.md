@@ -18,20 +18,22 @@ The `parts/` tree is the compatibility surface for the rewrite. Different direct
 
 ## Green Surface vs Auxiliary Surface
 
-- The official all-green compatibility surface is `parts/basic`, `parts/testing`, `parts/overture`, and `parts/rv32i`.
-- `parts/picorv32` is compile-green and also has a curated executable harness surface, but it is still best thought of as an advanced demo and stress target rather than the base compatibility contract.
-- `parts/sap2` is a runnable auxiliary corpus that specifically targets the new four-state/internal-`inout` work; it is useful, but it is not yet part of the official green contract.
-- `parts/sap1` and `parts/simple8` remain valuable design examples without being the canonical gate for every change.
+- Since 2026-07-06 every directory above except `parts/failing` and
+  `parts/roms` is part of the gated green surface:
+  [`crates/svsim/tests/corpus_gate.rs`](../../crates/svsim/tests/corpus_gate.rs)
+  runs each one under `cargo test` and fails on any red suite (or on a
+  missing/empty directory). The older four-directory "official" set
+  (`basic`, `testing`, `overture`, `rv32i`) is a historical distinction.
+- `parts/picorv32` remains the most advanced stress target: the upstream core
+  compiles, and its harness exercises a curated executable slice.
+- `parts/failing` is the negative corpus and must stay out of the green gate.
 
 ## Practical Commands
 
 ```text
-cargo run -q -p svsim-cli -- --compile-dir parts/basic --compile-dir parts/testing --compile-dir parts/overture --compile-dir parts/rv32i
-cargo run -q -p svsim-cli -- --json-test-dir parts/basic --json-test-dir parts/testing --json-test-dir parts/overture --json-test-dir parts/rv32i
-cargo run -q -p svsim-cli -- --json-test-dir parts/picorv32
-cargo run -q -p svsim-cli -- --json-test-dir parts/sap2
-cargo run -q -p svsim-cli -- --json-test-dir parts/sap3
-cargo run -q -p svsim-cli -- --compile-dir parts/failing
+cargo test                       # green-corpus gate + unit + CLI tests
+./test.sh                        # regenerate docs/tests/report-parts-*.json
+cargo run -q -p svsim-cli -- --json-test-dir parts/sap3   # one dir ad hoc
 cargo run -q -p svsim-cli -- --json-test-dir parts/failing
 ```
 

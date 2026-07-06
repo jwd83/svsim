@@ -238,7 +238,15 @@ proposed below should run heavy suites in release or a tiered mode.</p>
   step&nbsp;2; committed reports kept-and-regenerated rather than removed.</p></li>
   <li><b>Truth up the guidance docs.</b> Fix AGENTS.md (<code>ref/</code> absence, git-history
   note, test commands), refresh the wiki workspace map and current-state pages against post-sap3
-  reality, and move root plan files into the <code>plans/</code> lifecycle.</li>
+  reality, and move root plan files into the <code>plans/</code> lifecycle.
+  <p class="done-note"><b>Done 2026-07-06</b>, one docs-only commit: AGENTS.md truthed up
+  (stale <code>ref/</code> and git-history claims removed; gated 9-dir corpus, corpus gate, and
+  opt-level override documented); <code>plan.md</code> &rarr;
+  <code>plans/completed/plan-sap2-inout.md</code> and <code>plan-sap3.done.md</code> &rarr;
+  <code>plans/completed/plan-sap3.md</code>; nine wiki pages refreshed + log entry appended.
+  Surprise: public top-level <code>inout</code> is already supported (verified in the gated
+  corpus), so the sap2/inout campaign was fully complete, not &ldquo;mostly landed.&rdquo;
+  Test baseline unchanged (187/187).</p></li>
   <li><b>Split <code>sim.rs</code> into a <code>sim/</code> module directory</b> along existing
   seams: <code>value.rs</code>, <code>eval.rs</code>, <code>state.rs</code>, <code>memory.rs</code>,
   <code>session.rs</code>, moving inline tests with their subjects. Public API unchanged;

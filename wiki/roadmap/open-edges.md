@@ -4,9 +4,9 @@ The project is healthy, but it is not "done." The most important gaps are no lon
 
 ## Near-Term Bounded Targets
 
-- ~~Decide when, or whether, to remove the intentional public/top-level `inout` rejection now that the internal runtime slice and `sap2` auxiliary corpus are working.~~ (resolved 2026-04-16; public top-level `inout` is now supported, see [`../../plan-next.md`](../../plan-next.md) Slice 3.)
-- ~~Extend the `sap2` shared-bus structure beyond the current leaf-driver slice if a closer import of the original machine partitioning is worth the added complexity.~~ (resolved 2026-04-16; register tiles fold the bus drivers into the register modules, see [`../../plan-next.md`](../../plan-next.md) Slice 2.)
-- ~~Decide whether HDL literal lowering should carry explicit `x` / `z` digits natively instead of leaning on floated nets for some internal-bus patterns.~~ (resolved 2026-04-16; native four-state literals landed with [`../../plan-next.md`](../../plan-next.md) Slice 1.)
+- ~~Decide when, or whether, to remove the intentional public/top-level `inout` rejection now that the internal runtime slice and `sap2` auxiliary corpus are working.~~ (resolved 2026-04-16; public top-level `inout` is now supported, see [`plan-sap3.md`](../../plans/completed/plan-sap3.md) Slice 3.)
+- ~~Extend the `sap2` shared-bus structure beyond the current leaf-driver slice if a closer import of the original machine partitioning is worth the added complexity.~~ (resolved 2026-04-16; register tiles fold the bus drivers into the register modules, see [`plan-sap3.md`](../../plans/completed/plan-sap3.md) Slice 2.)
+- ~~Decide whether HDL literal lowering should carry explicit `x` / `z` digits natively instead of leaning on floated nets for some internal-bus patterns.~~ (resolved 2026-04-16; native four-state literals landed with [`plan-sap3.md`](../../plans/completed/plan-sap3.md) Slice 1.)
 
 ## Language And Runtime Gaps
 
@@ -32,7 +32,7 @@ The project is healthy, but it is not "done." The most important gaps are no lon
 
 ## Sources
 
-- [../../plan.md](../../plan.md)
+- [../../plan.md](../../plans/completed/plan-sap2-inout.md)
 - [../../docs/rust-port-plan.md](../../docs/rust-port-plan.md)
 - [../../docs/progress/progress-report-2026-03-20.md](../../docs/progress/progress-report-2026-03-20.md)
 - [../../docs/sap1-port-compromises.md](../../docs/sap1-port-compromises.md)

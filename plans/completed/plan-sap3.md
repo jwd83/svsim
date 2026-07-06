@@ -30,7 +30,7 @@
   No follow-ups needed. Slice 4 is cleanly landed, reproducible, and consistent with plan-next.md:241-270.  
 # Next Plan: Finish The SAP Port Story
 
-This plan picks up where [`plan.md`](./plan.md) left off. The four-state /
+This plan picks up where [`plan.md`](plan-sap2-inout.md) left off. The four-state /
 internal-`inout` / `sap2` milestone has effectively landed; the question now is
 what is the next concrete, defensible step that moves the SAP-1 redesign and
 SAP-2 port toward "completed or meaningfully moved" without overreaching.
@@ -55,7 +55,7 @@ Combined executable surface (green + auxiliary): **186 / 186**.
 
 ### Wiki vs Code Drift
 
-- [`wiki/status/current-state.md`](./wiki/status/current-state.md) reports
+- [`wiki/status/current-state.md`](../../wiki/status/current-state.md) reports
   `parts/testing` at `50/50`. Actual today is `52/52` (`022-FourStateControl`,
   `023-FourStateBoundary`, `parameter_defaults.json`, etc.). The wiki snapshot
   is from 2026-04-12 and is mildly stale on counts but otherwise accurate.
@@ -64,7 +64,7 @@ Combined executable surface (green + auxiliary): **186 / 186**.
 - All other architectural claims in the wiki match the code (four-state runtime
   values, elaborated structural runtime, internal whole-net `inout`, public
   top-level `inout` still rejected at
-  [`crates/svsim/src/validate.rs:207-214`](./crates/svsim/src/validate.rs)).
+  [`crates/svsim/src/validate.rs:207-214`](../../crates/svsim/src/validate.rs)).
 
 ### Plan Unlock Bar Status
 
@@ -72,9 +72,9 @@ The `plan.md` "Public `inout` Unlock Bar" lists six conditions. All six now
 read as satisfied:
 
 1. Elaboration owns typed ports, net kinds, storage kinds, instance bindings -
-   live in [`crates/svsim/src/elaborate.rs`](./crates/svsim/src/elaborate.rs).
+   live in [`crates/svsim/src/elaborate.rs`](../../crates/svsim/src/elaborate.rs).
 2. Per-bit net resolution and shared structural connectivity - live in
-   [`crates/svsim/src/net_resolve.rs`](./crates/svsim/src/net_resolve.rs) and
+   [`crates/svsim/src/net_resolve.rs`](../../crates/svsim/src/net_resolve.rs) and
    the structural rewiring inside `sim.rs`.
 3. Four-state expression and control semantics - live in `sim.rs`.
 4. Public API, CLI, JSON, traces, reports round-trip literal `x`/`z` and `?` -
@@ -86,11 +86,11 @@ read as satisfied:
 The remaining lock is policy, not capability: top-level `inout` is still
 rejected by `validate_supported_port_directions` and the sim's child-binding
 path also returns `Unsupported` for `Inout` when no parent net alias exists
-([`crates/svsim/src/sim.rs:734`](./crates/svsim/src/sim.rs)).
+([`crates/svsim/src/sim.rs:734`](../../crates/svsim/src/sim.rs)).
 
 ## Where SAP-2 Stands Today
 
-[`parts/sap2/sap2.sv`](./parts/sap2/sap2.sv) keeps the same harness contract as
+[`parts/sap2/sap2.sv`](../../parts/sap2/sap2.sv) keeps the same harness contract as
 SAP-1 but rewires the *output* side of every bus producer through real `inout`
 leaf drivers. The remaining gaps to "feels like the original Ben Eater shared
 bus" are:
@@ -103,7 +103,7 @@ bus" are:
 - **Idiomatic high-Z**: the bus driver currently has to use a separately
   declared, never-driven `wire [7:0] float_bus` to obtain `z`, instead of
   writing `assign bus = en_read ? value : 8'bz;`. That is because
-  [`parse_based_value`](./crates/svsim/src/frontend/sv_parser.rs:3733) in the
+  [`parse_based_value`](../../crates/svsim/src/frontend/sv_parser.rs:3733) in the
   frontend silently coerces `x` and `z` digits to `0` via
   `coerce_unknown_digits_to_zero`. Today's `NumericLiteral.bits` is a 2-state
   `BitValue`, so `8'bz` lowers as `8'b0`.
@@ -118,8 +118,8 @@ Land **native four-state literal lowering** as the next slice. Of the open
 gaps, this one is the smallest change with the highest leverage:
 
 - It removes the `float_bus` workaround from
-  [`parts/sap2/sap2.sv`](./parts/sap2/sap2.sv) and
-  [`parts/sap2/sap2_bus_semantics.sv`](./parts/sap2/sap2_bus_semantics.sv) so
+  [`parts/sap2/sap2.sv`](../../parts/sap2/sap2.sv) and
+  [`parts/sap2/sap2_bus_semantics.sv`](../../parts/sap2/sap2_bus_semantics.sv) so
   the source matches what a real Verilog author would write.
 - It is a near-prerequisite for any honest top-level `inout` story, because
   external testbenches conventionally release a bus with `8'bz`.
@@ -172,11 +172,11 @@ Exit:
 ### Slice 2: SAP-2 Register-Tile Partitioning
 
 **Status: landed 2026-04-16.** `register_tile`, `register_pc_tile`, and
-`register_instr_tile` now live in [`parts/sap2/sap2.sv`](./parts/sap2/sap2.sv)
+`register_instr_tile` now live in [`parts/sap2/sap2.sv`](../../parts/sap2/sap2.sv)
 and absorb the former `reg_a_bus`, `pc_bus`, and `instr_bus` driver siblings.
 `machine` now instantiates 3 `bus_driver` instances (external, alu, mem) instead
 of 6. `register` is still used for the write-only `b` and `out_r` (which never
-drive the bus). Added [`parts/sap2/sap2_register_tile.{sv,json}`](./parts/sap2)
+drive the bus). Added [`parts/sap2/sap2_register_tile.{sv,json}`](../../parts/sap2)
 covering en_write capture, en_read drive, floating bus, and contention.
 Verified: `cargo test` 178/178; `parts/basic+testing+overture+rv32i` 156/156;
 `parts/sap1` 6/6; `parts/simple8` 5/5; `parts/picorv32` 13/13; `parts/sap2`
@@ -192,7 +192,7 @@ internally.
 Scope:
 
 - Introduce `register_tile`, `register_pc_tile`, and `register_instr_tile`
-  modules in [`parts/sap2/sap2.sv`](./parts/sap2/sap2.sv).
+  modules in [`parts/sap2/sap2.sv`](../../parts/sap2/sap2.sv).
 - Drop the now-redundant `bus_driver reg_a_bus` and `bus_driver pc_bus`
   instances. Keep separate `external_bus`, `alu_bus`, and `mem_bus` driver
   instances since those represent non-register sources.
@@ -216,15 +216,15 @@ released), and `collect_outputs_logic` surfaces `Inout` ports in the post-settle
 output map. The JSON harness required no format change: `LogicValue`'s
 deserializer already accepted four-state strings, so tests can drive
 `"bus": "8'bz"` to release or `"bus": 165` to contend. Added
-[`parts/testing/025-TopLevelInout.{sv,json}`](./parts/testing) (1-bit top-level
+[`parts/testing/025-TopLevelInout.{sv,json}`](../../parts/testing) (1-bit top-level
 `inout` with release / drive-low / drive-high / contention coverage) and
-[`parts/sap2/sap2_inout_top.{sv,json}`](./parts/sap2) (CPU-shaped sibling that
+[`parts/sap2/sap2_inout_top.{sv,json}`](../../parts/sap2) (CPU-shaped sibling that
 exposes the 8-bit bus directly to the harness). Updated
-[`docs/sap1-port-compromises.md`](./docs/sap1-port-compromises.md),
-[`wiki/architecture/runtime-and-state.md`](./wiki/architecture/runtime-and-state.md),
-[`wiki/testing/corpus-map.md`](./wiki/testing/corpus-map.md),
-[`wiki/roadmap/open-edges.md`](./wiki/roadmap/open-edges.md), and
-[`wiki/status/current-state.md`](./wiki/status/current-state.md). Verified:
+[`docs/sap1-port-compromises.md`](../../docs/sap1-port-compromises.md),
+[`wiki/architecture/runtime-and-state.md`](../../wiki/architecture/runtime-and-state.md),
+[`wiki/testing/corpus-map.md`](../../wiki/testing/corpus-map.md),
+[`wiki/roadmap/open-edges.md`](../../wiki/roadmap/open-edges.md), and
+[`wiki/status/current-state.md`](../../wiki/status/current-state.md). Verified:
 `cargo test` 178/178; `parts/basic+testing+overture+rv32i` 157/157 (includes
 new 025); `parts/sap1` 6/6; `parts/simple8` 5/5; `parts/picorv32` 13/13;
 `parts/sap2` 9/9 (the 7 program suites plus the `sap2_register_tile` and
@@ -237,7 +237,7 @@ runtime + validation to allow top-level `inout`.
 Scope:
 
 - Remove the top-level rejection in
-  [`validate.rs::validate_supported_port_directions`](./crates/svsim/src/validate.rs)
+  [`validate.rs::validate_supported_port_directions`](../../crates/svsim/src/validate.rs)
   for `Inout`. Internal whole-net binding rules still apply for child
   instantiations.
 - In `sim.rs`, add a top-level `inout` path. Treat each external `inout`
@@ -248,8 +248,8 @@ Scope:
   expressed as four-state strings (already supported for outputs), so a
   harness can drive `"bus": "8'bz"` to release the bus or `"bus": "8'b1010"`
   to drive a contender. Document the convention in
-  [`docs/sap1-port-compromises.md`](./docs/sap1-port-compromises.md) and
-  [`wiki/architecture/runtime-and-state.md`](./wiki/architecture/runtime-and-state.md).
+  [`docs/sap1-port-compromises.md`](../../docs/sap1-port-compromises.md) and
+  [`wiki/architecture/runtime-and-state.md`](../../wiki/architecture/runtime-and-state.md).
 - Add a focused `parts/testing/025-TopLevelInout.{sv,json}` that drives a
   single-bit shared bus from both the harness and an internal driver, covering
   release / drive-low / drive-high / contention cases.
@@ -270,10 +270,10 @@ Exit:
 
 ### Slice 4 (Optional): SAP-3 Sketch
 
-**Status: landed 2026-04-17.** Added [`parts/sap3`](./parts/sap3/) as a
+**Status: landed 2026-04-17.** Added [`parts/sap3`](../../parts/sap3/) as a
 richer CPU sketch on top of the existing simulator surface. The simulator
 itself was not touched; the slice lives entirely in the corpus. Changes
-versus [`parts/sap2/sap2.sv`](./parts/sap2/sap2.sv):
+versus [`parts/sap2/sap2.sv`](../../parts/sap2/sap2.sv):
 
 - Three new opcodes (`AND = 0xB`, `OR = 0xC`, `XOR = 0xD`) served by a new
   `alu` module that takes `alu_op_and` / `alu_op_or` / `alu_op_xor` control
@@ -288,9 +288,9 @@ versus [`parts/sap2/sap2.sv`](./parts/sap2/sap2.sv):
 - `register_tile`, `register_pc_tile`, `register_instr_tile`, and
   `bus_driver` are carried over unchanged from `sap2.sv`.
 
-Added [`parts/sap3/gen_svsim.py`](./parts/sap3/gen_svsim.py) as a single
+Added [`parts/sap3/gen_svsim.py`](../../parts/sap3/gen_svsim.py) as a single
 generator that owns the microcode, assembles `.s` sources in
-[`parts/sap3/examples`](./parts/sap3/examples/), simulates the CPU
+[`parts/sap3/examples`](../../parts/sap3/examples/), simulates the CPU
 cycle-by-cycle, and emits JSON suites in the existing shape. Four programs
 are generated: `add3to42`, `fib` (ported from SAP-1/-2), `logic_mask` and
 `parity` (exercising AND / OR / XOR).
@@ -302,7 +302,7 @@ Verified: `cargo test --workspace` 178/178; `parts/basic+testing+overture+rv32i`
 ## Validation Commands
 
 After each slice, the green compatibility surface is the
-[`AGENTS.md`](./AGENTS.md) one:
+[`AGENTS.md`](../../AGENTS.md) one:
 
 ```text
 cargo fmt --check
@@ -355,14 +355,14 @@ surfaces at their current pass counts.
 
 ## Cross-References
 
-- Active milestone backstory: [`plan.md`](./plan.md)
-- Corpus inventory: [`wiki/testing/corpus-map.md`](./wiki/testing/corpus-map.md)
+- Active milestone backstory: [`plan.md`](plan-sap2-inout.md)
+- Corpus inventory: [`wiki/testing/corpus-map.md`](../../wiki/testing/corpus-map.md)
 - Architectural snapshot:
-  [`wiki/architecture/runtime-and-state.md`](./wiki/architecture/runtime-and-state.md)
+  [`wiki/architecture/runtime-and-state.md`](../../wiki/architecture/runtime-and-state.md)
 - Open simulator gaps:
-  [`wiki/roadmap/open-edges.md`](./wiki/roadmap/open-edges.md)
+  [`wiki/roadmap/open-edges.md`](../../wiki/roadmap/open-edges.md)
 - Original SAP-1 import friction:
-  [`docs/sap1-port-compromises.md`](./docs/sap1-port-compromises.md)
+  [`docs/sap1-port-compromises.md`](../../docs/sap1-port-compromises.md)
 - Current SAP-2 source:
-  [`parts/sap2/sap2.sv`](./parts/sap2/sap2.sv) and
-  [`parts/sap2/sap2_bus_semantics.sv`](./parts/sap2/sap2_bus_semantics.sv)
+  [`parts/sap2/sap2.sv`](../../parts/sap2/sap2.sv) and
+  [`parts/sap2/sap2_bus_semantics.sv`](../../parts/sap2/sap2_bus_semantics.sv)

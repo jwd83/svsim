@@ -1,6 +1,6 @@
 # Four-State, Inout, And SAP-2 Milestone
 
-This page answers one question: what has actually landed from the current zero-delay net-semantics milestone, and what is still intentionally held back?
+This page answers one question: what actually landed from the zero-delay net-semantics milestone, and what was still held back at each snapshot? The milestone is now complete; see the 2026-07-06 update below.
 
 ## Landed And Verified On 2026-04-12
 
@@ -18,6 +18,18 @@ This page answers one question: what has actually landed from the current zero-d
 - Internal `inout` is still a bounded feature: only whole parent net bindings are supported, not part selects, memories, or arbitrary expressions.
 - The milestone is still zero-delay only; switch primitives, pull devices, and broader event/timing semantics remain deferred.
 
+## Update 2026-07-06: Milestone Complete
+
+- Public/top-level `inout` is supported and regression-tested in the gated
+  green corpus (`parts/testing/025-TopLevelInout`, `parts/sap2/sap2_inout_top`);
+  the "remains rejected" state above is historical.
+- `parts/sap3` followed and completed as its own campaign
+  ([../../plans/completed/plan-sap3.md](../../plans/completed/plan-sap3.md)).
+- The campaign plan moved from the repo root to
+  [../../plans/completed/plan-sap2-inout.md](../../plans/completed/plan-sap2-inout.md).
+  Zero-delay-only scoping (no switch primitives, pull devices, or event/timing
+  semantics) still holds; those remain open edges.
+
 ## Why SAP-2 Matters
 
 - `sap1` documented a major product gap: imported shared-bus designs had to be rewritten into explicit mux structures.
@@ -28,11 +40,11 @@ This page answers one question: what has actually landed from the current zero-d
 
 - Is the current leaf-only shared-bus slice enough, or should more of the SAP-2 machine move onto the `inout` fabric?
 - Should HDL literal lowering learn to carry explicit `x` / `z` digits natively instead of relying on floated nets in some internal-bus patterns?
-- At what point does keeping public/top-level `inout` rejected become more confusing than helpful?
+- ~~At what point does keeping public/top-level `inout` rejected become more confusing than helpful?~~ (resolved: public top-level `inout` landed; see the 2026-07-06 update above.)
 
 ## Sources
 
-- [../../plan.md](../../plan.md)
+- [../../plans/completed/plan-sap2-inout.md](../../plans/completed/plan-sap2-inout.md)
 - [../../parts/sap2/README.md](../../parts/sap2/README.md)
 - [../../parts/sap2/sap2.sv](../../parts/sap2/sap2.sv)
 - [../../parts/sap2/sap2_bus_semantics.sv](../../parts/sap2/sap2_bus_semantics.sv)

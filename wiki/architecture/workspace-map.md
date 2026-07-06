@@ -9,10 +9,10 @@ The workspace is intentionally small. Most of the simulator lives in one core cr
 | [`../../crates/svsim`](../../crates/svsim) | Core library crate. Parsing, HIR, validation, design handles, simulation, and JSON harness execution live here. |
 | [`../../crates/svsim-cli`](../../crates/svsim-cli) | Thin CLI wrapper over the library APIs. |
 | [`../../crates/svsim-render`](../../crates/svsim-render) | Placeholder render crate. Current status is literally `"rendering deferred"`. |
-| [`../../parts`](../../parts) | Compatibility corpus, demo designs, harness assets, and negative tests. |
-| [`../../docs`](../../docs) | Plans, progress reports, and port-specific design notes. |
+| [`../../parts`](../../parts) | Compatibility corpus, demo designs, harness assets, and negative tests. Green dirs are gated by [`corpus_gate.rs`](../../crates/svsim/tests/corpus_gate.rs). |
+| [`../../docs`](../../docs) | Progress reports, port-specific design notes, and generated corpus reports (`docs/tests/`). |
+| [`../../plans`](../../plans) | Plan lifecycle: `in-progress/` and `completed/`. The active architectural review lives here. |
 | [`../../wiki`](../../wiki) | Persistent synthesized knowledge layer that summarizes and cross-links the code and corpus. |
-| [`../../ref`](../../ref) | Python reference implementation and historical planning context. |
 
 ## Main `svsim` Modules
 
@@ -31,6 +31,7 @@ The workspace is intentionally small. Most of the simulator lives in one core cr
 | [`../../crates/svsim/src/diag.rs`](../../crates/svsim/src/diag.rs) | Diagnostics and top-level error types. |
 | [`../../crates/svsim/src/width.rs`](../../crates/svsim/src/width.rs) | Width inference plus shared shift/sign-extension helpers. |
 | [`../../crates/svsim/src/bit_value.rs`](../../crates/svsim/src/bit_value.rs) | Limb-backed bit-vector type used by validation and simulation. |
+| [`../../crates/svsim/tests/corpus_gate.rs`](../../crates/svsim/tests/corpus_gate.rs) | Green-corpus gate: one test per green `parts/` directory; `cargo test` fails if any regression suite fails. |
 
 ## Practical Reading Order
 

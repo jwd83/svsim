@@ -17,3 +17,11 @@
 - Verified `cargo run -q -p svsim-cli -- --json-test-dir parts/picorv32`: pass (`13/13`).
 - Verified `cargo run -q -p svsim-cli -- --json-test-dir parts/sap2`: pass (`7/7`).
 - Updated the status, architecture, roadmap, and corpus pages to match the verified April 12 state and added dedicated `sap2` and milestone pages.
+
+## [2026-07-06] lint | corpus gate and doc truth-up (architectural review steps 1-2)
+
+- Verified `cargo test`: pass (`187/187` — `168` `svsim` unit tests, `9` new green-corpus gate tests in `crates/svsim/tests/corpus_gate.rs`, `10` CLI tests).
+- Recorded that `test.sh` had been writing sap1's results into `report-parts-sap2.json` and omitting `parts/sap3` entirely; the script is fixed and all `docs/tests/` reports were regenerated (sap2 truly `9/9`, sap3 `4/4` added).
+- Moved root plan files into the plans lifecycle: `plan.md` → `plans/completed/plan-sap2-inout.md`, `plan-sap3.done.md` → `plans/completed/plan-sap3.md`; updated wiki links accordingly (append-only history entries left as written).
+- Refreshed `status/current-state.md` (2026-07-06 snapshot), `architecture/workspace-map.md` (dropped the absent `ref/`, added `plans/` and the corpus gate), `overview.md`, `index.md`, `sources/source-map.md`, and marked the `inout`/`sap2` milestone page complete (public top-level `inout` is supported).
+- AGENTS.md truth-up in the same pass: removed stale `ref/` and "no usable Git history" claims, documented the corpus gate and the dev/test `opt-level = 2` override for `svsim`.

@@ -10,9 +10,12 @@ The `sap2` corpus is the first checked-in proof that `svsim` can support a more 
 
 ## What Is Still Constrained
 
-- The harness-visible top module stays output-only; public/top-level `inout` remains intentionally rejected.
+*(Updated 2026-07-06: two earlier constraints have since lifted — public/top-level
+`inout` is now supported and regression-tested (`sap2_inout_top`), and `sap2` is
+part of the gated green corpus enforced by
+[`corpus_gate.rs`](../../crates/svsim/tests/corpus_gate.rs).)*
+
 - Internal `inout` is currently limited to zero-delay, whole-net bindings rather than arbitrary lvalue targets.
-- `sap2` is a valuable auxiliary corpus, but it is not yet part of the official all-green compatibility contract from [../../AGENTS.md](../../AGENTS.md).
 
 ## Checked-In Coverage
 
@@ -29,7 +32,7 @@ The `sap2` corpus is the first checked-in proof that `svsim` can support a more 
 
 ## Sources
 
-- [../../plan.md](../../plan.md)
+- [../../plan.md](../../plans/completed/plan-sap2-inout.md)
 - [../../parts/sap2/README.md](../../parts/sap2/README.md)
 - [../../parts/sap2/sap2.sv](../../parts/sap2/sap2.sv)
 - [../../parts/sap2/sap2_bus_semantics.sv](../../parts/sap2/sap2_bus_semantics.sv)

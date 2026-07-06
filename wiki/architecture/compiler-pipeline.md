@@ -24,7 +24,7 @@ The runtime does not execute `sv-parser` syntax trees directly. The project comp
 
 ## Important Validation Boundaries
 
-- Public/top-level `inout` is still rejected.
+- Public/top-level `inout` is supported (verified by `parts/testing/025-TopLevelInout` and `parts/sap2/sap2_inout_top` in the gated green corpus).
 - Internal `inout` is currently only allowed when an instantiated child port is bound to a whole parent net signal.
 - `ref` ports are still rejected.
 - Recursive instantiation is rejected.
@@ -36,7 +36,7 @@ The runtime does not execute `sv-parser` syntax trees directly. The project comp
 ## Still Missing In The Architecture
 
 - A compiled simulation IR distinct from HIR.
-- Broader public `inout` support beyond the current internal whole-net subset.
+- Broader `inout` binding targets beyond whole nets (part selects, memory elements, arbitrary expressions).
 - Delay-based or general event-control simulation.
 - Render integration on top of stable structured artifacts.
 
@@ -48,5 +48,5 @@ The runtime does not execute `sv-parser` syntax trees directly. The project comp
 - [../../crates/svsim/src/elaborate.rs](../../crates/svsim/src/elaborate.rs)
 - [../../crates/svsim/src/validate.rs](../../crates/svsim/src/validate.rs)
 - [../../crates/svsim/src/design.rs](../../crates/svsim/src/design.rs)
-- [../../plan.md](../../plan.md)
+- [../../plan.md](../../plans/completed/plan-sap2-inout.md)
 - [../../docs/rust-port-plan.md](../../docs/rust-port-plan.md)
