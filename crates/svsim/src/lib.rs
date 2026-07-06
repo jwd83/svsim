@@ -3,6 +3,7 @@ pub mod compiler;
 pub mod design;
 pub mod diag;
 pub mod elaborate;
+mod expr_eval;
 pub mod frontend;
 pub mod hir;
 mod logic_ops;

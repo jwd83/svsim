@@ -4,46 +4,10 @@
 use super::*;
 
 #[derive(Debug, Clone)]
-pub(super) struct MemoryState {
-    pub(super) index_range: PackedRange,
-    pub(super) words: Vec<Value>,
-}
-
-#[derive(Debug, Clone)]
 pub(super) struct LegacyRomState {
     pub(super) addr_port: String,
     pub(super) data_port: String,
     pub(super) words: Vec<Value>,
-}
-
-impl MemoryState {
-    pub(super) fn read(&self, index: usize, memory_name: &str) -> Result<Value> {
-        let offset = self.index_range.index_offset(index).ok_or_else(|| {
-            Error::Resolve(format!(
-                "memory index [{}] is out of range for '{}'",
-                index, memory_name
-            ))
-        })?;
-        Ok(self.words[offset].clone())
-    }
-
-    pub(super) fn write(&mut self, index: usize, value: Value, memory_name: &str) -> Result<bool> {
-        let offset = self.index_range.index_offset(index).ok_or_else(|| {
-            Error::Resolve(format!(
-                "memory index [{}] is out of range for '{}'",
-                index, memory_name
-            ))
-        })?;
-        let current = self
-            .words
-            .get_mut(offset)
-            .expect("memory offset is guaranteed to be in range");
-        let coerced = value.coerced_to(current.width);
-        let next = Value::from_logic(coerced.logic, current.width);
-        let changed = *current != next;
-        *current = next;
-        Ok(changed)
-    }
 }
 
 pub(super) fn parse_memory_file(
