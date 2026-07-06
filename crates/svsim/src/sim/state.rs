@@ -242,7 +242,10 @@ fn build_net_special_table(
             continue;
         }
         if matches!(port.direction, PortDirection::Output) && port.storage.is_variable() {
-            specials.insert(port.name.clone(), (binding, NetSpecialAction::ReplaceDriver));
+            specials.insert(
+                port.name.clone(),
+                (binding, NetSpecialAction::ReplaceDriver),
+            );
         } else if signal_has_procedural_driver(module, &port.name) {
             specials.insert(
                 port.name.clone(),
