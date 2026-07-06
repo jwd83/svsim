@@ -1591,6 +1591,94 @@ fn eval_once_applies_named_parameter_overrides_from_parent_modules() {
 }
 
 #[test]
+fn instantiate_rejects_override_of_range_frozen_parameter() {
+    let design = Compiler::new()
+        .compile_str(
+            PathBuf::from("/virtual/top.sv"),
+            concat!(
+                "module leaf #(parameter WIDTH = 8)(",
+                "input [WIDTH-1:0] a, output [WIDTH-1:0] y",
+                "); ",
+                "assign y = ~a; ",
+                "endmodule\n",
+                "module top(input [7:0] a, output [7:0] y); ",
+                "leaf #(.WIDTH(4)) u_leaf(.a(a), .y(y)); ",
+                "endmodule\n"
+            ),
+        )
+        .expect("compile virtual design");
+
+    let error = design
+        .instantiate_top()
+        .expect_err("frozen-range override must be rejected")
+        .to_string();
+    assert!(
+        error.contains("parameter 'WIDTH' of module 'leaf' is frozen into")
+            && error.contains("a packed declaration range")
+            && error.contains("u_leaf"),
+        "unexpected diagnostic: {error}"
+    );
+}
+
+#[test]
+fn instantiate_allows_override_equal_to_frozen_default() {
+    let design = Compiler::new()
+        .compile_str(
+            PathBuf::from("/virtual/top.sv"),
+            concat!(
+                "module leaf #(parameter WIDTH = 8)(",
+                "input [WIDTH-1:0] a, output [WIDTH-1:0] y",
+                "); ",
+                "assign y = ~a; ",
+                "endmodule\n",
+                "module top(input [7:0] a, output [7:0] y); ",
+                "leaf #(.WIDTH(8)) u_leaf(.a(a), .y(y)); ",
+                "endmodule\n"
+            ),
+        )
+        .expect("compile virtual design");
+    let mut sim = design.instantiate_top().expect("instantiate");
+    let outputs = sim
+        .eval_once(BTreeMap::from([(
+            "a".to_string(),
+            LogicValue::from(BitValue::from(0x0f_u64)),
+        )]))
+        .expect("eval");
+
+    assert_signal_eq!(outputs, "y", 0xf0);
+}
+
+#[test]
+fn instantiate_rejects_override_that_shifts_dependent_frozen_localparam() {
+    let design = Compiler::new()
+        .compile_str(
+            PathBuf::from("/virtual/top.sv"),
+            concat!(
+                "module leaf #(parameter BASE = 2)(",
+                "output [7:0] y",
+                "); ",
+                "localparam W = BASE * 2; ",
+                "wire [W-1:0] inner = {W{1'b1}}; ",
+                "assign y = {4'b0000, inner}; ",
+                "endmodule\n",
+                "module top(output [7:0] y); ",
+                "leaf #(.BASE(3)) u_leaf(.y(y)); ",
+                "endmodule\n"
+            ),
+        )
+        .expect("compile virtual design");
+
+    let error = design
+        .instantiate_top()
+        .expect_err("override shifting a frozen dependent localparam must be rejected")
+        .to_string();
+    assert!(
+        error.contains("parameter 'W' of module 'leaf' is frozen into"),
+        "unexpected diagnostic: {error}"
+    );
+}
+
+#[test]
 fn step_runs_picorv32_smoke_store_sequence() {
     let repo = repo_root();
     let design = Compiler::new()

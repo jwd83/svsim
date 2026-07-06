@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::Serialize;
 
 use crate::diag::{Error, Result, SourceSpan};
-use crate::expr_eval::{Value, eval_expr};
+use crate::expr_eval::{Value, eval_expr, resolve_parameter_defaults};
 use crate::hir::{
     Expr, HirDesign, LValue, MemoryDecl, ModuleInstanceSummary, ModuleSummary, PackedRange,
     ParameterDecl, PortDecl, PortDirection, SignalDecl, StorageKind, expr_to_lvalue,
@@ -215,6 +215,32 @@ fn elaborate_module_parameters(
             eval_expr(&param.default_value, module, &values, &empty_memories)?
         };
         values.insert(param.name.clone(), value.coerced_to(param.width()));
+    }
+
+    // Frozen parameters were baked into this module's HIR with their default
+    // values at lowering time (see `ModuleSummary::frozen_parameters`). An
+    // override that changes one — directly, or indirectly through a dependent
+    // localparam — would silently disagree with the already-lowered design,
+    // so reject it here. Overrides that resolve to the default value are fine.
+    if instance.is_some_and(|instance| !instance.parameter_overrides.is_empty())
+        && !module.frozen_parameters.is_empty()
+    {
+        let defaults = resolve_parameter_defaults(&module.parameters, module)?;
+        for (name, frozen_construct) in &module.frozen_parameters {
+            let (Some(actual), Some(default)) = (values.get(name), defaults.get(name)) else {
+                continue;
+            };
+            if actual.logic() != default.logic() {
+                let instance_name =
+                    instance.map_or("<top>", |instance| instance.instance_name.as_str());
+                return Err(Error::Resolve(format!(
+                    "parameter '{name}' of module '{}' is frozen into {frozen_construct} at \
+                     its lowering-time default; parameter overrides on instance \
+                     '{instance_name}' would change its value",
+                    module.name
+                )));
+            }
+        }
     }
 
     Ok(values)
