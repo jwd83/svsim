@@ -12,6 +12,26 @@ pub(super) struct ModuleState {
     pub(super) previous_clocks: HashMap<String, bool>,
     pub(super) legacy_rom: Option<LegacyRomState>,
     pub(super) children: Vec<ChildState>,
+    /// Signals on net-storage runtime objects that need their driver
+    /// refreshed every settle pass (see `NetSpecialAction`); precomputed so
+    /// the per-pass commit only walks dirty names plus this set.
+    pub(super) net_specials: HashMap<String, (SignalBinding, NetSpecialAction)>,
+    /// Signals whose whole value is driven by a child instance's output
+    /// sink; the module's own commit skips them (the child drive wins).
+    pub(super) child_output_driven: HashSet<String>,
+}
+
+/// Per-pass driver refresh policy for a signal on a net-storage object.
+/// Nets resolve from the drivers staged in the current pass only, so these
+/// must be re-staged every pass or an untouched net would float to Z.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum NetSpecialAction {
+    /// Variable-storage signal backing a net object: its value replaces the
+    /// object's driver list outright (and is written to the frame).
+    ReplaceDriver,
+    /// Net signal with a procedural driver: its current value is staged as a
+    /// driver unless something else already drove the object this pass.
+    StageIfUndriven,
 }
 
 #[derive(Debug, Clone)]
@@ -189,6 +209,8 @@ pub(super) fn instantiate_module_state(
     }
 
     stack.pop();
+    let net_specials = build_net_special_table(module, &signals, objects);
+    let child_output_driven = build_child_output_driven_table(&children);
     Ok(ModuleState {
         module_name: elaborated.module_name.clone(),
         parameter_values,
@@ -197,7 +219,151 @@ pub(super) fn instantiate_module_state(
         previous_clocks: build_clock_state_table(module),
         legacy_rom: build_legacy_rom_state(hir, module)?,
         children,
+        net_specials,
+        child_output_driven,
     })
+}
+
+fn build_net_special_table(
+    module: &ModuleSummary,
+    signals: &HashMap<String, SignalBinding>,
+    objects: &[RuntimeObjectLayout],
+) -> HashMap<String, (SignalBinding, NetSpecialAction)> {
+    let mut specials = HashMap::new();
+
+    for port in &module.ports {
+        let Some(binding) = signals.get(&port.name).copied() else {
+            continue;
+        };
+        if !objects
+            .get(binding.object_id)
+            .is_some_and(|object| object.storage.is_net())
+        {
+            continue;
+        }
+        if matches!(port.direction, PortDirection::Output) && port.storage.is_variable() {
+            specials.insert(port.name.clone(), (binding, NetSpecialAction::ReplaceDriver));
+        } else if signal_has_procedural_driver(module, &port.name) {
+            specials.insert(
+                port.name.clone(),
+                (binding, NetSpecialAction::StageIfUndriven),
+            );
+        }
+    }
+
+    for signal in &module.signals {
+        let Some(binding) = signals.get(&signal.name).copied() else {
+            continue;
+        };
+        if !objects
+            .get(binding.object_id)
+            .is_some_and(|object| object.storage.is_net())
+        {
+            continue;
+        }
+        if signal.storage.is_variable() {
+            specials.insert(
+                signal.name.clone(),
+                (binding, NetSpecialAction::ReplaceDriver),
+            );
+        } else if signal_has_procedural_driver(module, &signal.name) {
+            specials.insert(
+                signal.name.clone(),
+                (binding, NetSpecialAction::StageIfUndriven),
+            );
+        }
+    }
+
+    specials
+}
+
+fn build_child_output_driven_table(children: &[ChildState]) -> HashSet<String> {
+    let mut driven = HashSet::new();
+    for child in children {
+        for sink in &child.output_sinks {
+            if let LValue::Signal(name) = &sink.target {
+                driven.insert(name.clone());
+            }
+        }
+    }
+    driven
+}
+
+/// Per-pass replacement for `sync_instance_values_to_frame` in the settle
+/// loop: applies the same per-signal policy, but only to the names the pass
+/// actually wrote (`overlay`) plus the precomputed `net_specials` that need
+/// their drivers refreshed every pass. Net-storage signals are staged, not
+/// written (`write_net_values = false` semantics); signals wholly driven by
+/// a child output are skipped (`defer_child_output_net_drivers = true`
+/// semantics).
+pub(super) fn commit_overlay_to_frame(
+    state: &ModuleState,
+    overlay: &HashMap<String, Value>,
+    frame: &mut [ObjectValue],
+    object_layouts: &[RuntimeObjectLayout],
+    net_drivers: &mut NetDriverTable,
+) -> Result<bool> {
+    let mut changed = false;
+
+    for (name, value) in overlay {
+        if state.child_output_driven.contains(name) {
+            continue;
+        }
+        let Some(binding) = state.signals.get(name).copied() else {
+            // Overlay entries that are not signals (parameter-named seeds)
+            // have no frame slot, matching the old sync which only walked
+            // declared ports and signals.
+            continue;
+        };
+        if object_layouts
+            .get(binding.object_id)
+            .is_some_and(|object| object.storage.is_net())
+        {
+            match state.net_specials.get(name) {
+                Some((_, NetSpecialAction::ReplaceDriver)) => {
+                    replace_whole_signal_driver(
+                        binding,
+                        value.clone(),
+                        object_layouts,
+                        net_drivers,
+                    )?;
+                    changed |= write_binding(binding, value.clone(), frame, object_layouts)?;
+                }
+                Some((_, NetSpecialAction::StageIfUndriven)) => {
+                    if !net_drivers.contains_key(&binding.object_id) {
+                        stage_whole_signal_driver(
+                            binding,
+                            value.clone(),
+                            object_layouts,
+                            net_drivers,
+                        )?;
+                    }
+                }
+                None => {}
+            }
+            continue;
+        }
+        changed |= write_binding(binding, value.clone(), frame, object_layouts)?;
+    }
+
+    for (name, (binding, action)) in &state.net_specials {
+        if overlay.contains_key(name) || state.child_output_driven.contains(name) {
+            continue;
+        }
+        let value = read_binding(*binding, frame)?;
+        match action {
+            NetSpecialAction::ReplaceDriver => {
+                replace_whole_signal_driver(*binding, value, object_layouts, net_drivers)?;
+            }
+            NetSpecialAction::StageIfUndriven => {
+                if !net_drivers.contains_key(&binding.object_id) {
+                    stage_whole_signal_driver(*binding, value, object_layouts, net_drivers)?;
+                }
+            }
+        }
+    }
+
+    Ok(changed)
 }
 
 pub(super) fn runtime_bits_width(shape: RuntimeObjectShape) -> Result<usize> {
@@ -286,6 +452,31 @@ impl ValueReader for FrameValues<'_> {
         }
         let binding = self.state.signals.get(name).copied()?;
         read_binding(binding, self.frame).ok()
+    }
+}
+
+/// `FrameValues` plus a copy-on-write overlay of the values the current
+/// settle pass has written. Reads prefer the overlay so blocking-assignment
+/// effects stay visible within the pass, exactly as the old full value
+/// table behaved after in-place mutation.
+pub(super) struct OverlayValues<'a> {
+    pub(super) module: &'a ModuleSummary,
+    pub(super) state: &'a ModuleState,
+    pub(super) frame: &'a [ObjectValue],
+    pub(super) overlay: &'a HashMap<String, Value>,
+}
+
+impl ValueReader for OverlayValues<'_> {
+    fn read_value(&self, name: &str) -> Option<Value> {
+        if let Some(value) = self.overlay.get(name) {
+            return Some(value.clone());
+        }
+        FrameValues {
+            module: self.module,
+            state: self.state,
+            frame: self.frame,
+        }
+        .read_value(name)
     }
 }
 

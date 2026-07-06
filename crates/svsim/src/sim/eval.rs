@@ -251,6 +251,177 @@ pub(super) fn apply_resolved_lvalue(
     }
 }
 
+/// Seeds the overlay with the current value of every signal the lvalue
+/// touches, so `apply_resolved_lvalue` (which mutates map entries in place)
+/// sees the same starting state the old full value table provided.
+pub(super) fn seed_overlay_for_lvalue(
+    lvalue: &ResolvedLValue,
+    module: &ModuleSummary,
+    state: &ModuleState,
+    frame: &[ObjectValue],
+    overlay: &mut HashMap<String, Value>,
+) {
+    match lvalue {
+        ResolvedLValue::Signal(name)
+        | ResolvedLValue::BitSelect { signal: name, .. }
+        | ResolvedLValue::PartSelect { signal: name, .. } => {
+            if !overlay.contains_key(name) {
+                let reader = FrameValues {
+                    module,
+                    state,
+                    frame,
+                };
+                if let Some(value) = reader.read_value(name) {
+                    overlay.insert(name.clone(), value);
+                }
+            }
+        }
+        ResolvedLValue::Concat(items) => {
+            for item in items {
+                seed_overlay_for_lvalue(item, module, state, frame, overlay);
+            }
+        }
+        ResolvedLValue::MemoryElement { .. } => {}
+    }
+}
+
+/// Frame-native equivalent of routing a child output sink through the old
+/// clone-table-then-sync path: net-storage targets stage drivers, variable
+/// targets are read-modified-written on the frame directly, and a variable
+/// target backing a net object refreshes that object's driver list, exactly
+/// as `sync_instance_values_to_frame` would have done for the touched name.
+pub(super) fn apply_resolved_lvalue_to_frame(
+    lvalue: &ResolvedLValue,
+    value: Value,
+    module: &ModuleSummary,
+    state: &ModuleState,
+    frame: &mut [ObjectValue],
+    object_layouts: &[RuntimeObjectLayout],
+    net_drivers: &mut NetDriverTable,
+) -> Result<bool> {
+    let signal_binding = |signal: &str| {
+        state.signals.get(signal).copied().ok_or_else(|| {
+            Error::Resolve(format!(
+                "signal '{}' is not declared in '{}'",
+                signal, module.name
+            ))
+        })
+    };
+
+    match lvalue {
+        ResolvedLValue::Signal(name) => {
+            let binding = signal_binding(name)?;
+            if signal_storage(module, name).is_some_and(StorageKind::is_net) {
+                stage_whole_signal_driver(binding, value, object_layouts, net_drivers)?;
+                return Ok(false);
+            }
+            if object_layouts
+                .get(binding.object_id)
+                .is_some_and(|object| object.storage.is_net())
+            {
+                replace_whole_signal_driver(binding, value.clone(), object_layouts, net_drivers)?;
+            }
+            write_binding(binding, value, frame, object_layouts)
+        }
+        ResolvedLValue::BitSelect { signal, index } => {
+            let binding = signal_binding(signal)?;
+            if signal_storage(module, signal).is_some_and(StorageKind::is_net) {
+                stage_partial_signal_driver(
+                    binding,
+                    *index,
+                    1,
+                    value.coerced_to(1),
+                    object_layouts,
+                    net_drivers,
+                )?;
+                return Ok(false);
+            }
+            let current = read_binding(binding, frame)?;
+            if *index >= current.width {
+                return Err(Error::Resolve(format!(
+                    "bit select [{}] is out of range for signal '{}'",
+                    index, signal
+                )));
+            }
+            let bit = value.coerced_to(1).logic().bit(0);
+            let next = Value::from_logic(
+                logic_replace_slice(current.logic(), *index, 1, &logic_value_from_bit(bit)),
+                current.width,
+            );
+            if object_layouts
+                .get(binding.object_id)
+                .is_some_and(|object| object.storage.is_net())
+            {
+                replace_whole_signal_driver(binding, next.clone(), object_layouts, net_drivers)?;
+            }
+            write_binding(binding, next, frame, object_layouts)
+        }
+        ResolvedLValue::PartSelect { signal, msb, lsb } => {
+            let binding = signal_binding(signal)?;
+            let low = (*msb).min(*lsb);
+            let high = (*msb).max(*lsb);
+            let width = high - low + 1;
+            if signal_storage(module, signal).is_some_and(StorageKind::is_net) {
+                stage_partial_signal_driver(
+                    binding,
+                    low,
+                    width,
+                    value.coerced_to(width),
+                    object_layouts,
+                    net_drivers,
+                )?;
+                return Ok(false);
+            }
+            let current = read_binding(binding, frame)?;
+            if high >= current.width {
+                return Err(Error::Resolve(format!(
+                    "part select [{}:{}] is out of range for signal '{}'",
+                    msb, lsb, signal
+                )));
+            }
+            let next = Value::from_logic(
+                logic_replace_slice(current.logic(), low, width, value.coerced_to(width).logic()),
+                current.width,
+            );
+            if object_layouts
+                .get(binding.object_id)
+                .is_some_and(|object| object.storage.is_net())
+            {
+                replace_whole_signal_driver(binding, next.clone(), object_layouts, net_drivers)?;
+            }
+            write_binding(binding, next, frame, object_layouts)
+        }
+        ResolvedLValue::Concat(items) => {
+            let total_width = resolved_lvalue_width(lvalue, module)?;
+            let normalized = value.coerced_to(total_width);
+            let mut remaining_width = total_width;
+            let mut changed = false;
+            for item in items {
+                let item_width = resolved_lvalue_width(item, module)?;
+                remaining_width -= item_width;
+                let chunk = Value::from_logic(
+                    logic_slice(normalized.logic(), remaining_width, item_width),
+                    item_width,
+                );
+                changed |= apply_resolved_lvalue_to_frame(
+                    item,
+                    chunk,
+                    module,
+                    state,
+                    frame,
+                    object_layouts,
+                    net_drivers,
+                )?;
+            }
+            Ok(changed)
+        }
+        ResolvedLValue::MemoryElement { memory, .. } => Err(Error::Resolve(format!(
+            "memory '{}' is not declared in '{}'",
+            memory, module.name
+        ))),
+    }
+}
+
 pub(super) fn stage_signal_driver_if_net(
     signal_name: &str,
     value: Value,

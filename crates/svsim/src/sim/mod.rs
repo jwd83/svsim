@@ -6,7 +6,7 @@
 //! (hierarchical module state and bindings), `memory` (memory files and the
 //! legacy ROM shim), `session` (public API and scheduler).
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::path::Path;
 

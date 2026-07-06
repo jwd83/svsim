@@ -372,9 +372,8 @@ fn settle_module_pass(
             apply_external_inputs(module, state, frame, object_layouts, inputs, net_drivers)?;
     }
 
-    let mut values = build_instance_value_table(module, state, frame)?;
-
     if let Some(legacy_rom) = &state.legacy_rom {
+        let mut values = build_instance_value_table(module, state, frame)?;
         apply_legacy_rom_outputs(module, &mut values, legacy_rom)?;
         if let Some(value) = values.get(&legacy_rom.data_port).cloned() {
             stage_signal_driver_if_net(
@@ -400,21 +399,33 @@ fn settle_module_pass(
         return Ok(changed);
     }
 
+    let mut overlay: HashMap<String, Value> = HashMap::new();
+
     for assign in &module.continuous_assignments {
-        let value = eval_expr(&assign.expr, module, &values, &state.memories)?;
-        let target = resolve_lvalue(&assign.target, module, &values, &state.memories)?;
+        let (value, target) = {
+            let reader = OverlayValues {
+                module,
+                state,
+                frame,
+                overlay: &overlay,
+            };
+            let value = eval_expr(&assign.expr, module, &reader, &state.memories)?;
+            let target = resolve_lvalue(&assign.target, module, &reader, &state.memories)?;
+            (value, target)
+        };
         if resolved_lvalue_contains_memory(&target) {
             return Err(Error::Unsupported(
                 "continuous assignments to memory elements are not supported".into(),
             ));
         }
+        seed_overlay_for_lvalue(&target, module, state, frame, &mut overlay);
         let mut no_memories = HashMap::new();
         changed |= apply_or_stage_resolved_lvalue(
             &target,
             value,
             module,
             state,
-            &mut values,
+            &mut overlay,
             &mut no_memories,
             object_layouts,
             net_drivers,
@@ -426,21 +437,14 @@ fn settle_module_pass(
             &block.kind,
             &block.body,
             module,
-            &mut values,
+            state,
+            frame,
+            &mut overlay,
             &state.memories,
         )?;
     }
 
-    changed |= sync_instance_values_to_frame(
-        module,
-        state,
-        &values,
-        frame,
-        object_layouts,
-        net_drivers,
-        false,
-        true,
-    )?;
+    changed |= commit_overlay_to_frame(state, &overlay, frame, object_layouts, net_drivers)?;
 
     for child_state in &state.children {
         let child = resolve_supported_module(hir, &child_state.state.module_name)?;
@@ -467,12 +471,10 @@ fn settle_module_pass(
         )?;
         changed |= child_changed;
 
-        let parent_values = build_instance_value_table(module, state, frame)?;
         let applied_outputs = apply_child_output_sinks(
             module,
             state,
             child_state,
-            &parent_values,
             &state.memories,
             frame,
             object_layouts,
@@ -681,17 +683,11 @@ fn apply_child_output_sinks(
     parent_module: &ModuleSummary,
     parent_state: &ModuleState,
     child_state: &ChildState,
-    parent_values: &HashMap<String, Value>,
     parent_memories: &HashMap<String, MemoryState>,
     frame: &mut [ObjectValue],
     object_layouts: &[RuntimeObjectLayout],
     net_drivers: &mut NetDriverTable,
 ) -> Result<bool> {
-    if child_state.output_sinks.is_empty() {
-        return Ok(false);
-    }
-
-    let mut next_parent_values = parent_values.clone();
     let mut changed = false;
 
     for sink in &child_state.output_sinks {
@@ -707,35 +703,25 @@ fn apply_child_output_sinks(
                 ))
             })?;
         let value = read_binding(binding, frame)?;
-        let target = resolve_lvalue(
-            &sink.target,
-            parent_module,
-            &next_parent_values,
-            parent_memories,
-        )?;
-        let mut no_memories = HashMap::new();
-        changed |= apply_or_stage_resolved_lvalue(
+        let target = {
+            let reader = FrameValues {
+                module: parent_module,
+                state: parent_state,
+                frame,
+            };
+            resolve_lvalue(&sink.target, parent_module, &reader, parent_memories)?
+        };
+        changed |= apply_resolved_lvalue_to_frame(
             &target,
             value,
             parent_module,
             parent_state,
-            &mut next_parent_values,
-            &mut no_memories,
+            frame,
             object_layouts,
             net_drivers,
         )?;
     }
 
-    changed |= sync_instance_values_to_frame(
-        parent_module,
-        parent_state,
-        &next_parent_values,
-        frame,
-        object_layouts,
-        net_drivers,
-        false,
-        false,
-    )?;
     Ok(changed)
 }
 
@@ -743,11 +729,15 @@ fn execute_proc_block(
     kind: &ProcBlockKind,
     body: &Stmt,
     module: &ModuleSummary,
-    values: &mut HashMap<String, Value>,
+    state: &ModuleState,
+    frame: &[ObjectValue],
+    overlay: &mut HashMap<String, Value>,
     memories: &HashMap<String, MemoryState>,
 ) -> Result<bool> {
     match kind {
-        ProcBlockKind::AlwaysComb => execute_comb_stmt(body, module, values, memories),
+        ProcBlockKind::AlwaysComb => {
+            execute_comb_stmt(body, module, state, frame, overlay, memories)
+        }
         ProcBlockKind::AlwaysFf { .. } => Ok(false),
     }
 }
@@ -755,7 +745,9 @@ fn execute_proc_block(
 fn execute_comb_stmt(
     stmt: &Stmt,
     module: &ModuleSummary,
-    values: &mut HashMap<String, Value>,
+    state: &ModuleState,
+    frame: &[ObjectValue],
+    overlay: &mut HashMap<String, Value>,
     memories: &HashMap<String, MemoryState>,
 ) -> Result<bool> {
     match stmt {
@@ -763,22 +755,32 @@ fn execute_comb_stmt(
         Stmt::Block(statements) => {
             let mut changed = false;
             for statement in statements {
-                changed |= execute_comb_stmt(statement, module, values, memories)?;
+                changed |= execute_comb_stmt(statement, module, state, frame, overlay, memories)?;
             }
             Ok(changed)
         }
         Stmt::Assign { kind, target, expr } => match kind {
             AssignmentKind::Blocking => {
-                let value = eval_expr(expr, module, values, memories)?;
-                let target = resolve_lvalue(target, module, values, memories)?;
+                let (value, target) = {
+                    let reader = OverlayValues {
+                        module,
+                        state,
+                        frame,
+                        overlay,
+                    };
+                    let value = eval_expr(expr, module, &reader, memories)?;
+                    let target = resolve_lvalue(target, module, &reader, memories)?;
+                    (value, target)
+                };
                 if resolved_lvalue_contains_memory(&target) {
                     return Err(Error::Unsupported(
                         "memory element assignments are only supported inside `always_ff` blocks"
                             .into(),
                     ));
                 }
+                seed_overlay_for_lvalue(&target, module, state, frame, overlay);
                 let mut no_memories = HashMap::new();
-                apply_resolved_lvalue(&target, value, module, values, &mut no_memories)
+                apply_resolved_lvalue(&target, value, module, overlay, &mut no_memories)
             }
             AssignmentKind::Nonblocking => Err(Error::Unsupported(
                 "nonblocking assignments are only supported inside `always_ff` blocks".into(),
@@ -789,13 +791,19 @@ fn execute_comb_stmt(
             then_branch,
             else_branch,
         } => {
-            if matches!(
-                eval_expr(cond, module, values, memories)?.truthiness(),
-                LogicTruth::True
-            ) {
-                execute_comb_stmt(then_branch, module, values, memories)
+            let truth = {
+                let reader = OverlayValues {
+                    module,
+                    state,
+                    frame,
+                    overlay,
+                };
+                eval_expr(cond, module, &reader, memories)?.truthiness()
+            };
+            if matches!(truth, LogicTruth::True) {
+                execute_comb_stmt(then_branch, module, state, frame, overlay, memories)
             } else if let Some(else_branch) = else_branch {
-                execute_comb_stmt(else_branch, module, values, memories)
+                execute_comb_stmt(else_branch, module, state, frame, overlay, memories)
             } else {
                 Ok(false)
             }
@@ -805,16 +813,35 @@ fn execute_comb_stmt(
             items,
             default,
         } => {
-            let value = eval_expr(expr, module, values, memories)?;
+            let value = {
+                let reader = OverlayValues {
+                    module,
+                    state,
+                    frame,
+                    overlay,
+                };
+                eval_expr(expr, module, &reader, memories)?
+            };
             for item in items {
                 for pattern in &item.patterns {
-                    if values_case_equal(&value, &eval_expr(pattern, module, values, memories)?) {
-                        return execute_comb_stmt(&item.body, module, values, memories);
+                    let matched = {
+                        let reader = OverlayValues {
+                            module,
+                            state,
+                            frame,
+                            overlay,
+                        };
+                        values_case_equal(&value, &eval_expr(pattern, module, &reader, memories)?)
+                    };
+                    if matched {
+                        return execute_comb_stmt(
+                            &item.body, module, state, frame, overlay, memories,
+                        );
                     }
                 }
             }
             if let Some(default) = default {
-                execute_comb_stmt(default, module, values, memories)
+                execute_comb_stmt(default, module, state, frame, overlay, memories)
             } else {
                 Ok(false)
             }
