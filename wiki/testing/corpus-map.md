@@ -13,7 +13,7 @@ The `parts/` tree is the compatibility surface for the rewrite. Different direct
 | [`../../parts/sap2`](../../parts/sap2) | Auxiliary shared-bus runtime corpus | Runnable SAP-family follow-on that restores internal shared-bus structure with focused `inout` / floating / contention coverage. `sap2_register_tile.{sv,json}` isolates the register-tile partitioning and `sap2_inout_top.{sv,json}` exposes the bus as a top-level `inout` to prove the public-`inout` boundary. |
 | [`../../parts/sap3`](../../parts/sap3) | Richer SAP sketch | Extends the SAP-2 shared-bus CPU with AND/OR/XOR ops, a memory-mapped output port at address `0x10`, and a 20-bit microcode word. Exists to prove the simulator side of the SAP port story is complete — no simulator changes were required to run it. |
 | [`../../parts/simple8`](../../parts/simple8) | Teaching/demo CPU corpus | Tiny self-documenting CPU with a programmable harness. |
-| [`../../parts/failing`](../../parts/failing) | Negative corpus | Intentionally failing parser, compile, and JSON cases. |
+| [`../../parts/failing`](../../parts/failing) | Negative corpus | Intentionally failing parser, compile, and JSON cases. Gated as must-fail since 2026-07-06 (`corpus_failing_stays_red`). |
 | [`../../parts/roms`](../../parts/roms) | ROM text-file conventions | Documents the plain-text ROM format used by harnessed designs. |
 
 ## Green Surface vs Auxiliary Surface
@@ -26,7 +26,10 @@ The `parts/` tree is the compatibility surface for the rewrite. Different direct
   (`basic`, `testing`, `overture`, `rv32i`) is a historical distinction.
 - `parts/picorv32` remains the most advanced stress target: the upstream core
   compiles, and its harness exercises a curated executable slice.
-- `parts/failing` is the negative corpus and must stay out of the green gate.
+- `parts/failing` is the negative corpus: it stays out of the green
+  expectations, and since 2026-07-06 it is gated in the opposite direction —
+  `corpus_failing_stays_red` asserts each of its suites keeps failing with a
+  stable diagnostic fragment, so diagnostic regressions fail `cargo test` too.
 
 ## Practical Commands
 
@@ -35,6 +38,7 @@ cargo test                       # green-corpus gate + unit + CLI tests
 ./test.sh                        # regenerate docs/tests/report-parts-*.json
 cargo run -q -p svsim-cli -- --json-test-dir parts/sap3   # one dir ad hoc
 cargo run -q -p svsim-cli -- --json-test-dir parts/failing
+./test-fails.sh                  # pretty-print negative-corpus failure reports
 ```
 
 ## Sources

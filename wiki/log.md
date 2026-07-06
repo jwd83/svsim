@@ -40,3 +40,12 @@
 - Parameter values are now resolved during elaboration and carried on `ElaboratedInstance`; `validate.rs` is validation-only (1,048 → 729 lines).
 - The legacy ROM shim is isolated in `crates/svsim/src/sim/legacy_rom.rs` with its `rom_<stem>` naming contract documented as do-not-extend.
 - The architectural review campaign is complete; the review moved to `plans/completed/2026-07-06-architectural-review.md` and wiki links were updated (workspace map, source map, overview, current state).
+
+## [2026-07-06] lint | negative corpus gated (second architectural review, step 1)
+
+- Verified `cargo test`: pass (`202/202` — `182` `svsim` unit tests, `10` corpus gate tests including the new `corpus_failing_stays_red`, `10` CLI tests).
+- A second architectural review was authored against the post-campaign baseline (`plans/in-progress/architectural-review.md`, committed as `0761ab8`); step 1 of its plan is complete.
+- `parts/failing` (6 suites) is now gated as must-fail: 5 suites asserted on stable suite-error fragments, 1 on an expectation mismatch (`outY`); a changed suite set or drifted diagnostic fails `cargo test`.
+- `test.bat` now regenerates all nine `docs/tests/` reports (it was missing sap2/sap3/simple8 — same drift class as the sap1-into-sap2 bug the first review caught in `test.sh`). Its `svsim.exe` invocation was correct all along: `svsim-cli` declares `[[bin]] name = "svsim"`.
+- `test-fails.sh` is documented as a manual failure-report inspector (not a gate) and was actually broken on the system Python 3.9 (`str | None` annotation); fixed.
+- `parts/failing/README.md` dropped stale `ref/pysvsim.py` and four-directory-corpus text; `AGENTS.md` and `wiki/testing/corpus-map.md` now describe the must-fail gate.

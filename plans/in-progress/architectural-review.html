@@ -177,7 +177,15 @@ incrementally useful.</p>
 <ol class="steps">
   <li><strong>Gate the negative corpus.</strong> Must-fail tests over <code>parts/failing</code> in
       <code>corpus_gate.rs</code> (failure + stable diagnostic fragment); retire/thin <code>test-fails.sh</code>;
-      fix or delete <code>test.bat</code>.</li>
+      fix or delete <code>test.bat</code>.
+      <div class="note"><strong>Done 2026-07-06</strong> — <code>d0f4982</code> adds
+      <code>corpus_failing_stays_red</code> (6 suites must fail: 5 stable error fragments + 1
+      expectation mismatch on <code>outY</code>); <code>0f8c0a2</code> truths up <code>test.bat</code>
+      (all nine report dirs), <code>test-fails.sh</code> (documented as manual inspector; fixed a
+      Python-3.9 incompatibility found during verification), <code>parts/failing/README.md</code>, and
+      <code>AGENTS.md</code>. Suite: 202/202. Deviation: the review's <code>svsim.exe</code> claim was
+      wrong (<code>svsim-cli</code> declares <code>[[bin]] name = "svsim"</code>) — <code>test.bat</code>
+      was fixed, not deleted; <code>test-fails.sh</code> kept as the failure-report inspector.</div></li>
   <li><strong>Fence the parameterization trap.</strong> Elaboration rejects overrides feeding frozen
       constructs unless equal to the default; add <code>parts/failing</code> cases (now gated); document
       the freeze in <code>hir.rs</code> and the wiki.</li>

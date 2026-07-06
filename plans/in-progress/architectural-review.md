@@ -221,6 +221,31 @@ incremental, and each converted call site is immediately useful.
    diagnostic fragment); retire or thin `test-fails.sh`; fix or delete the
    stale `test.bat` in the same pass. This widens the safety net every later
    step stands on.
+
+   *Done 2026-07-06*, in 3 commits (the review itself was committed as
+   `0761ab8` by the user):
+   - `d0f4982`: `corpus_failing_stays_red` in `corpus_gate.rs` — all 6
+     `parts/failing` suites must fail: 5 asserted on stable suite-error
+     fragments (constant memory OOB, duplicate instance, malformed JSON,
+     missing child module, syntax error), 1 on an expectation mismatch
+     (`outY`). A changed suite set or drifted diagnostic fails `cargo test`.
+   - `0f8c0a2`: `test.bat` regenerates all nine reports (was missing
+     sap2/sap3/simple8) with a gate-pointer header; `test-fails.sh`
+     documented as a manual inspector and its Python-3.10-only `str | None`
+     annotation fixed for the system Python 3.9 (the script was actually
+     broken, discovered during verification); `parts/failing/README.md`
+     dropped stale `ref/pysvsim.py` and four-directory-corpus text;
+     `AGENTS.md` describes the must-fail gate.
+   - (annotation commit): this note plus wiki sync (`log.md`,
+     `testing/corpus-map.md`, `status/current-state.md`).
+
+   Result: full suite 202/202 (182 unit + 10 gate + 10 CLI); the new gate
+   test runs in ~0.02 s. Two deviations from the review text: `test.bat`'s
+   `svsim.exe` claim was **wrong** — `svsim-cli` declares
+   `[[bin]] name = "svsim"`, so only the missing directories were stale, and
+   the script was fixed rather than deleted; `test-fails.sh` was kept (and
+   repaired) as the only human-readable failure-report inspector rather than
+   retired.
 2. **Fence the parameterization trap.** In elaboration, reject instance
    parameter overrides that feed frozen constructs (port/signal/memory ranges,
    unrolled loop bounds) when they differ from the default, with a

@@ -4,10 +4,11 @@ Snapshot date: 2026-07-06
 
 ## Verified Today
 
-- `cargo test`: pass, `201/201` — `182` `svsim` unit tests (including `14`
+- `cargo test`: pass, `202/202` — `182` `svsim` unit tests (including `14`
   direct four-state truth-table tests in `crates/svsim/src/logic_ops.rs`),
-  `9` green-corpus gate tests (`crates/svsim/tests/corpus_gate.rs`), and `10`
-  CLI integration tests, in roughly two minutes of wall time.
+  `10` corpus gate tests (`crates/svsim/tests/corpus_gate.rs`: nine green
+  directories plus `corpus_failing_stays_red` over the negative corpus), and
+  `10` CLI integration tests, in roughly two minutes of wall time.
 - Green corpus, now enforced directly by `cargo test`: `194/194` regression
   suites across all nine green `parts/` directories — `44` basic, `54`
   testing, `43` overture, `16` rv32i, `13` picorv32, `6` sap1, `9` sap2, `4`
@@ -22,7 +23,9 @@ Snapshot date: 2026-07-06
 - The official all-green compatibility target is no longer the four-directory
   set from the bootstrap era: every `parts/` directory except `parts/failing`
   (negative corpus) and `parts/roms` (assets) is gated, and a missing or
-  emptied corpus directory fails the gate instead of passing silently.
+  emptied corpus directory fails the gate instead of passing silently. Since
+  the second review's step 1, `parts/failing` is gated in the opposite
+  direction: its six suites must keep failing with stable diagnostics.
 - The workspace `Cargo.toml` builds the `svsim` package at `opt-level = 2`
   even in dev/test profiles; unoptimized simulation is ~9x slower and made
   the full suite impractical (unit tests dropped from ~130s to ~32s).
