@@ -262,7 +262,14 @@ proposed below should run heavy suites in release or a tiered mode.</p>
   <code>sim/tests.rs</code>; per-subject test migration deferred to steps 4–5.</p></li>
   <li><b>Move the four-state primitive operations into the value layer</b>
   (<code>logic_value.rs</code> or <code>logic_ops.rs</code>) with direct truth-table unit tests;
-  <code>sim/eval.rs</code> becomes a consumer.</li>
+  <code>sim/eval.rs</code> becomes a consumer.
+  <p class="done-note"><b>Done 2026-07-06</b> in 3 slice commits: <code>b246902</code> bit truth
+  tables → new crate-private <code>logic_ops.rs</code> (6 tests, full 4&times;4 tables);
+  <code>7fc56ce</code> structural ops (sign-extend / slice / replace-slice, 5 x/z tests);
+  <code>41d7cc4</code> reductions retyped to <code>&amp;LogicValue</code> and moved (3 tests).
+  Core unit tests 168&rarr;182; full suite <b>201/201</b>. Value-level combinators stay in
+  <code>sim/value.rs</code> by design — they encode coercion/signedness semantics, not truth
+  tables.</p></li>
   <li><b>Consolidate constant evaluation into one shared HIR const-evaluator</b> used by
   <code>validate.rs</code>, frontend folding, and parameter elaboration; delete
   <code>ConstValue</code> and the frontend's private folding once ported, with regression tests

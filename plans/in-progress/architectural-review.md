@@ -298,6 +298,29 @@ would destabilize the corpus for no present-day gain.
 4. **Move the four-state primitive operations into the value layer**
    (`logic_value.rs` or `logic_ops.rs`) with direct truth-table unit tests;
    `sim/eval.rs` becomes a consumer.
+
+   *Done 2026-07-06*, in 3 slice commits (each green):
+   - `b246902` slice 1: bit truth tables (`normalize_unknown_bit`,
+     `logic_bit_not/and/or/xor`, `logic_value_from_bit`) → new crate-private
+     `logic_ops.rs` in the value layer, with 6 direct truth-table tests
+     covering the full 4×4 tables and z-collapses-to-x.
+   - `7fc56ce` slice 2: `LogicValue` structural ops (`logic_sign_extend`,
+     `logic_slice`, `logic_replace_slice`) moved with 5 tests (x/z
+     preservation, unknown sign fill, narrowing, replacement coercion).
+   - `41d7cc4` slice 3: reductions (`logic_reduce_or/and/xor`) retyped from
+     the sim `Value` wrapper to `&LogicValue` (identical behavior — `Value`
+     keeps `width == logic.width()` by construction) and moved; the four
+     `eval.rs` call sites now pass `value.logic()`; 3 dominance/poisoning
+     tests.
+
+   Result: core unit tests 168 → 182; full suite 201/201 (182 + 9 gate +
+   10 CLI). Deviations: chose the sibling-module option (`logic_ops.rs`)
+   over growing `logic_value.rs`, keeping representation and operations
+   separate. The `Value`-level combinators (bitwise-binary wrapper,
+   logical and/or, equalities, comparisons, shifts, ternary merge,
+   literal/concat) deliberately stay in `sim/value.rs` — they encode sim
+   `Value` coercion/signedness semantics, not bare truth tables; revisit
+   only if step 5's shared const-eval needs them relocated.
 5. **Consolidate constant evaluation into one shared HIR const-evaluator**
    used by `validate.rs`, frontend constant folding, and parameter
    elaboration; delete `ConstValue` and the frontend's private folding once

@@ -25,3 +25,10 @@
 - Moved root plan files into the plans lifecycle: `plan.md` → `plans/completed/plan-sap2-inout.md`, `plan-sap3.done.md` → `plans/completed/plan-sap3.md`; updated wiki links accordingly (append-only history entries left as written).
 - Refreshed `status/current-state.md` (2026-07-06 snapshot), `architecture/workspace-map.md` (dropped the absent `ref/`, added `plans/` and the corpus gate), `overview.md`, `index.md`, `sources/source-map.md`, and marked the `inout`/`sap2` milestone page complete (public top-level `inout` is supported).
 - AGENTS.md truth-up in the same pass: removed stale `ref/` and "no usable Git history" claims, documented the corpus gate and the dev/test `opt-level = 2` override for `svsim`.
+
+## [2026-07-06] lint | sim module split and logic_ops extraction (architectural review steps 3-4)
+
+- Verified `cargo test`: pass (`201/201` — `182` `svsim` unit tests, `9` corpus gate tests, `10` CLI tests).
+- `crates/svsim/src/sim.rs` (4,970 lines) is now the `crates/svsim/src/sim/` module directory: `mod.rs` (root), `session.rs`, `eval.rs`, `state.rs`, `memory.rs`, `value.rs`, `tests.rs`; wiki links updated from the old `sim.rs` path.
+- Four-state primitives (bit truth tables, reductions, slices, sign extension) moved from the sim runtime into crate-private `crates/svsim/src/logic_ops.rs` with 14 direct truth-table unit tests; `sim/eval.rs` is now a consumer.
+- Updated `architecture/workspace-map.md`, `sources/source-map.md`, and `status/current-state.md` to match.

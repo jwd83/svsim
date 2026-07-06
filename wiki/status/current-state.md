@@ -4,9 +4,10 @@ Snapshot date: 2026-07-06
 
 ## Verified Today
 
-- `cargo test`: pass, `187/187` — `168` `svsim` unit tests, `9` green-corpus
-  gate tests (`crates/svsim/tests/corpus_gate.rs`), and `10` CLI integration
-  tests, in roughly two minutes of wall time.
+- `cargo test`: pass, `201/201` — `182` `svsim` unit tests (including `14`
+  direct four-state truth-table tests in `crates/svsim/src/logic_ops.rs`),
+  `9` green-corpus gate tests (`crates/svsim/tests/corpus_gate.rs`), and `10`
+  CLI integration tests, in roughly two minutes of wall time.
 - Green corpus, now enforced directly by `cargo test`: `194/194` regression
   suites across all nine green `parts/` directories — `44` basic, `54`
   testing, `43` overture, `16` rv32i, `13` picorv32, `6` sap1, `9` sap2, `4`
@@ -35,7 +36,8 @@ Snapshot date: 2026-07-06
   structured compile and simulation results.
 - An architectural review campaign is active at
   [../../plans/in-progress/architectural-review.md](../../plans/in-progress/architectural-review.md);
-  steps 1–2 (corpus gate, doc truth-up) are complete.
+  steps 1–4 are complete (corpus gate, doc truth-up, `sim/` module split, and
+  four-state primitives relocated to the value layer as `logic_ops.rs`).
 
 ## Commands Used
 

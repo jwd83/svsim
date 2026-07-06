@@ -25,6 +25,7 @@ The workspace is intentionally small. Most of the simulator lives in one core cr
 | [`../../crates/svsim/src/design.rs`](../../crates/svsim/src/design.rs) | `CompiledDesign`, hierarchy reporting, elaboration access, and runtime instantiation entry points. |
 | [`../../crates/svsim/src/elaborate.rs`](../../crates/svsim/src/elaborate.rs) | Typed elaboration layer that turns HIR modules into runtime object shapes and instance bindings. |
 | [`../../crates/svsim/src/logic_value.rs`](../../crates/svsim/src/logic_value.rs) | Four-state runtime values, parsing, formatting, and wildcard expectation matching. |
+| [`../../crates/svsim/src/logic_ops.rs`](../../crates/svsim/src/logic_ops.rs) | Crate-private four-state primitive operations (bit truth tables, reductions, slices, sign extension) with direct truth-table unit tests. |
 | [`../../crates/svsim/src/net_resolve.rs`](../../crates/svsim/src/net_resolve.rs) | Zero-delay per-bit net resolution and drive-strength handling. |
 | [`../../crates/svsim/src/sim/`](../../crates/svsim/src/sim/) | Structural runtime, split by responsibility: `session.rs` (public API + settle/step scheduler), `eval.rs` (expression/lvalue evaluation, driver staging), `state.rs` (hierarchical module state, bindings), `memory.rs` (memory files, legacy ROM shim), `value.rs` (four-state values and primitive ops). |
 | [`../../crates/svsim/src/test.rs`](../../crates/svsim/src/test.rs) | JSON suite parsing, execution, tracing, and report types. |
