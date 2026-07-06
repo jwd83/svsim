@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Architectural Review — svsim (2026-07-06)</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1a1d21;
+    --muted: #5c6570;
+    --accent: #0b5fa5;
+    --border: #d9dee3;
+    --card: #f6f8fa;
+    --good: #1a7f37;
+    --warn: #9a6700;
+    --bad: #b42318;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171a;
+      --fg: #e6e9ec;
+      --muted: #9aa4ae;
+      --accent: #6cb2ee;
+      --border: #30363d;
+      --card: #1d2126;
+      --good: #4ac26b;
+      --warn: #d4a72c;
+      --bad: #f0716a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0 auto;
+    max-width: 60rem;
+    padding: 2.5rem 1.5rem 5rem;
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+  }
+  h1 { font-size: 1.9rem; line-height: 1.25; margin: 0 0 .25rem; }
+  h2 { font-size: 1.35rem; margin: 2.5rem 0 .75rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+  h3 { font-size: 1.05rem; margin: 1.75rem 0 .5rem; }
+  p, li { max-width: 52rem; }
+  .meta { color: var(--muted); margin-bottom: 1.5rem; }
+  code {
+    font-family: var(--mono);
+    font-size: .875em;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: .1em .35em;
+  }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: .95rem; }
+  th, td { text-align: left; padding: .5rem .75rem; border: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--card); }
+  .lede {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+    margin: 1.25rem 0 0;
+  }
+  .badge {
+    display: inline-block;
+    font-size: .72rem;
+    font-weight: 600;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    border-radius: 999px;
+    padding: .15em .7em;
+    margin-right: .5em;
+    vertical-align: middle;
+  }
+  .badge.now   { background: color-mix(in srgb, var(--bad) 14%, transparent);  color: var(--bad);  border: 1px solid var(--bad); }
+  .badge.high  { background: color-mix(in srgb, var(--warn) 14%, transparent); color: var(--warn); border: 1px solid var(--warn); }
+  .badge.med   { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); border: 1px solid var(--accent); }
+  .badge.defer { background: color-mix(in srgb, var(--muted) 14%, transparent); color: var(--muted); border: 1px solid var(--muted); }
+  .badge.keep  { background: color-mix(in srgb, var(--good) 14%, transparent); color: var(--good); border: 1px solid var(--good); }
+  .risk { margin: 1.5rem 0; padding: 1rem 1.25rem; border: 1px solid var(--border); border-radius: 6px; }
+  .risk h3 { margin: 0 0 .5rem; }
+  .risk p { margin: .5rem 0; }
+  .label { font-weight: 600; color: var(--muted); font-size: .85rem; text-transform: uppercase; letter-spacing: .03em; }
+  ol.attack { counter-reset: step; list-style: none; padding-left: 0; }
+  ol.attack > li {
+    counter-increment: step;
+    position: relative;
+    padding: .85rem 1rem .85rem 3.25rem;
+    margin: .6rem 0;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--card);
+  }
+  ol.attack > li::before {
+    content: counter(step);
+    position: absolute;
+    left: .9rem;
+    top: .85rem;
+    width: 1.7rem; height: 1.7rem;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--bg);
+    font-weight: 700;
+    font-size: .95rem;
+  }
+  ol.attack b { display: block; margin-bottom: .15rem; }
+  .footer { margin-top: 3rem; color: var(--muted); font-size: .85rem; border-top: 1px solid var(--border); padding-top: 1rem; }
+  ul.tight li { margin: .35rem 0; }
+</style>
+</head>
+<body>
+
+<h1>Architectural Review — svsim</h1>
+<p class="meta">Reviewed 2026-07-06 against <code>main</code> @ <code>94e5ef5</code> ·
+canonical copy: <code>plans/in-progress/architectural-review.md</code></p>
+
+<div class="lede">
+<p><b>Executive summary.</b> The Rust rewrite is structurally healthy where it matters most:
+the compile pipeline (frontend &rarr; HIR &rarr; validate &rarr; elaborate &rarr; design) has clean,
+owned boundaries, the CLI is genuinely thin, and behavior is pinned by a large corpus-driven
+compatibility suite. The structural cost is concentrated in two places:
+<code>sim.rs</code> is a ~5,000-line god module absorbing every runtime concern, and the
+verification story behind the project's &ldquo;all green&rdquo; claims is quietly broken &mdash;
+<code>test.sh</code> never actually tests <code>parts/sap2</code> (its committed report contains
+sap1&rsquo;s results) and <code>parts/sap3</code> is untested by any script.
+<b>Order of attack: fix verification first so every later change is provable, then split
+<code>sim.rs</code> along its existing seams, then consolidate the three parallel expression
+evaluators.</b></p>
+</div>
+
+<h2>Snapshot</h2>
+<table>
+  <tr><th>Metric</th><th>Value</th></tr>
+  <tr><td>Workspace</td><td>3 crates: <code>svsim</code> (core), <code>svsim-cli</code> (thin wrapper), <code>svsim-render</code> (5-line placeholder)</td></tr>
+  <tr><td>Rust source</td><td>~17,700 lines total; core crate ~16,900</td></tr>
+  <tr><td>Largest files</td><td><code>sim.rs</code> 4,970 (3,059 impl + 1,911 inline tests) · <code>frontend/sv_parser.rs</code> 4,669 (3,939 + 730) · <code>compiler.rs</code> 1,906 · <code>test.rs</code> 1,402 · <code>validate.rs</code> 1,048</td></tr>
+  <tr><td>Test baseline</td><td><b>178/178 passing</b> (168 core unit + 10 CLI integration), <code>cargo test</code> debug mode — but slow: ~130s core, ~92s CLI; one corpus test alone exceeds 60s</td></tr>
+  <tr><td>Compatibility corpus</td><td>8 green part dirs (~190 JSON suites) + 1 negative dir (<code>parts/failing</code>, 6 suites)</td></tr>
+  <tr><td>Corpus reports</td><td><code>docs/tests/report-parts-*.json</code> all show 100% pass — <b>but the sap2 report contains sap1&rsquo;s results</b> (test.sh bug)</td></tr>
+  <tr><td>Dependencies</td><td>clap, rayon, serde/serde_json, sv-parser, thiserror — small, all used</td></tr>
+  <tr><td>Docs</td><td>AGENTS.md + maintained <code>wiki/</code> (architecture, status, roadmap) + <code>docs/</code> progress reports</td></tr>
+</table>
+<p>Interpretation: test coverage is genuinely strong for a simulator at this stage — the risk is
+not missing tests but that the shell-script layer that runs the corpus and publishes
+&ldquo;green&rdquo; reports has rotted without anything noticing. Secondary cost: the debug-mode
+suite takes ~4 minutes wall because unit tests execute whole corpus simulations; the corpus gate
+proposed below should run heavy suites in release or a tiered mode.</p>
+
+<h2>Structurally sound elements <span class="badge keep">preserve</span></h2>
+<ul class="tight">
+  <li><b>Owned HIR boundary.</b> <code>sv-parser</code> types never escape <code>crates/svsim/src/frontend/</code> (verified by grep). The rest of the system programs against <code>hir.rs</code> (474 lines, plain data). The single most load-bearing decision in the codebase — do not let convenience imports breach it.</li>
+  <li><b>Library-first, thin CLI.</b> <code>main.rs</code> is 242 lines of clap dispatch over library entry points; a 521-line integration test drives the binary end-to-end.</li>
+  <li><b>Corpus-driven compatibility testing.</b> JSON expectation suites beside the SystemVerilog sources, with a deliberate green/negative split. The four-state and inout campaigns both landed against this corpus without breaking it — the mechanism works.</li>
+  <li><b>Typed value layers with explicit escape hatches.</b> <code>BitValue</code> (2-state, host-facing) vs <code>LogicValue</code> (4-state, HDL runtime) is a documented, locked decision; <code>_2state</code> wrappers preserve legacy fail-on-x/z behavior explicitly.</li>
+  <li><b>Maintained knowledge layer.</b> <code>wiki/architecture/</code> is accurate at the module level and materially shortens onboarding; AGENTS.md rules match the code's actual shape (exceptions noted below).</li>
+  <li><b>Deliberate deferral of rendering.</b> <code>svsim-render</code> is a placeholder on purpose — nothing here is a reason to build it out early.</li>
+</ul>
+
+<h2>Structural risks and costs</h2>
+
+<div class="risk">
+<h3><span class="badge now">rank 1</span>Verification scripts are broken; published reports are stale artifacts</h3>
+<p><span class="label">Evidence</span> — <code>test.sh:10</code> runs <code>parts/sap1</code> a second time and writes the output to <code>report-parts-sap2.json</code>; <code>parts/sap2</code> (9 JSON suites) is never executed by the script and its committed &ldquo;6/6 green&rdquo; report is actually sap1 data. <code>parts/sap3</code> (4 suites) appears in no script. Three divergent runners exist (<code>test.sh</code>, <code>test-fails.sh</code>, <code>test.bat</code>); <code>docs/tests/*.json</code> are generated artifacts committed to git with no drift detection.</p>
+<p><span class="label">Consequence</span> — the core invariant &ldquo;the green corpus is green&rdquo; is unverifiable by any single command and has silently regressed at least once. Every future slice lands with false confidence.</p>
+<p><span class="label">Fix direction</span> — make the green corpus a <code>cargo test</code> gate using the existing <code>run_json_test_dir</code> API; fix or retire the shell scripts; regenerate the committed reports as part of the gate or stop committing them. No new infrastructure needed.</p>
+</div>
+
+<div class="risk">
+<h3><span class="badge now">rank 2</span><code>sim.rs</code> is a god module absorbing every runtime concern</h3>
+<p><span class="label">Evidence</span> — 3,059 implementation lines holding at least seven distinguishable responsibilities: the public <code>SimulationSession</code> API (~280 lines); hierarchical state instantiation (~160); the settle/step scheduler; a full four-state expression interpreter (<code>eval_expr</code>, ~220, plus ~500 lines of logic-bit primitives at sim.rs:2043&ndash;2316); lvalue resolution and net-driver staging (~400); <code>$readmem</code>-style memory-file parsing (sim.rs:403&ndash;518); the legacy ROM shim (sim.rs:1816&ndash;1921); and per-instance parameter elaboration (sim.rs:1921).</p>
+<p><span class="label">Consequence</span> — every runtime feature, fix, and slice lands in the same file; review diffs concentrate there; unrelated changes collide; interpreter primitives can't be unit-tested where they live. The dominant ongoing tax on development.</p>
+<p><span class="label">Fix direction</span> — split into a <code>sim/</code> module directory along seams that already exist (the file is mostly free functions): <code>value.rs</code>, <code>eval.rs</code>, <code>state.rs</code>, <code>memory.rs</code>, <code>session.rs</code>, moving inline tests with their subjects. No trait abstractions, no new crates.</p>
+</div>
+
+<div class="risk">
+<h3><span class="badge high">rank 3</span>Three parallel expression evaluators with divergence risk</h3>
+<p><span class="label">Evidence</span> — (a) <code>validate.rs::const_eval_expr</code> + <code>ConstValue</code>, ~400 lines of 2-state constant evaluation (validate.rs:648&ndash;1048); (b) <code>sim.rs::eval_expr</code>, the four-state runtime interpreter; (c) <code>frontend/sv_parser.rs::lower_constant_*</code> parse-time folding (sv_parser.rs:432&ndash;614). Parameters are additionally evaluated at session-build time via evaluator (b).</p>
+<p><span class="label">Consequence</span> — every new operator or width rule must be kept consistent in up to three places; a constant expression can legally fold differently at compile time than it simulates at runtime; nothing tests the evaluators against each other.</p>
+<p><span class="label">Fix direction</span> — one shared HIR-level constant evaluator used by validation, frontend folding, and parameter elaboration. The runtime interpreter stays separate but shares the primitive bit ops (rank 4).</p>
+</div>
+
+<div class="risk">
+<h3><span class="badge high">rank 4</span>Four-state primitives live in the interpreter, not the value layer</h3>
+<p><span class="label">Evidence</span> — <code>logic_bit_not/and/or/xor</code>, reductions, shifts, comparisons, slices, sign-extension (~500 lines, sim.rs:2043&ndash;2316) operate purely on <code>LogicBit</code>/<code>LogicValue</code> yet live in <code>sim.rs</code>; <code>logic_value.rs</code> (699 lines, well-tested) exposes only construction/inspection.</p>
+<p><span class="label">Consequence</span> — the truth tables that define simulator correctness are tested only indirectly through whole-simulation runs; the const evaluator can't reuse them, which is partly why it reimplements arithmetic on <code>BitValue</code>.</p>
+<p><span class="label">Fix direction</span> — move the primitives into <code>logic_value.rs</code> (or <code>logic_ops.rs</code>) with direct truth-table unit tests. Mechanical and behavior-preserving; shrinks <code>sim.rs</code> as a side effect.</p>
+</div>
+
+<div class="risk">
+<h3><span class="badge med">rank 5</span>Elaboration responsibilities are split across three files</h3>
+<p><span class="label">Evidence</span> — <code>elaborate.rs</code> (357 lines) computes runtime object <i>shapes</i> but not parameter <i>values</i>; values are computed lazily in <code>sim.rs</code> per session build; <code>validate.rs</code> owns <code>resolve_legacy_rom_data_path</code> (path resolution, not validation) which <code>sim.rs</code> imports. The wiki describes <code>elaborate.rs</code> as &ldquo;the&rdquo; elaboration layer, which no longer matches.</p>
+<p><span class="label">Consequence</span> — unclear ownership: a parameter bug can plausibly live in three files; elaboration can't be inspected or cached independently of a live session.</p>
+<p><span class="label">Fix direction</span> — move parameter evaluation into <code>elaborate.rs</code> so <code>ElaboratedDesign</code> carries resolved values; relocate ROM path resolution next to the ROM shim. A re-homing, not a redesign.</p>
+</div>
+
+<div class="risk">
+<h3><span class="badge defer">rank 6 · deferred</span>String-keyed, clone-heavy runtime state</h3>
+<p><span class="label">Evidence</span> — <code>ModuleState</code> keys parameters, signals, memories, and clock state by <code>HashMap&lt;String, …&gt;</code>; port drivers carry cloned <code>Expr</code>s; <code>build_instance_value_table</code>/<code>sync_instance_values_to_frame</code> (sim.rs:1212&ndash;1344) maintain a second, name-keyed view of the object frame re-synced every settle pass.</p>
+<p><span class="label">Consequence</span> — two representations of runtime state must stay coherent; per-step hashing/cloning sets a hard performance ceiling. This is the wall <code>picorv32</code>-scale simulation will hit.</p>
+<p><span class="label">Fix direction</span> — <b>explicitly deferred.</b> When picorv32-scale simulation becomes a goal, extend elaboration to assign numeric object ids ahead of time. Do not attempt this rewrite in the current campaign; it would destabilize the corpus for no present-day gain.</p>
+</div>
+
+<h3>Smaller frictions</h3>
+<ul class="tight">
+  <li><b>Doc drift:</b> AGENTS.md and the wiki reference a <code>ref/</code> Python oracle absent from this checkout; AGENTS.md claims &ldquo;no usable Git history&rdquo; while the repo has a meaningful one; <code>docs/progress/</code> stops at 2026-03-20.</li>
+  <li><b>Plan scatter:</b> plans live at the repo root (<code>plan.md</code>, <code>plan-sap3.done.md</code>), in <code>docs/</code>, and in <code>wiki/roadmap/</code> with no single lifecycle. This review adopts <code>plans/in-progress/</code> &rarr; <code>plans/completed/</code>.</li>
+  <li><b>Legacy ROM magic naming</b> contradicts AGENTS.md's &ldquo;explicit configuration over hidden naming conventions&rdquo;; fine to keep as a compat shim, but isolate and document it as legacy (covered by ranks 2/5).</li>
+  <li><code>parts/roms/</code> is empty; <code>test.bat</code> appears Windows-stale.</li>
+</ul>
+
+<h2>Recommended order of attack</h2>
+<ol class="attack">
+  <li><b>Make the green corpus a <code>cargo test</code> gate and repair the scripts.</b>
+  Add a core-crate integration test that runs every green <code>parts/</code> dir through
+  <code>run_json_test_dir</code> and asserts all-pass (sap2's 9 suites and sap3's 4 included).
+  Fix <code>test.sh</code> (sap2 typo, add sap3) or reduce it to a thin wrapper; regenerate the
+  committed <code>docs/tests/</code> reports or remove them in favor of on-demand output.</li>
+  <li><b>Truth up the guidance docs.</b> Fix AGENTS.md (<code>ref/</code> absence, git-history
+  note, test commands), refresh the wiki workspace map and current-state pages against post-sap3
+  reality, and move root plan files into the <code>plans/</code> lifecycle.</li>
+  <li><b>Split <code>sim.rs</code> into a <code>sim/</code> module directory</b> along existing
+  seams: <code>value.rs</code>, <code>eval.rs</code>, <code>state.rs</code>, <code>memory.rs</code>,
+  <code>session.rs</code>, moving inline tests with their subjects. Public API unchanged;
+  behavior-preserving by construction, verified by the step-1 gate.</li>
+  <li><b>Move the four-state primitive operations into the value layer</b>
+  (<code>logic_value.rs</code> or <code>logic_ops.rs</code>) with direct truth-table unit tests;
+  <code>sim/eval.rs</code> becomes a consumer.</li>
+  <li><b>Consolidate constant evaluation into one shared HIR const-evaluator</b> used by
+  <code>validate.rs</code>, frontend folding, and parameter elaboration; delete
+  <code>ConstValue</code> and the frontend's private folding once ported, with regression tests
+  pinning today's accepted/rejected corpus behavior.</li>
+  <li><b>Re-home elaboration:</b> move <code>elaborate_module_parameters</code> from
+  <code>sim.rs</code> into <code>elaborate.rs</code> (resolved values on
+  <code>ElaboratedDesign</code>); move <code>resolve_legacy_rom_data_path</code> out of
+  <code>validate.rs</code> next to the ROM shim.</li>
+  <li><b>Isolate the legacy ROM shim</b> in its own module with a short doc header stating the
+  naming contract and its legacy status.</li>
+</ol>
+<p>Deferred by design: runtime interning/performance work (rank 6) and any build-out of
+<code>svsim-render</code> — both wait until their milestones are actually scheduled.</p>
+
+<h2>Closing assessment</h2>
+<p>The dominant risk is concentration: one file owns the runtime, and one broken shell script owns
+the credibility of the compatibility suite. The best leverage point is step 1 — a single
+<code>cargo test</code> that truthfully proves the corpus green — because it converts every
+subsequent refactor from &ldquo;careful&rdquo; to &ldquo;mechanical.&rdquo; After the split and
+consolidation steps, the expected payoff is that new language features touch one evaluator and one
+runtime module instead of three evaluators inside a 5,000-line file — and that &ldquo;all
+green&rdquo; means what it says.</p>
+
+<div class="footer">
+Generated 2026-07-06 · svsim architectural review · canonical markdown:
+<code>plans/in-progress/architectural-review.md</code>
+</div>
+
+</body>
+</html>
