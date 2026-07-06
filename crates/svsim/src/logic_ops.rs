@@ -52,6 +52,54 @@ pub(crate) fn logic_value_from_bit(bit: LogicBit) -> LogicValue {
     LogicValue::new(bits, 1)
 }
 
+pub(crate) fn logic_sign_extend(
+    logic: &LogicValue,
+    from_width: usize,
+    to_width: usize,
+) -> LogicValue {
+    let to_width = to_width.max(1);
+    let from_width = from_width.max(1);
+    let mut bits = LogicBits::zero();
+    let sign = logic.bit(from_width - 1);
+    for index in 0..to_width {
+        let bit = if index < from_width {
+            logic.bit(index)
+        } else {
+            sign
+        };
+        bits.set_bit(index, bit);
+    }
+    LogicValue::new(bits, to_width)
+}
+
+pub(crate) fn logic_slice(value: &LogicValue, low: usize, width: usize) -> LogicValue {
+    let width = width.max(1);
+    let mut bits = LogicBits::zero();
+    for offset in 0..width {
+        bits.set_bit(offset, value.bit(low + offset));
+    }
+    LogicValue::new(bits, width)
+}
+
+pub(crate) fn logic_replace_slice(
+    base: &LogicValue,
+    low: usize,
+    width: usize,
+    replacement: &LogicValue,
+) -> LogicValue {
+    let mut bits = LogicBits::zero();
+    let replacement = replacement.coerced_to(width);
+    for index in 0..base.width() {
+        let bit = if (low..low + width).contains(&index) {
+            replacement.bit(index - low)
+        } else {
+            base.bit(index)
+        };
+        bits.set_bit(index, bit);
+    }
+    LogicValue::new(bits, base.width())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -131,5 +179,49 @@ mod tests {
             assert_eq!(value.width(), 1);
             assert_eq!(value.bit(0), bit);
         }
+    }
+
+    fn logic(text: &str) -> LogicValue {
+        LogicValue::from_logic_str(text).expect("parse logic literal")
+    }
+
+    #[test]
+    fn sign_extend_replicates_the_sign_bit_including_x_and_z() {
+        assert_eq!(logic_sign_extend(&logic("0101"), 4, 8), logic("00000101"));
+        assert_eq!(logic_sign_extend(&logic("1010"), 4, 8), logic("11111010"));
+        assert_eq!(logic_sign_extend(&logic("x010"), 4, 8), logic("xxxxx010"));
+        assert_eq!(logic_sign_extend(&logic("z010"), 4, 8), logic("zzzzz010"));
+    }
+
+    #[test]
+    fn sign_extend_to_narrower_width_keeps_low_bits() {
+        assert_eq!(logic_sign_extend(&logic("1100_1010"), 8, 4), logic("1010"));
+    }
+
+    #[test]
+    fn slice_extracts_bits_preserving_x_and_z() {
+        let value = logic("01xz0110");
+        assert_eq!(logic_slice(&value, 0, 4), logic("0110"));
+        assert_eq!(logic_slice(&value, 4, 4), logic("01xz"));
+        assert_eq!(logic_slice(&value, 3, 3), logic("xz0"));
+    }
+
+    #[test]
+    fn replace_slice_overwrites_only_the_target_range() {
+        let base = logic("1111_1111");
+        assert_eq!(
+            logic_replace_slice(&base, 2, 4, &logic("0xz0")),
+            logic("110xz011")
+        );
+    }
+
+    #[test]
+    fn replace_slice_coerces_replacement_to_the_range_width() {
+        let base = logic("0000_0000");
+        // Wider replacement is truncated to the 2-bit range.
+        assert_eq!(
+            logic_replace_slice(&base, 0, 2, &logic("1111")),
+            logic("00000011")
+        );
     }
 }

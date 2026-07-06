@@ -141,54 +141,6 @@ pub(super) fn logic_to_public_bit_value(logic: &LogicValue, context: String) -> 
         .map(|bits| bits.truncate(logic.width()))
 }
 
-pub(super) fn logic_sign_extend(
-    logic: &LogicValue,
-    from_width: usize,
-    to_width: usize,
-) -> LogicValue {
-    let to_width = to_width.max(1);
-    let from_width = from_width.max(1);
-    let mut bits = LogicBits::zero();
-    let sign = logic.bit(from_width - 1);
-    for index in 0..to_width {
-        let bit = if index < from_width {
-            logic.bit(index)
-        } else {
-            sign
-        };
-        bits.set_bit(index, bit);
-    }
-    LogicValue::new(bits, to_width)
-}
-
-pub(super) fn logic_slice(value: &LogicValue, low: usize, width: usize) -> LogicValue {
-    let width = width.max(1);
-    let mut bits = LogicBits::zero();
-    for offset in 0..width {
-        bits.set_bit(offset, value.bit(low + offset));
-    }
-    LogicValue::new(bits, width)
-}
-
-pub(super) fn logic_replace_slice(
-    base: &LogicValue,
-    low: usize,
-    width: usize,
-    replacement: &LogicValue,
-) -> LogicValue {
-    let mut bits = LogicBits::zero();
-    let replacement = replacement.coerced_to(width);
-    for index in 0..base.width() {
-        let bit = if (low..low + width).contains(&index) {
-            replacement.bit(index - low)
-        } else {
-            base.bit(index)
-        };
-        bits.set_bit(index, bit);
-    }
-    LogicValue::new(bits, base.width())
-}
-
 pub(super) fn logic_value_from_ordering(ordering: Option<bool>) -> Value {
     match ordering {
         Some(true) => Value::from_logic(logic_value_from_bit(LogicBit::One), 1),
