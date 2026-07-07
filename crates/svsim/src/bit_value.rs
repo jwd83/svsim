@@ -11,9 +11,27 @@ pub const BIT_VALUE_LIMB_BITS: usize = u64::BITS as usize;
 const DECIMAL_CHUNK_BASE: u64 = 10_000_000_000_000_000_000;
 const DECIMAL_CHUNK_WIDTH: usize = 19;
 
+/// Limb storage with an inline fast path. Values that fit in one limb — the
+/// overwhelming majority of runtime signal values — never touch the heap.
+///
+/// Invariant: `Heap` always holds at least two limbs and its last limb is
+/// non-zero; anything smaller is `Inline` (zero is `Inline(0)`). This keeps
+/// the derived `PartialEq`/`Hash` consistent with numeric equality.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+enum Limbs {
+    Inline(u64),
+    Heap(Vec<u64>),
+}
+
+impl Default for Limbs {
+    fn default() -> Self {
+        Limbs::Inline(0)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Default, Hash)]
 pub struct BitValue {
-    limbs: Vec<u64>,
+    limbs: Limbs,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -45,7 +63,38 @@ impl BitValue {
     }
 
     pub fn is_zero(&self) -> bool {
-        self.limbs.is_empty()
+        matches!(self.limbs, Limbs::Inline(0))
+    }
+
+    /// The significant limbs, least significant first; empty when zero.
+    fn limbs(&self) -> &[u64] {
+        match &self.limbs {
+            Limbs::Inline(0) => &[],
+            Limbs::Inline(value) => std::slice::from_ref(value),
+            Limbs::Heap(limbs) => limbs,
+        }
+    }
+
+    fn limb_len(&self) -> usize {
+        match &self.limbs {
+            Limbs::Inline(0) => 0,
+            Limbs::Inline(_) => 1,
+            Limbs::Heap(limbs) => limbs.len(),
+        }
+    }
+
+    /// Single-limb view: `Some(limb0)` when the value fits in one limb.
+    fn inline(&self) -> Option<u64> {
+        match &self.limbs {
+            Limbs::Inline(value) => Some(*value),
+            Limbs::Heap(_) => None,
+        }
+    }
+
+    fn from_inline(value: u64) -> Self {
+        Self {
+            limbs: Limbs::Inline(value),
+        }
     }
 
     pub fn from_prefixed_str(text: &str) -> Result<Self, ParseBitValueError> {
@@ -94,32 +143,29 @@ impl BitValue {
             ));
         }
 
-        let mut value = Self::zero();
+        let mut limbs = Vec::new();
         for ch in cleaned.chars() {
             let digit = ch
                 .to_digit(radix)
                 .ok_or_else(|| ParseBitValueError::new("invalid digit for radix"))?;
-            value.mul_small_assign(radix as u64);
-            value.add_small_assign(digit as u64);
+            mul_small_assign(&mut limbs, radix as u64);
+            add_small_assign(&mut limbs, digit as u64);
         }
 
-        Ok(value)
+        Ok(Self::new(limbs))
     }
 
     pub fn bit_len(&self) -> usize {
-        let Some(&last) = self.limbs.last() else {
+        let limbs = self.limbs();
+        let Some(&last) = limbs.last() else {
             return 0;
         };
-        (self.limbs.len() - 1) * BIT_VALUE_LIMB_BITS
+        (limbs.len() - 1) * BIT_VALUE_LIMB_BITS
             + (BIT_VALUE_LIMB_BITS - last.leading_zeros() as usize)
     }
 
     pub fn to_u64_checked(&self) -> Option<u64> {
-        match self.limbs.as_slice() {
-            [] => Some(0),
-            [value] => Some(*value),
-            _ => None,
-        }
+        self.inline()
     }
 
     pub fn to_usize_checked(&self) -> Option<usize> {
@@ -127,12 +173,14 @@ impl BitValue {
     }
 
     pub fn cmp_unsigned(&self, other: &Self) -> Ordering {
-        match self.limbs.len().cmp(&other.limbs.len()) {
+        let left = self.limbs();
+        let right = other.limbs();
+        match left.len().cmp(&right.len()) {
             Ordering::Equal => {}
             ordering => return ordering,
         }
 
-        for (left, right) in self.limbs.iter().rev().zip(other.limbs.iter().rev()) {
+        for (left, right) in left.iter().rev().zip(right.iter().rev()) {
             match left.cmp(right) {
                 Ordering::Equal => {}
                 ordering => return ordering,
@@ -143,39 +191,62 @@ impl BitValue {
     }
 
     pub fn truncate(&self, width: usize) -> Self {
+        if let Some(value) = self.inline() {
+            if width == 0 {
+                return Self::zero();
+            }
+            if width >= BIT_VALUE_LIMB_BITS {
+                return Self::from_inline(value);
+            }
+            return Self::from_inline(value & low_mask(width));
+        }
         let mut value = self.clone();
         value.truncate_in_place(width);
         value
     }
 
     pub fn truncate_in_place(&mut self, width: usize) {
-        let limb_count = limb_count(width);
-        self.limbs.truncate(limb_count);
-        if width == 0 {
-            self.limbs.clear();
-            return;
+        match &mut self.limbs {
+            Limbs::Inline(value) => {
+                if width == 0 {
+                    *value = 0;
+                } else if width < BIT_VALUE_LIMB_BITS {
+                    *value &= low_mask(width);
+                }
+            }
+            Limbs::Heap(limbs) => {
+                let limb_count = limb_count(width);
+                limbs.truncate(limb_count);
+                if width == 0 {
+                    limbs.clear();
+                } else if let Some(last) = limbs.last_mut() {
+                    *last &= low_mask(width % BIT_VALUE_LIMB_BITS);
+                }
+                self.canonicalize();
+            }
         }
-        if let Some(last) = self.limbs.last_mut() {
-            *last &= low_mask(width % BIT_VALUE_LIMB_BITS);
-        }
-        self.normalize();
     }
 
     pub fn mask(width: usize) -> Self {
         let limb_count = limb_count(width);
-        if limb_count == 0 {
-            return Self::zero();
+        match limb_count {
+            0 => Self::zero(),
+            1 => Self::from_inline(low_mask(width % BIT_VALUE_LIMB_BITS)),
+            _ => {
+                let mut limbs = vec![u64::MAX; limb_count];
+                if let Some(last) = limbs.last_mut() {
+                    *last = low_mask(width % BIT_VALUE_LIMB_BITS);
+                }
+                Self::new(limbs)
+            }
         }
-
-        let mut limbs = vec![u64::MAX; limb_count];
-        if let Some(last) = limbs.last_mut() {
-            *last = low_mask(width % BIT_VALUE_LIMB_BITS);
-        }
-        Self::new(limbs)
     }
 
     pub fn bitand(&self, other: &Self) -> Self {
-        let len = self.limbs.len().min(other.limbs.len());
+        if let (Some(left), Some(right)) = (self.inline(), other.inline()) {
+            return Self::from_inline(left & right);
+        }
+        let len = self.limb_len().min(other.limb_len());
         let mut limbs = Vec::with_capacity(len);
         for index in 0..len {
             limbs.push(self.limb(index) & other.limb(index));
@@ -184,22 +255,32 @@ impl BitValue {
     }
 
     pub fn bitor(&self, other: &Self) -> Self {
+        if let (Some(left), Some(right)) = (self.inline(), other.inline()) {
+            return Self::from_inline(left | right);
+        }
         self.combine(other, |left, right| left | right)
     }
 
     pub fn bitxor(&self, other: &Self) -> Self {
+        if let (Some(left), Some(right)) = (self.inline(), other.inline()) {
+            return Self::from_inline(left ^ right);
+        }
         self.combine(other, |left, right| left ^ right)
     }
 
     pub fn bitnot_with_width(&self, width: usize) -> Self {
-        let mut value = self.truncate(width);
-        let required_limbs = limb_count(width);
-        if value.limbs.len() < required_limbs {
-            value.limbs.resize(required_limbs, 0);
+        if width <= BIT_VALUE_LIMB_BITS {
+            if width == 0 {
+                return Self::zero();
+            }
+            return Self::from_inline(!self.limb(0) & low_mask(width % BIT_VALUE_LIMB_BITS));
         }
-        for limb in &mut value.limbs {
+        let mut limbs = self.limbs().to_vec();
+        limbs.resize(limb_count(width), 0);
+        for limb in &mut limbs {
             *limb = !*limb;
         }
+        let mut value = Self::new(limbs);
         value.truncate_in_place(width);
         value
     }
@@ -208,13 +289,19 @@ impl BitValue {
         if self.is_zero() || amount == 0 {
             return self.clone();
         }
+        if let Some(value) = self.inline() {
+            if amount + self.bit_len() <= BIT_VALUE_LIMB_BITS {
+                return Self::from_inline(value << amount);
+            }
+        }
 
+        let source = self.limbs();
         let limb_shift = amount / BIT_VALUE_LIMB_BITS;
         let bit_shift = amount % BIT_VALUE_LIMB_BITS;
         let extra = usize::from(bit_shift != 0);
-        let mut limbs = vec![0; self.limbs.len() + limb_shift + extra];
+        let mut limbs = vec![0; source.len() + limb_shift + extra];
 
-        for (index, limb) in self.limbs.iter().enumerate() {
+        for (index, limb) in source.iter().enumerate() {
             let dest = index + limb_shift;
             limbs[dest] |= *limb << bit_shift;
             if bit_shift != 0 {
@@ -229,19 +316,26 @@ impl BitValue {
         if self.is_zero() || amount == 0 {
             return self.clone();
         }
+        if let Some(value) = self.inline() {
+            if amount >= BIT_VALUE_LIMB_BITS {
+                return Self::zero();
+            }
+            return Self::from_inline(value >> amount);
+        }
 
+        let source = self.limbs();
         let limb_shift = amount / BIT_VALUE_LIMB_BITS;
         let bit_shift = amount % BIT_VALUE_LIMB_BITS;
-        if limb_shift >= self.limbs.len() {
+        if limb_shift >= source.len() {
             return Self::zero();
         }
 
-        let mut limbs = vec![0; self.limbs.len() - limb_shift];
-        for src in limb_shift..self.limbs.len() {
+        let mut limbs = vec![0; source.len() - limb_shift];
+        for src in limb_shift..source.len() {
             let dest = src - limb_shift;
-            limbs[dest] |= self.limbs[src] >> bit_shift;
-            if bit_shift != 0 && src + 1 < self.limbs.len() {
-                limbs[dest] |= self.limbs[src + 1] << (BIT_VALUE_LIMB_BITS - bit_shift);
+            limbs[dest] |= source[src] >> bit_shift;
+            if bit_shift != 0 && src + 1 < source.len() {
+                limbs[dest] |= source[src + 1] << (BIT_VALUE_LIMB_BITS - bit_shift);
             }
         }
 
@@ -249,11 +343,15 @@ impl BitValue {
     }
 
     pub fn wrapping_add(&self, other: &Self, width: usize) -> Self {
-        let limit = limb_count(width);
-        if limit == 0 {
+        if width == 0 {
             return Self::zero();
         }
+        if width <= BIT_VALUE_LIMB_BITS {
+            let sum = self.limb(0).wrapping_add(other.limb(0));
+            return Self::from_inline(sum & low_mask(width % BIT_VALUE_LIMB_BITS));
+        }
 
+        let limit = limb_count(width);
         let mut limbs = Vec::with_capacity(limit + 1);
         let mut carry = 0_u128;
         for index in 0..limit {
@@ -271,11 +369,15 @@ impl BitValue {
     }
 
     pub fn wrapping_mul(&self, other: &Self, width: usize) -> Self {
-        let limit = limb_count(width);
-        if limit == 0 || self.is_zero() || other.is_zero() {
+        if width == 0 || self.is_zero() || other.is_zero() {
             return Self::zero();
         }
+        if width <= BIT_VALUE_LIMB_BITS {
+            let product = self.limb(0).wrapping_mul(other.limb(0));
+            return Self::from_inline(product & low_mask(width % BIT_VALUE_LIMB_BITS));
+        }
 
+        let limit = limb_count(width);
         let mut limbs = vec![0u64; limit + 1];
         for i in 0..limit {
             let a = self.limb(i) as u128;
@@ -299,11 +401,15 @@ impl BitValue {
     }
 
     pub fn wrapping_sub(&self, other: &Self, width: usize) -> Self {
-        let limit = limb_count(width);
-        if limit == 0 {
+        if width == 0 {
             return Self::zero();
         }
+        if width <= BIT_VALUE_LIMB_BITS {
+            let difference = self.limb(0).wrapping_sub(other.limb(0));
+            return Self::from_inline(difference & low_mask(width % BIT_VALUE_LIMB_BITS));
+        }
 
+        let limit = limb_count(width);
         let mut limbs = Vec::with_capacity(limit);
         let mut borrow = 0_u128;
         for index in 0..limit {
@@ -330,17 +436,32 @@ impl BitValue {
     }
 
     pub fn set_bit(&mut self, index: usize, value: bool) {
+        if let Limbs::Inline(current) = &mut self.limbs {
+            if index < BIT_VALUE_LIMB_BITS {
+                if value {
+                    *current |= 1_u64 << index;
+                } else {
+                    *current &= !(1_u64 << index);
+                }
+                return;
+            }
+            if !value {
+                return;
+            }
+        }
+
+        let mut limbs = self.limbs().to_vec();
         let limb_index = index / BIT_VALUE_LIMB_BITS;
         let bit_index = index % BIT_VALUE_LIMB_BITS;
         if value {
-            if self.limbs.len() <= limb_index {
-                self.limbs.resize(limb_index + 1, 0);
+            if limbs.len() <= limb_index {
+                limbs.resize(limb_index + 1, 0);
             }
-            self.limbs[limb_index] |= 1_u64 << bit_index;
-        } else if limb_index < self.limbs.len() {
-            self.limbs[limb_index] &= !(1_u64 << bit_index);
-            self.normalize();
+            limbs[limb_index] |= 1_u64 << bit_index;
+        } else if limb_index < limbs.len() {
+            limbs[limb_index] &= !(1_u64 << bit_index);
         }
+        *self = Self::new(limbs);
     }
 
     pub fn slice(&self, lsb: usize, width: usize) -> Self {
@@ -351,77 +472,93 @@ impl BitValue {
         while limbs.last() == Some(&0) {
             limbs.pop();
         }
-        Self { limbs }
+        match limbs.as_slice() {
+            [] => Self::from_inline(0),
+            [value] => Self::from_inline(*value),
+            _ => Self {
+                limbs: Limbs::Heap(limbs),
+            },
+        }
     }
 
     fn limb(&self, index: usize) -> u64 {
-        self.limbs.get(index).copied().unwrap_or(0)
+        self.limbs().get(index).copied().unwrap_or(0)
     }
 
-    fn normalize(&mut self) {
-        while self.limbs.last() == Some(&0) {
-            self.limbs.pop();
+    /// Restores the `Inline`/`Heap` invariant after in-place heap edits.
+    fn canonicalize(&mut self) {
+        if let Limbs::Heap(limbs) = &mut self.limbs {
+            while limbs.last() == Some(&0) {
+                limbs.pop();
+            }
+            match limbs.as_slice() {
+                [] => self.limbs = Limbs::Inline(0),
+                [value] => self.limbs = Limbs::Inline(*value),
+                _ => {}
+            }
         }
     }
 
     fn combine(&self, other: &Self, op: impl Fn(u64, u64) -> u64) -> Self {
-        let len = self.limbs.len().max(other.limbs.len());
+        let len = self.limb_len().max(other.limb_len());
         let mut limbs = Vec::with_capacity(len);
         for index in 0..len {
             limbs.push(op(self.limb(index), other.limb(index)));
         }
         Self::new(limbs)
     }
+}
 
-    fn add_small_assign(&mut self, value: u64) {
-        if value == 0 {
-            return;
-        }
-
-        let mut carry = value as u128;
-        let mut index = 0;
-        while carry != 0 {
-            if index == self.limbs.len() {
-                self.limbs.push(0);
-            }
-            let sum = self.limbs[index] as u128 + carry;
-            self.limbs[index] = sum as u64;
-            carry = sum >> BIT_VALUE_LIMB_BITS;
-            index += 1;
-        }
+fn add_small_assign(limbs: &mut Vec<u64>, value: u64) {
+    if value == 0 {
+        return;
     }
 
-    fn mul_small_assign(&mut self, factor: u64) {
-        if self.is_zero() || factor == 1 {
-            return;
+    let mut carry = value as u128;
+    let mut index = 0;
+    while carry != 0 {
+        if index == limbs.len() {
+            limbs.push(0);
         }
-        if factor == 0 {
-            self.limbs.clear();
-            return;
-        }
+        let sum = limbs[index] as u128 + carry;
+        limbs[index] = sum as u64;
+        carry = sum >> BIT_VALUE_LIMB_BITS;
+        index += 1;
+    }
+}
 
-        let mut carry = 0_u128;
-        for limb in &mut self.limbs {
-            let product = *limb as u128 * factor as u128 + carry;
-            *limb = product as u64;
-            carry = product >> BIT_VALUE_LIMB_BITS;
-        }
-        if carry != 0 {
-            self.limbs.push(carry as u64);
-        }
+fn mul_small_assign(limbs: &mut Vec<u64>, factor: u64) {
+    if limbs.is_empty() || factor == 1 {
+        return;
+    }
+    if factor == 0 {
+        limbs.clear();
+        return;
     }
 
-    fn div_rem_small(&mut self, divisor: u64) -> u64 {
-        debug_assert!(divisor != 0);
-        let mut remainder = 0_u128;
-        for limb in self.limbs.iter_mut().rev() {
-            let value = (remainder << BIT_VALUE_LIMB_BITS) | *limb as u128;
-            *limb = (value / divisor as u128) as u64;
-            remainder = value % divisor as u128;
-        }
-        self.normalize();
-        remainder as u64
+    let mut carry = 0_u128;
+    for limb in limbs.iter_mut() {
+        let product = *limb as u128 * factor as u128 + carry;
+        *limb = product as u64;
+        carry = product >> BIT_VALUE_LIMB_BITS;
     }
+    if carry != 0 {
+        limbs.push(carry as u64);
+    }
+}
+
+fn div_rem_small(limbs: &mut Vec<u64>, divisor: u64) -> u64 {
+    debug_assert!(divisor != 0);
+    let mut remainder = 0_u128;
+    for limb in limbs.iter_mut().rev() {
+        let value = (remainder << BIT_VALUE_LIMB_BITS) | *limb as u128;
+        *limb = (value / divisor as u128) as u64;
+        remainder = value % divisor as u128;
+    }
+    while limbs.last() == Some(&0) {
+        limbs.pop();
+    }
+    remainder as u64
 }
 
 impl Serialize for BitValue {
@@ -500,10 +637,10 @@ impl fmt::Display for BitValue {
             return f.write_str("0");
         }
 
-        let mut value = self.clone();
+        let mut limbs = self.limbs().to_vec();
         let mut chunks = Vec::new();
-        while !value.is_zero() {
-            chunks.push(value.div_rem_small(DECIMAL_CHUNK_BASE));
+        while !limbs.is_empty() {
+            chunks.push(div_rem_small(&mut limbs, DECIMAL_CHUNK_BASE));
         }
 
         let Some(first) = chunks.pop() else {
@@ -527,11 +664,7 @@ impl FromStr for BitValue {
 
 impl From<u64> for BitValue {
     fn from(value: u64) -> Self {
-        if value == 0 {
-            Self::zero()
-        } else {
-            Self { limbs: vec![value] }
-        }
+        Self::from_inline(value)
     }
 }
 
@@ -539,12 +672,12 @@ impl From<u128> for BitValue {
     fn from(value: u128) -> Self {
         let low = value as u64;
         let high = (value >> BIT_VALUE_LIMB_BITS) as u64;
-        match (low, high) {
-            (0, 0) => Self::zero(),
-            (_, 0) => Self::from(low),
-            _ => Self {
-                limbs: vec![low, high],
-            },
+        if high == 0 {
+            Self::from_inline(low)
+        } else {
+            Self {
+                limbs: Limbs::Heap(vec![low, high]),
+            }
         }
     }
 }
@@ -621,5 +754,50 @@ mod tests {
         assert_eq!(value.shift_left(1).to_string(), "36893488147419103234");
         assert_eq!(value.shift_right(64).to_u64_checked(), Some(1));
         assert_eq!(value.slice(64, 1).to_u64_checked(), Some(1));
+    }
+
+    #[test]
+    fn inline_and_heap_values_compare_consistently_across_transitions() {
+        // Heap results that shrink to one limb must equal (and hash like)
+        // values built inline.
+        let wide = BitValue::from(1_u128 << 64);
+        let narrowed = wide.truncate(64);
+        assert_eq!(narrowed, BitValue::zero());
+
+        let one_again = wide.shift_right(64);
+        assert_eq!(one_again, BitValue::one());
+
+        let mut bit_cleared = BitValue::from(1_u128 << 64);
+        bit_cleared.set_bit(64, false);
+        assert_eq!(bit_cleared, BitValue::zero());
+
+        let mut grown = BitValue::one();
+        grown.set_bit(64, true);
+        assert_eq!(grown, BitValue::from((1_u128 << 64) | 1));
+        assert_eq!(grown.to_u64_checked(), None);
+    }
+
+    #[test]
+    fn single_limb_arithmetic_matches_wide_paths_at_boundaries() {
+        let max = BitValue::from(u64::MAX);
+        assert_eq!(max.wrapping_add(&BitValue::one(), 64), BitValue::zero());
+        assert_eq!(
+            max.wrapping_add(&BitValue::one(), 65),
+            BitValue::from(1_u128 << 64)
+        );
+        assert_eq!(
+            BitValue::zero().wrapping_sub(&BitValue::one(), 64),
+            BitValue::from(u64::MAX)
+        );
+        assert_eq!(
+            max.wrapping_mul(&BitValue::from(2_u64), 64),
+            BitValue::from(u64::MAX - 1)
+        );
+        assert_eq!(BitValue::mask(64), BitValue::from(u64::MAX));
+        assert_eq!(BitValue::mask(1), BitValue::one());
+        assert_eq!(
+            BitValue::from(0b1010_u64).bitnot_with_width(4),
+            BitValue::from(0b0101_u64)
+        );
     }
 }
