@@ -41,7 +41,7 @@
 
 <header>
   <h1>Architectural Review — svsim <span style="font-weight:400">(second review)</span></h1>
-  <div class="meta">Reviewed 2026-07-06 against <code>main</code> @ <code>1b08d69</code> · canonical copy: <code>plans/in-progress/architectural-review.md</code> · predecessor campaign: <code>plans/completed/2026-07-06-architectural-review.md</code></div>
+  <div class="meta">Reviewed 2026-07-06 against <code>main</code> @ <code>1b08d69</code> · <strong>campaign completed 2026-07-07</strong>: all seven steps done, suite 209/209 · canonical copy: <code>plans/completed/2026-07-07-architectural-review.md</code> · predecessor campaign: <code>plans/completed/2026-07-06-architectural-review.md</code></div>
 </header>
 
 <p class="lead">
@@ -236,7 +236,14 @@ incrementally useful.</p>
       207/207 with a new span regression test; negative-corpus fragments unaffected.</div></li>
   <li><strong>Truth-up and close.</strong> Fix the stale <code>width.rs</code> wiki row, add a root
       <code>README.md</code>, add doc examples to <code>Compiler</code>/<code>SimulationSession</code>, refresh
-      <code>./test.sh</code> reports (capturing new <code>step_hz</code>), move this review to <code>plans/completed/</code>.</li>
+      <code>./test.sh</code> reports (capturing new <code>step_hz</code>), move this review to <code>plans/completed/</code>.
+      <div class="note"><strong>Done 2026-07-07 — campaign complete.</strong> <code>62475fd</code>: README,
+      first doctests (combinational eval + clocked counter), width row fixed; closing commit moves the
+      review here and syncs the wiki. Suite 209/209. Campaign totals vs the 2026-07-06 baseline:
+      negative corpus gated (8 must-fail suites), parameterization trap fenced, release corpus
+      54.4 s → 15.5 s, <code>cargo test</code> ~2 min → ~50 s, largest production file 3,731 → 1,151
+      lines, span-carrying diagnostics. Deferred for a future review: runtime value representation
+      (the residual per-operation allocation cost) and <code>svsim-render</code>.</div></li>
 </ol>
 
 <h2>Closing assessment</h2>

@@ -1,6 +1,8 @@
 # Architectural Review — svsim (second review)
 
-*Reviewed 2026-07-06 against `main` @ `1b08d69`.*
+*Reviewed 2026-07-06 against `main` @ `1b08d69`. Campaign completed
+2026-07-07: all seven steps done, full suite 209/209 (including the crate's
+first doctests), release corpus 3.5× faster than the review baseline.*
 
 This is the second architectural review, taken immediately after the completed
 seven-step campaign recorded in
@@ -404,6 +406,26 @@ incremental, and each converted call site is immediately useful.
    `Compiler` and `SimulationSession`, re-run `./test.sh` to refresh committed
    reports (capturing the new `step_hz`), and move this review to
    `plans/completed/`.
+
+   *Done 2026-07-07*, in 2 commits — the final step; the campaign is
+   complete:
+   - `62475fd`: root `README.md` (human front door → `AGENTS.md`, wiki);
+     runnable doc examples on `Compiler` (combinational eval) and
+     `SimulationSession` (clocked counter) — the crate's first doctests;
+     stale `width.rs` workspace-map row fixed.
+   - (this commit): `./test.sh` reports refreshed; review moved to
+     `plans/completed/2026-07-07-architectural-review.md` (+ `.html`
+     companion); wiki synced (log, current-state).
+
+   Result: full suite 209/209 (187 unit + 10 gate + 10 CLI + 2 doctests).
+   Campaign totals against the 2026-07-06 baseline: negative corpus gated
+   (8 must-fail suites), the parameterization trap fenced with
+   construct-naming diagnostics, release corpus 54.4 s → 15.5 s, `cargo
+   test` ~2 min → ~50 s, largest production file 3,731 → 1,151 lines,
+   frontend diagnostics span-carrying. Deferred by design, for a future
+   review against this new baseline: runtime value representation
+   (per-operation `LogicValue` allocation — the residual perf cost) and
+   `svsim-render`.
 
 ## Closing assessment
 

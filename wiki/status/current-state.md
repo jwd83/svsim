@@ -4,12 +4,13 @@ Snapshot date: 2026-07-06
 
 ## Verified Today
 
-- `cargo test`: pass, `206/206` — `186` `svsim` unit tests (including `14`
+- `cargo test`: pass, `209/209` — `187` `svsim` unit tests (including `14`
   direct four-state truth-table tests in `crates/svsim/src/logic_ops.rs`),
   `10` corpus gate tests (`crates/svsim/tests/corpus_gate.rs`: nine green
-  directories plus `corpus_failing_stays_red` over the negative corpus), and
-  `10` CLI integration tests, in roughly fifty seconds of wall time (down
-  from roughly two minutes before the second review's step 3).
+  directories plus `corpus_failing_stays_red` over the negative corpus),
+  `10` CLI integration tests, and `2` doctests, in roughly fifty seconds of
+  wall time (down from roughly two minutes before the second review's
+  step 3).
 - Green corpus, now enforced directly by `cargo test`: `195/195` regression
   suites across all nine green `parts/` directories — `44` basic, `55`
   testing, `43` overture, `16` rv32i, `13` picorv32, `6` sap1, `9` sap2, `4`
@@ -46,6 +47,12 @@ Snapshot date: 2026-07-06
   `expressions`, `literals`, `const_eval`, `loop_unroll`, `tests`); the
   largest production file in the crate is `module_structure.rs` at 1,151
   lines.
+- The second architectural review campaign is complete (all seven steps):
+  [../../plans/completed/2026-07-07-architectural-review.md](../../plans/completed/2026-07-07-architectural-review.md).
+  Steps 6–7 added span-carrying frontend diagnostics, module context in
+  evaluator errors, a root `README.md`, and the crate's first doc examples.
+  Deferred for a future review against this baseline: runtime value
+  representation (per-operation `LogicValue` allocation) and `svsim-render`.
 - The workspace `Cargo.toml` builds the `svsim` package at `opt-level = 2`
   even in dev/test profiles; unoptimized simulation is ~9x slower and made
   the full suite impractical (unit tests dropped from ~130s to ~32s).

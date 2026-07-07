@@ -77,3 +77,11 @@
 - `crates/svsim/src/frontend/sv_parser.rs` (4,535 lines) is now the `sv_parser/` module directory: `mod.rs` (160 — public `SvParserFrontend` + plumbing), `module_structure.rs` (1,151), `expressions.rs` (866), `statements.rs` (744), `loop_unroll.rs` (468), `literals.rs` (251), `const_eval.rs` (183), `tests.rs` (802). Zero call-site churn via the proven `sim/` pattern.
 - `loop_unroll.rs` is named for what it is — elaboration work done at lowering time — with a doc header stating the default-parameter freeze and cross-referencing the step-2 fence; `const_eval.rs` (a sixth file beyond the review's list) holds the `const_eval_param_expr` choke point and frozen-parameter recording.
 - The largest production file in the crate is now `module_structure.rs` at 1,151 lines (was `sv_parser.rs` at 3,731 production lines).
+
+## [2026-07-07] lint | diagnostics spans and campaign completion (second architectural review, steps 6-7)
+
+- Verified `cargo test`: pass (`209/209` — `187` `svsim` unit tests, `10` corpus gate tests, `10` CLI tests, and the crate's first `2` doctests).
+- Frontend `unsupported` diagnostics carry source spans: `span_of_node` (first `Locate` leaf, evaluated only on the error path) covers the lowering functions, and `with_fallback_span` attaches spans at call-site boundaries for leaf helpers without source context (literal parsing, operator tables, const-eval funnels). `eval_expr`/`expr_width` errors name their module.
+- The repository has a root `README.md` (front door → `AGENTS.md`, wiki), and `Compiler`/`SimulationSession` carry runnable doc examples.
+- The second architectural review campaign is complete (all seven steps); the review moved to `plans/completed/2026-07-07-architectural-review.md` (+ `.html`). Campaign totals against the 2026-07-06 baseline: negative corpus gated as must-fail, frozen-parameter overrides rejected with construct-naming diagnostics, release corpus 54.4 s → 15.5 s, `cargo test` ~2 min → ~50 s, largest production file 3,731 → 1,151 lines.
+- Deferred by design for a future review: runtime value representation (per-operation `LogicValue` allocation is the residual perf cost) and `svsim-render`.
