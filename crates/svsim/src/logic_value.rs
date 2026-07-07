@@ -144,10 +144,11 @@ impl LogicValue {
     }
 
     pub fn all_z(width: usize) -> Self {
-        let mut bits = LogicBits::zero();
-        for index in 0..width.max(1) {
-            bits.set_bit(index, LogicBit::Z);
-        }
+        let bits = LogicBits {
+            ones: BitValue::zero(),
+            x_mask: BitValue::zero(),
+            z_mask: BitValue::mask(width.max(1)),
+        };
         Self::new(bits, width)
     }
 
@@ -182,6 +183,12 @@ impl LogicValue {
 
     #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn coerced_to(&self, width: usize) -> Self {
+        // `new` already truncated `bits` to `self.width`, so an equal-width
+        // coercion is a plain clone — the hottest case on the runtime's
+        // read/write paths.
+        if width.max(1) == self.width {
+            return self.clone();
+        }
         Self::new(self.bits.clone(), width)
     }
 
