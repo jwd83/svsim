@@ -70,3 +70,10 @@
 - The settle loop converges on `pass_changed | nets_changed` instead of cloning and deep-comparing the whole frame every iteration. Overlay-level change flags from assigns and proc blocks are deliberately discarded — a default-then-override sequence reports "changed" at steady state — and the sound signal is `commit_overlay_to_frame`'s comparison of each dirty name's final value against the frame.
 - The iteration budget was measured with the new env-gated `SVSIM_SETTLE_STATS=1` hook: across `48,069` settle calls the deepest design converged in `12` iterations against budgets up to `558,880`. The historical ×8 multiplier is gone; the bound is budget + 1 confirming pass, floored at 16 (the floor covers undriven pulled nets — `tri1` — which change once before they can be confirmed stable).
 - Release corpus 16.7 s → 15.5 s for step 4 alone; combined steps 3+4 versus the review baseline: 54.4 s → 15.5 s (3.5×), `regfile_8x8` 4 → 19 step/s, `adder_cs_64bit` 1 → 6, sap1 395 → 1,633. The remaining runtime cost is per-operation value allocation in expression evaluation — deferred to a future value-representation campaign, as the review planned.
+
+## [2026-07-07] lint | sv_parser module split (second architectural review, step 5)
+
+- Verified `cargo test`: pass (`206/206` after every slice).
+- `crates/svsim/src/frontend/sv_parser.rs` (4,535 lines) is now the `sv_parser/` module directory: `mod.rs` (160 — public `SvParserFrontend` + plumbing), `module_structure.rs` (1,151), `expressions.rs` (866), `statements.rs` (744), `loop_unroll.rs` (468), `literals.rs` (251), `const_eval.rs` (183), `tests.rs` (802). Zero call-site churn via the proven `sim/` pattern.
+- `loop_unroll.rs` is named for what it is — elaboration work done at lowering time — with a doc header stating the default-parameter freeze and cross-referencing the step-2 fence; `const_eval.rs` (a sixth file beyond the review's list) holds the `const_eval_param_expr` choke point and frozen-parameter recording.
+- The largest production file in the crate is now `module_structure.rs` at 1,151 lines (was `sv_parser.rs` at 3,731 production lines).

@@ -220,7 +220,13 @@ incrementally useful.</p>
       adder_cs_64bit 1→6, sap1 395→1,633 — a 4–6× move, short of the predicted 10×; the residual
       is per-operation value allocation, deferred to a future value-representation campaign.</div></li>
   <li><strong>Split <code>frontend/sv_parser.rs</code></strong> into <code>module_structure.rs</code>, <code>statements.rs</code>,
-      <code>expressions.rs</code>, <code>literals.rs</code>, <code>loop_unroll.rs</code> using the <code>sim/</code> pattern.</li>
+      <code>expressions.rs</code>, <code>literals.rs</code>, <code>loop_unroll.rs</code> using the <code>sim/</code> pattern.
+      <div class="note"><strong>Done 2026-07-07</strong> — six slices (<code>9bc1e5b</code>…<code>f6a4f52</code>),
+      206/206 after each, zero call-site churn. Final shape: module_structure 1,151 · expressions 866 ·
+      statements 744 · loop_unroll 468 (doc header names it elaboration-in-exile, cross-refs the step-2
+      fence) · literals 251 · const_eval 183 · tests 802 · mod.rs 160. Deviation: a sixth file,
+      <code>const_eval.rs</code>, since the funnels serve ranges/selects too. Largest production file in
+      the crate is now 1,151 lines (was 3,731).</div></li>
   <li><strong>Thread spans through diagnostics.</strong> Convert the ~58 span-less <code>unsupported()</code> sites;
       prefix evaluator/width errors with module + construct; verify against the gated negative corpus.</li>
   <li><strong>Truth-up and close.</strong> Fix the stale <code>width.rs</code> wiki row, add a root

@@ -41,6 +41,11 @@ Snapshot date: 2026-07-06
   12 iterations; re-measure with `SVSIM_SETTLE_STATS=1`). Release-corpus
   runtime dropped 3.5× (54.4 s → 15.5 s); e.g. `regfile_8x8` 4 → 19 steps/s,
   sap programs ~300 → ~1,500 steps/s, picorv32 ~250 steps/s.
+- Since the second review's step 5, the frontend is the
+  `frontend/sv_parser/` module directory (`module_structure`, `statements`,
+  `expressions`, `literals`, `const_eval`, `loop_unroll`, `tests`); the
+  largest production file in the crate is `module_structure.rs` at 1,151
+  lines.
 - The workspace `Cargo.toml` builds the `svsim` package at `opt-level = 2`
   even in dev/test profiles; unoptimized simulation is ~9x slower and made
   the full suite impractical (unit tests dropped from ~130s to ~32s).

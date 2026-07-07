@@ -353,6 +353,29 @@ incremental, and each converted call site is immediately useful.
    pattern — `module_structure.rs`, `statements.rs`, `expressions.rs`,
    `literals.rs`, `loop_unroll.rs` — naming the unroller for what it is and
    cross-referencing the step-2 fence in its doc header.
+
+   *Done 2026-07-07*, in 6 commits:
+   - `9bc1e5b`: `git mv` to `sv_parser/mod.rs`; 804-line inline test module
+     extracted to `tests.rs`.
+   - `b606a89`: `literals.rs` (251) and `const_eval.rs` (183 — the
+     `const_eval_param_expr` choke point, usize funnels, and
+     frozen-parameter recording, doc header pointing at the step-2 fence).
+   - `5aeda2a`: `loop_unroll.rs` (468), doc header naming it elaboration
+     work done at lowering time, stating the default-parameter freeze, and
+     noting it is the code a future HIR loop representation would replace.
+   - `4dc66d1`: `expressions.rs` (866).
+   - `1473fb1`: `statements.rs` (744).
+   - `f6a4f52`: `module_structure.rs` (1,151); `mod.rs` ends at 160 lines
+     (doc header, `SvParserFrontend` entry points, span/identifier
+     plumbing).
+
+   Result: full suite 206/206 after every slice; zero call-site churn (the
+   `sim/` pattern: `use super::*;` submodules, `pub(super)` items, private
+   glob re-exports in `mod.rs`). One deviation from the review's five-file
+   list: a sixth file, `const_eval.rs`, because the constant-evaluation
+   funnels serve ranges and selects too, not just the unroller. The largest
+   production file in the crate is now `module_structure.rs` at 1,151 lines
+   (down from `sv_parser.rs` at 3,731 production lines).
 6. **Thread spans through diagnostics.** Convert the ~58 span-less
    `unsupported()` sites in the (now split) frontend; prefix evaluator/width
    `Resolve` errors with module and construct context. Verify diagnostic

@@ -19,7 +19,7 @@ The workspace is intentionally small. Most of the simulator lives in one core cr
 | Module | Responsibility |
 | --- | --- |
 | [`../../crates/svsim/src/compiler.rs`](../../crates/svsim/src/compiler.rs) | Entry points for file/string compilation plus compile-dir and JSON-dir batch runs. |
-| [`../../crates/svsim/src/frontend`](../../crates/svsim/src/frontend) | `sv-parser` integration and lowering into owned HIR. |
+| [`../../crates/svsim/src/frontend`](../../crates/svsim/src/frontend) | `sv-parser` integration and lowering into owned HIR. Split by responsibility under [`sv_parser/`](../../crates/svsim/src/frontend/sv_parser/): `module_structure.rs`, `statements.rs`, `expressions.rs`, `literals.rs`, `const_eval.rs` (lowering-time constant folding + frozen-parameter recording), and `loop_unroll.rs` (for-loop unrolling — elaboration work done at lowering time). |
 | [`../../crates/svsim/src/hir.rs`](../../crates/svsim/src/hir.rs) | The parser-independent executable model: modules, ports, memories, statements, expressions, and lvalues. |
 | [`../../crates/svsim/src/validate.rs`](../../crates/svsim/src/validate.rs) | Compile-time semantic checks, including whole-net `inout` binding rules. |
 | [`../../crates/svsim/src/design.rs`](../../crates/svsim/src/design.rs) | `CompiledDesign`, hierarchy reporting, elaboration access, and runtime instantiation entry points. |

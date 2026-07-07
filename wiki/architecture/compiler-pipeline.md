@@ -43,7 +43,7 @@ The runtime does not execute `sv-parser` syntax trees directly. The project comp
 ## Sources
 
 - [../../crates/svsim/src/compiler.rs](../../crates/svsim/src/compiler.rs)
-- [../../crates/svsim/src/frontend/sv_parser.rs](../../crates/svsim/src/frontend/sv_parser.rs)
+- [../../crates/svsim/src/frontend/sv_parser/](../../crates/svsim/src/frontend/sv_parser/)
 - [../../crates/svsim/src/hir.rs](../../crates/svsim/src/hir.rs)
 - [../../crates/svsim/src/elaborate.rs](../../crates/svsim/src/elaborate.rs)
 - [../../crates/svsim/src/validate.rs](../../crates/svsim/src/validate.rs)
