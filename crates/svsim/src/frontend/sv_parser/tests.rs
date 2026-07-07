@@ -108,6 +108,41 @@ fn parse_str_lowers_modules_from_virtual_path() {
 }
 
 #[test]
+fn parse_str_attaches_spans_to_unsupported_diagnostics() {
+    let frontend = SvParserFrontend::default();
+    let source = frontend
+        .parse_str(
+            PathBuf::from("/virtual/design/span_probe.sv"),
+            concat!(
+                "module span_probe(input a, output logic y);\n",
+                "    always_comb begin\n",
+                "        repeat (3) begin\n",
+                "            y = a;\n",
+                "        end\n",
+                "    end\n",
+                "endmodule\n"
+            ),
+        )
+        .expect("parse span probe");
+
+    let module = &source.modules[0];
+    assert_eq!(module.unsupported.len(), 1);
+    let diagnostic = &module.unsupported[0];
+    assert!(
+        diagnostic
+            .message
+            .contains("loop statement is outside the current executable subset"),
+        "unexpected message: {}",
+        diagnostic.message
+    );
+    let span = diagnostic
+        .span
+        .as_ref()
+        .expect("unsupported diagnostic must carry a span");
+    assert_eq!(span.line, 3, "span should point at the repeat loop");
+}
+
+#[test]
 fn parse_str_records_frozen_parameters_per_construct() {
     let frontend = SvParserFrontend::default();
     let source = frontend

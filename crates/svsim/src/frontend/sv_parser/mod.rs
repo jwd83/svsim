@@ -121,6 +121,16 @@ fn unsupported(message: impl Into<String>, span: Option<SourceSpan>) -> Diagnost
     }
 }
 
+/// Attaches a span to a diagnostic that lacks one, so leaf helpers without
+/// source context (literal parsing, operator tables) get located at their
+/// call sites.
+fn with_fallback_span(diagnostic: Diagnostic, span: Option<SourceSpan>) -> Diagnostic {
+    if diagnostic.span.is_some() {
+        return diagnostic;
+    }
+    Diagnostic { span, ..diagnostic }
+}
+
 /// Best-effort source span for any syntax node: the first `Locate` leaf in
 /// preorder. Lowering functions compute this once per construct so their
 /// `unsupported` diagnostics point at the offending source line.

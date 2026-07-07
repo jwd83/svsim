@@ -17,7 +17,7 @@ pub(super) fn lower_constant_param_expression(
         }
         _ => Err(unsupported(
             "parameter default expression is outside the supported subset",
-            None,
+            span_of_node(path, expr),
         )),
     }
 }
@@ -66,7 +66,8 @@ pub(super) fn lower_constant_expression_to_expr(
             lower_constant_primary_to_expr(syntax_tree, primary, module, path)
         }
         ConstantExpression::Unary(u) => {
-            let op = lower_unary_operator(syntax_tree, &u.nodes.0)?;
+            let op = lower_unary_operator(syntax_tree, &u.nodes.0)
+                .map_err(|diag| with_fallback_span(diag, span_of_node(path, &u.nodes.0)))?;
             let operand = lower_constant_primary_to_expr(syntax_tree, &u.nodes.2, module, path)?;
             Ok(Expr::Unary {
                 op,
@@ -75,7 +76,8 @@ pub(super) fn lower_constant_expression_to_expr(
         }
         ConstantExpression::Binary(b) => {
             let left = lower_constant_expression_to_expr(syntax_tree, &b.nodes.0, module, path)?;
-            let op = lower_binary_operator(syntax_tree, &b.nodes.1)?;
+            let op = lower_binary_operator(syntax_tree, &b.nodes.1)
+                .map_err(|diag| with_fallback_span(diag, span_of_node(path, &b.nodes.1)))?;
             let right = lower_constant_expression_to_expr(syntax_tree, &b.nodes.3, module, path)?;
             Ok(Expr::Binary {
                 left: Box::new(left),
@@ -113,10 +115,16 @@ pub(super) fn lower_constant_primary_to_expr(
     path: &Path,
 ) -> LowerResult<Expr> {
     match primary {
-        sv_parser::ConstantPrimary::PrimaryLiteral(lit) => lower_literal(syntax_tree, lit),
+        sv_parser::ConstantPrimary::PrimaryLiteral(lit) => lower_literal(syntax_tree, lit)
+            .map_err(|diag| with_fallback_span(diag, span_of_node(path, &**lit))),
         sv_parser::ConstantPrimary::PsParameter(ps) => {
             let (name, _) = identifier_name_from_node(syntax_tree, RefNode::from(&ps.nodes.0))
-                .ok_or_else(|| unsupported("failed to determine parameter reference name", None))?;
+                .ok_or_else(|| {
+                    unsupported(
+                        "failed to determine parameter reference name",
+                        span_of_node(path, primary),
+                    )
+                })?;
             Ok(Expr::Ident(name))
         }
         sv_parser::ConstantPrimary::MintypmaxExpression(expr) => {
@@ -141,7 +149,7 @@ pub(super) fn lower_constant_primary_to_expr(
             let Expr::Literal(count_lit) = &count_expr else {
                 return Err(unsupported(
                     "replication count must be a literal in parameter expressions",
-                    None,
+                    span_of_node(path, primary),
                 ));
             };
             let count = count_lit
@@ -151,7 +159,7 @@ pub(super) fn lower_constant_primary_to_expr(
                 .ok_or_else(|| {
                     unsupported(
                         "replication count must be a two-state literal within host limits",
-                        None,
+                        span_of_node(path, primary),
                     )
                 })?;
             let mut exprs = Vec::new();
@@ -175,14 +183,17 @@ pub(super) fn lower_constant_primary_to_expr(
                 let (name, _) =
                     identifier_name_from_node(syntax_tree, RefNode::from(call.as_ref()))
                         .ok_or_else(|| {
-                            unsupported("constant function calls are not supported yet", None)
+                            unsupported(
+                                "constant function calls are not supported yet",
+                                span_of_node(path, primary),
+                            )
                         })?;
                 Ok(Expr::Ident(name))
             })
         }
         _ => Err(unsupported(
             "constant primary expression is outside the supported subset",
-            None,
+            span_of_node(path, primary),
         )),
     }
 }
@@ -196,7 +207,8 @@ pub(super) fn lower_expression(
     match expr {
         Expression::Primary(primary) => lower_primary(syntax_tree, primary, module, path),
         Expression::Unary(expr) => {
-            let op = lower_unary_operator(syntax_tree, &expr.nodes.0)?;
+            let op = lower_unary_operator(syntax_tree, &expr.nodes.0)
+                .map_err(|diag| with_fallback_span(diag, span_of_node(path, &expr.nodes.0)))?;
             Ok(Expr::Unary {
                 op,
                 expr: Box::new(lower_primary(syntax_tree, &expr.nodes.2, module, path)?),
@@ -208,7 +220,9 @@ pub(super) fn lower_expression(
                 return Ok(Expr::Ternary {
                     cond: Box::new(Expr::Binary {
                         left: Box::new(left),
-                        op: lower_binary_operator(syntax_tree, &expr.nodes.1)?,
+                        op: lower_binary_operator(syntax_tree, &expr.nodes.1).map_err(|diag| {
+                            with_fallback_span(diag, span_of_node(path, &expr.nodes.1))
+                        })?,
                         right: Box::new(lower_cond_predicate(
                             syntax_tree,
                             &rhs.nodes.0,
@@ -225,7 +239,8 @@ pub(super) fn lower_expression(
                     )?),
                 });
             }
-            let op = lower_binary_operator(syntax_tree, &expr.nodes.1)?;
+            let op = lower_binary_operator(syntax_tree, &expr.nodes.1)
+                .map_err(|diag| with_fallback_span(diag, span_of_node(path, &expr.nodes.1)))?;
             let right = lower_expression(syntax_tree, &expr.nodes.3, module, path)?;
             Ok(rebalance_logical_rhs_binary(left, op, right))
         }
@@ -239,7 +254,7 @@ pub(super) fn lower_expression(
         }
         _ => Err(unsupported(
             "expression is outside the current executable subset",
-            None,
+            span_of_node(path, expr),
         )),
     }
 }
@@ -291,7 +306,8 @@ pub(super) fn lower_primary(
     path: &Path,
 ) -> LowerResult<Expr> {
     match primary {
-        Primary::PrimaryLiteral(literal) => lower_literal(syntax_tree, literal),
+        Primary::PrimaryLiteral(literal) => lower_literal(syntax_tree, literal)
+            .map_err(|diag| with_fallback_span(diag, span_of_node(path, &**literal))),
         Primary::Hierarchical(primary) => {
             let (name, _) = lower_hierarchical_identifier(
                 syntax_tree,
@@ -310,7 +326,7 @@ pub(super) fn lower_primary(
             if concat.nodes.1.is_some() {
                 return Err(unsupported(
                     "concatenation primaries with range indexing are not supported yet",
-                    None,
+                    span_of_node(path, primary),
                 ));
             }
             lower_concatenation(syntax_tree, &concat.nodes.0, module, path)
@@ -319,7 +335,7 @@ pub(super) fn lower_primary(
             if concat.nodes.1.is_some() {
                 return Err(unsupported(
                     "replication primaries with range indexing are not supported yet",
-                    None,
+                    span_of_node(path, primary),
                 ));
             }
             lower_multiple_concatenation(syntax_tree, &concat.nodes.0, module, path)
@@ -330,7 +346,10 @@ pub(super) fn lower_primary(
         Primary::FunctionSubroutineCall(call) => {
             lower_function_subroutine_call(syntax_tree, call, module, path)
         }
-        _ => Err(unsupported("primary expression is not supported yet", None)),
+        _ => Err(unsupported(
+            "primary expression is not supported yet",
+            span_of_node(path, primary),
+        )),
     }
 }
 
@@ -341,25 +360,39 @@ pub(super) fn lower_function_subroutine_call(
     path: &Path,
 ) -> LowerResult<Expr> {
     let sv_parser::SubroutineCall::SystemTfCall(call) = &call.nodes.0 else {
-        return Err(unsupported("primary expression is not supported yet", None));
+        return Err(unsupported(
+            "primary expression is not supported yet",
+            span_of_node(path, call),
+        ));
     };
     let sv_parser::SystemTfCall::ArgExpression(call) = call.as_ref() else {
-        return Err(unsupported("primary expression is not supported yet", None));
+        return Err(unsupported(
+            "primary expression is not supported yet",
+            span_of_node(path, &**call),
+        ));
     };
 
-    let name = syntax_tree
-        .get_str(&call.nodes.0.nodes.0)
-        .ok_or_else(|| unsupported("failed to read system function name", None))?;
+    let name = syntax_tree.get_str(&call.nodes.0.nodes.0).ok_or_else(|| {
+        unsupported(
+            "failed to read system function name",
+            span_of_node(path, &**call),
+        )
+    })?;
     let op = match name.as_ref() {
         "$signed" => UnaryOp::Signed,
         "$unsigned" => UnaryOp::Unsigned,
-        _ => return Err(unsupported("primary expression is not supported yet", None)),
+        _ => {
+            return Err(unsupported(
+                "primary expression is not supported yet",
+                span_of_node(path, &**call),
+            ));
+        }
     };
 
     if call.nodes.1.nodes.1.1.is_some() {
         return Err(unsupported(
             format!("`{name}` clocking event arguments are not supported"),
-            None,
+            span_of_node(path, &**call),
         ));
     }
 
@@ -367,7 +400,7 @@ pub(super) fn lower_function_subroutine_call(
     let [Some(arg)] = args.as_slice() else {
         return Err(unsupported(
             format!("`{name}` expects exactly one expression argument"),
-            None,
+            span_of_node(path, &**call),
         ));
     };
 
@@ -439,7 +472,10 @@ pub(super) fn lower_expr_select(
     path: &Path,
 ) -> LowerResult<Expr> {
     if select.nodes.0.is_some() {
-        return Err(unsupported("member selections are not supported yet", None));
+        return Err(unsupported(
+            "member selections are not supported yet",
+            span_of_node(path, select),
+        ));
     }
 
     if let Expr::Ident(name) = &base {
@@ -452,7 +488,7 @@ pub(super) fn lower_expr_select(
                 [] => Ok(base),
                 _ => Err(unsupported(
                     "memory reads only support a single element index today",
-                    None,
+                    span_of_node(path, select),
                 )),
             };
         }
@@ -477,7 +513,7 @@ pub(super) fn lower_expr_select(
         _ => {
             return Err(unsupported(
                 "multidimensional bit selects are not supported yet",
-                None,
+                span_of_node(path, select),
             ));
         }
     }
@@ -513,7 +549,7 @@ pub(super) fn lower_net_lvalue(
         }
         _ => Err(unsupported(
             "complex net lvalues are not supported yet",
-            None,
+            span_of_node(path, lvalue),
         )),
     }
 }
@@ -551,7 +587,7 @@ pub(super) fn lower_variable_lvalue(
         }
         _ => Err(unsupported(
             "complex variable lvalues are not supported yet",
-            None,
+            span_of_node(path, lvalue),
         )),
     }
 }
@@ -563,7 +599,10 @@ pub(super) fn lower_constant_select_lvalue(
     path: &Path,
 ) -> LowerResult<LValue> {
     if select.nodes.0.is_some() {
-        return Err(unsupported("member selections are not supported yet", None));
+        return Err(unsupported(
+            "member selections are not supported yet",
+            span_of_node(path, select),
+        ));
     }
 
     match select.nodes.1.nodes.0.as_slice() {
@@ -577,7 +616,7 @@ pub(super) fn lower_constant_select_lvalue(
         _ => {
             return Err(unsupported(
                 "multidimensional bit selects are not supported yet",
-                None,
+                span_of_node(path, select),
             ));
         }
     }
@@ -602,7 +641,10 @@ pub(super) fn lower_select_lvalue(
     path: &Path,
 ) -> LowerResult<LValue> {
     if select.nodes.0.is_some() {
-        return Err(unsupported("member selections are not supported yet", None));
+        return Err(unsupported(
+            "member selections are not supported yet",
+            span_of_node(path, select),
+        ));
     }
 
     if module.memory_decl(&name).is_some() {
@@ -613,7 +655,7 @@ pub(super) fn lower_select_lvalue(
             }),
             [] => Err(unsupported(
                 "assignments must target a single memory element",
-                None,
+                span_of_node(path, select),
             )),
             _ => Err(unsupported(
                 "memory element assignments only support a single element index today",
@@ -639,7 +681,7 @@ pub(super) fn lower_select_lvalue(
         _ => {
             return Err(unsupported(
                 "multidimensional bit selects are not supported yet",
-                None,
+                span_of_node(path, select),
             ));
         }
     }
@@ -713,7 +755,7 @@ pub(super) fn lower_cond_predicate(
     let [entry] = entries.as_slice() else {
         return Err(unsupported(
             "conditional expressions with multiple predicates are not supported yet",
-            None,
+            span_of_node(path, predicate),
         ));
     };
     match entry {
@@ -722,7 +764,7 @@ pub(super) fn lower_cond_predicate(
         }
         _ => Err(unsupported(
             "conditional pattern expressions are not supported yet",
-            None,
+            span_of_node(path, predicate),
         )),
     }
 }
@@ -840,20 +882,26 @@ pub(super) fn lower_part_select_range(
             if width == 0 {
                 return Err(unsupported(
                     "indexed part selects must have a positive width",
-                    None,
+                    span_of_node(path, &**range),
                 ));
             }
             match symbol_text(syntax_tree, &range.nodes.1)?.as_str() {
                 "+:" => Ok((
                     base.checked_add(width - 1).ok_or_else(|| {
-                        unsupported("indexed part select exceeds host limits", None)
+                        unsupported(
+                            "indexed part select exceeds host limits",
+                            span_of_node(path, &**range),
+                        )
                     })?,
                     base,
                 )),
                 "-:" => Ok((
                     base,
                     base.checked_sub(width - 1).ok_or_else(|| {
-                        unsupported("indexed part select exceeds host limits", None)
+                        unsupported(
+                            "indexed part select exceeds host limits",
+                            span_of_node(path, &**range),
+                        )
                     })?,
                 )),
                 _ => Err(unsupported(

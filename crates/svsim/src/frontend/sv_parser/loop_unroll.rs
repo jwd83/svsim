@@ -24,7 +24,7 @@ pub(super) fn lower_loop_statement(
         }
         _ => Err(unsupported(
             "loop statement is outside the current executable subset",
-            None,
+            span_of_node(path, statement),
         )),
     }
 }
@@ -39,7 +39,7 @@ pub(super) fn lower_for_loop_statement(
     let Some(init) = controls.0.as_ref() else {
         return Err(unsupported(
             "procedural `for` loops require an initialization assignment",
-            None,
+            span_of_node(path, statement),
         ));
     };
     let Some(cond_expr) = controls.2.as_ref() else {
@@ -92,7 +92,7 @@ pub(super) fn lower_for_loop_statement(
 
     Err(unsupported(
         "procedural `for` loop exceeds the supported unrolling limit",
-        None,
+        span_of_node(path, statement),
     ))
 }
 
@@ -108,7 +108,7 @@ pub(super) fn lower_for_loop_initialization(
             let [assignment] = assignments.as_slice() else {
                 return Err(unsupported(
                     "procedural `for` loops only support a single initialization assignment",
-                    None,
+                    span_of_node(path, init),
                 ));
             };
             lower_for_loop_variable_assignment(
@@ -124,18 +124,23 @@ pub(super) fn lower_for_loop_initialization(
             let [declaration] = declarations.as_slice() else {
                 return Err(unsupported(
                     "procedural `for` loops only support a single initialization declaration",
-                    None,
+                    span_of_node(path, init),
                 ));
             };
             let assignments = declaration.nodes.2.contents();
             let [(identifier, _, expr)] = assignments.as_slice() else {
                 return Err(unsupported(
                     "procedural `for` loops only support a single initialized loop variable",
-                    None,
+                    span_of_node(path, init),
                 ));
             };
             let (name, _) = identifier_name_from_node(syntax_tree, RefNode::from(identifier))
-                .ok_or_else(|| unsupported("failed to determine loop variable name", None))?;
+                .ok_or_else(|| {
+                    unsupported(
+                        "failed to determine loop variable name",
+                        span_of_node(path, init),
+                    )
+                })?;
             Ok((
                 name,
                 normalize_for_loop_value(lower_const_eval_expression(
@@ -157,7 +162,10 @@ pub(super) fn lower_for_loop_variable_assignment(
     context: &str,
 ) -> LowerResult<(String, Value)> {
     if symbol_text(syntax_tree, &assignment.nodes.1)? != "=" {
-        return Err(unsupported(format!("{context} must use `=`"), None));
+        return Err(unsupported(
+            format!("{context} must use `=`"),
+            span_of_node(path, assignment),
+        ));
     }
 
     let LValue::Signal(name) =
@@ -165,7 +173,7 @@ pub(super) fn lower_for_loop_variable_assignment(
     else {
         return Err(unsupported(
             format!("{context} must target a plain loop variable"),
-            None,
+            span_of_node(path, assignment),
         ));
     };
 
@@ -192,7 +200,7 @@ pub(super) fn lower_for_loop_step(
     let [assignment] = assignments.as_slice() else {
         return Err(unsupported(
             "procedural `for` loops only support a single step assignment",
-            None,
+            span_of_node(path, step),
         ));
     };
 
@@ -213,7 +221,7 @@ pub(super) fn lower_for_loop_step(
             else {
                 return Err(unsupported(
                     "procedural `for` loop steps must target a plain loop variable",
-                    None,
+                    span_of_node(path, step),
                 ));
             };
             if name != loop_var {
@@ -223,7 +231,10 @@ pub(super) fn lower_for_loop_step(
                 ));
             }
             let loop_bits = loop_value.to_bit_value_checked().ok_or_else(|| {
-                unsupported("procedural `for` loops require two-state loop values", None)
+                unsupported(
+                    "procedural `for` loops require two-state loop values",
+                    span_of_node(path, step),
+                )
             })?;
             match symbol_text(syntax_tree, &op.nodes.0)?.as_str() {
                 "++" => Ok(normalize_for_loop_value(Value::new_with_signed(
@@ -257,7 +268,10 @@ pub(super) fn lower_for_loop_operator_step(
     loop_var: &str,
 ) -> LowerResult<Value> {
     if symbol_text(syntax_tree, &assignment.nodes.1.nodes.0)? != "=" {
-        return Err(unsupported("procedural `for` loop step must use `=`", None));
+        return Err(unsupported(
+            "procedural `for` loop step must use `=`",
+            span_of_node(path, assignment),
+        ));
     }
 
     let LValue::Signal(name) =
@@ -265,7 +279,7 @@ pub(super) fn lower_for_loop_operator_step(
     else {
         return Err(unsupported(
             "procedural `for` loop step must target a plain loop variable",
-            None,
+            span_of_node(path, assignment),
         ));
     };
     if name != loop_var {
@@ -294,7 +308,7 @@ pub(super) fn lower_const_eval_expression(
     .map_err(|_| {
         unsupported(
             "procedural `for` loops require constant-bounded expressions",
-            None,
+            span_of_node(path, expr),
         )
     })
 }

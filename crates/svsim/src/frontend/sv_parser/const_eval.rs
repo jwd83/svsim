@@ -23,7 +23,7 @@ pub(super) fn lower_usize_expression(
         Ok(value) => Ok(value),
         Err(_) => Err(unsupported(
             "only constant bit and part select indices are supported",
-            None,
+            span_of_node(path, expr),
         )),
     }
 }
@@ -51,9 +51,15 @@ pub(super) fn lower_usize_constant_expression_with_params(
 ) -> LowerResult<usize> {
     let module = const_eval_module(params);
     let lowered = lower_constant_expression_to_expr(syntax_tree, expr, &module, path)?;
-    const_eval_param_expr(&lowered, params, frozen_construct)?
+    const_eval_param_expr(&lowered, params, frozen_construct)
+        .map_err(|diag| with_fallback_span(diag, span_of_node(path, expr)))?
         .to_usize_checked()
-        .ok_or_else(|| unsupported("constant index exceeds host limits", None))
+        .ok_or_else(|| {
+            unsupported(
+                "constant index exceeds host limits",
+                span_of_node(path, expr),
+            )
+        })
 }
 
 pub(super) fn const_eval_module(params: &[ParameterDecl]) -> ModuleSummary {
