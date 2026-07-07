@@ -1,16 +1,23 @@
 # Current State
 
-Snapshot date: 2026-07-06
+Snapshot date: 2026-07-07
 
 ## Verified Today
 
-- `cargo test`: pass, `209/209` — `187` `svsim` unit tests (including `14`
-  direct four-state truth-table tests in `crates/svsim/src/logic_ops.rs`),
+- `cargo test`: pass, `211/211` — `189` `svsim` unit tests (including `14`
+  direct four-state truth-table tests in `crates/svsim/src/logic_ops.rs`
+  and new `bit_value` inline/heap boundary tests),
   `10` corpus gate tests (`crates/svsim/tests/corpus_gate.rs`: nine green
   directories plus `corpus_failing_stays_red` over the negative corpus),
-  `10` CLI integration tests, and `2` doctests, in roughly fifty seconds of
-  wall time (down from roughly two minutes before the second review's
-  step 3).
+  `10` CLI integration tests, and `2` doctests.
+- Runtime value representation was optimized (the item the 2026-07-07
+  review deferred): `BitValue` stores a single limb inline instead of always
+  heap-allocating a `Vec`, equal-width coercion is a clone/move instead of a
+  rebuild, and the simulator's internal maps use an Fx hasher. Release-corpus
+  runtime dropped another `1.85×` (15.5 s → 8.4 s); e.g. `regfile_8x8`
+  19 → 45 steps/s, picorv32 programs ~223 → ~469 steps/s, sap programs
+  ~1,500 → ~2,800 steps/s. Combined with steps 3–4, `regfile_8x8` is
+  ~11× faster than the first review's baseline (4 → 45 steps/s).
 - Green corpus, now enforced directly by `cargo test`: `195/195` regression
   suites across all nine green `parts/` directories — `44` basic, `55`
   testing, `43` overture, `16` rv32i, `13` picorv32, `6` sap1, `9` sap2, `4`

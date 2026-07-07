@@ -85,3 +85,13 @@
 - The repository has a root `README.md` (front door → `AGENTS.md`, wiki), and `Compiler`/`SimulationSession` carry runnable doc examples.
 - The second architectural review campaign is complete (all seven steps); the review moved to `plans/completed/2026-07-07-architectural-review.md` (+ `.html`). Campaign totals against the 2026-07-06 baseline: negative corpus gated as must-fail, frozen-parameter overrides rejected with construct-naming diagnostics, release corpus 54.4 s → 15.5 s, `cargo test` ~2 min → ~50 s, largest production file 3,731 → 1,151 lines.
 - Deferred by design for a future review: runtime value representation (per-operation `LogicValue` allocation is the residual perf cost) and `svsim-render`.
+
+## [2026-07-07] perf | runtime value representation
+
+- Verified `cargo test`: pass (`211/211` — `189` `svsim` unit tests, `10` corpus gate tests, `10` CLI tests, `2` doctests).
+- Addressed the value-representation item the 2026-07-07 review deferred, profile-driven (`sample` on `regfile_8x8`), in four commits:
+  - `31b8cc6`: `BitValue` limbs became an `Inline(u64)`/`Heap(Vec<u64>)` enum (invariant: heap only for ≥2 limbs, so derived `Eq`/`Hash` stay numeric). Single-limb values — nearly all runtime signal traffic — no longer allocate; hot ops take scalar fast paths. Was the malloc/free/memcpy that dominated the profile.
+  - `818499f`: `LogicValue::coerced_to` returns a plain clone when the width already matches (the constructor invariant guarantees it), and `all_z` builds its mask directly instead of per-bit.
+  - `1215d88`: an in-house Fx-style hasher (`fast_hash.rs`) replaced SipHash for the simulator's internal maps (`FrameValues`, overlay, `NetDriverTable`, elaborated parameters); `eval_expr`/`ValueReader` are generic over the hasher so const contexts and the public `BTreeMap` API are untouched.
+  - `7591c52`: `into_coerced` (by-value) turns equal-width coercions on owned write/stage paths into moves rather than clones; `LogicBits::clone` was the top profile entry.
+- Release corpus `15.5 s → 8.4 s` (`1.85×`); `regfile_8x8` 19 → 45 steps/s, picorv32 ~223 → ~469, sap programs ~1,500 → ~2,800. Combined with the review's steps 3–4, `regfile_8x8` is ~11× faster than the first review's baseline. The profile is now flat (no dominant cost); the next candidate — limb-parallel four-state bitwise ops in `logic_bitwise_binary` — was left as a smaller, higher-risk gain.

@@ -427,6 +427,16 @@ incremental, and each converted call site is immediately useful.
    (per-operation `LogicValue` allocation — the residual perf cost) and
    `svsim-render`.
 
+> **Post-campaign follow-up (2026-07-07):** the deferred *runtime value
+> representation* item was subsequently addressed as a focused,
+> profile-driven optimization (not a new review), in commits
+> `31b8cc6`/`818499f`/`1215d88`/`7591c52`: inline single-limb `BitValue`
+> storage, clone/move-based width coercion, and an Fx hasher for internal
+> maps. Release corpus 15.5 s → 8.4 s (`1.85×` on top of this campaign);
+> `regfile_8x8` reached ~11× the first review's baseline. See the wiki log
+> entry *[2026-07-07] perf | runtime value representation*. `svsim-render`
+> remains deferred.
+
 ## Closing assessment
 
 The first campaign paid down the debts of *organization* — this codebase is
