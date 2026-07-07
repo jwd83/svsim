@@ -356,9 +356,12 @@ pub(crate) fn eval_expr(
     memories: &HashMap<String, MemoryState>,
 ) -> Result<Value> {
     match expr {
-        Expr::Ident(name) => values
-            .read_value(name)
-            .ok_or_else(|| Error::Resolve(format!("signal '{}' is not declared", name))),
+        Expr::Ident(name) => values.read_value(name).ok_or_else(|| {
+            Error::Resolve(format!(
+                "signal '{}' is not declared in '{}'",
+                name, module.name
+            ))
+        }),
         Expr::Literal(literal) => Ok(value_from_literal(literal)),
         Expr::Concat(exprs) => {
             let mut values_out = Vec::with_capacity(exprs.len());
@@ -377,10 +380,15 @@ pub(crate) fn eval_expr(
             let index = index_value
                 .to_bit_value_checked()
                 .and_then(|bits| bits.to_usize_checked())
-                .ok_or_else(|| Error::Resolve("memory index exceeds host limits".into()))?;
-            let memory_state = memories
-                .get(memory)
-                .ok_or_else(|| Error::Resolve(format!("memory '{}' is not declared", memory)))?;
+                .ok_or_else(|| {
+                    Error::Resolve(format!("memory index for '{}' exceeds host limits", memory))
+                })?;
+            let memory_state = memories.get(memory).ok_or_else(|| {
+                Error::Resolve(format!(
+                    "memory '{}' is not declared in '{}'",
+                    memory, module.name
+                ))
+            })?;
             memory_state.read(index, memory)
         }
         Expr::BitSelect { expr, index } => {

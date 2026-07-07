@@ -34,8 +34,8 @@ pub(crate) fn expr_width(expr: &Expr, module: &ModuleSummary) -> Result<usize> {
             let width = expr_width(expr, module)?;
             if *index >= width {
                 return Err(Error::Resolve(format!(
-                    "bit select [{}] is out of range for width {}",
-                    index, width
+                    "bit select [{}] is out of range for width {} in '{}'",
+                    index, width, module.name
                 )));
             }
             Ok(1)
@@ -45,8 +45,8 @@ pub(crate) fn expr_width(expr: &Expr, module: &ModuleSummary) -> Result<usize> {
             let high = (*msb).max(*lsb);
             if high >= width {
                 return Err(Error::Resolve(format!(
-                    "part select [{}:{}] is out of range for width {}",
-                    msb, lsb, width
+                    "part select [{}:{}] is out of range for width {} in '{}'",
+                    msb, lsb, width, module.name
                 )));
             }
             Ok(high - (*msb).min(*lsb) + 1)
