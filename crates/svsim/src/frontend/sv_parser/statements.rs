@@ -17,7 +17,7 @@ pub(super) fn lower_initial_construct(
     } else {
         Err(unsupported(
             "initial constructs are not supported yet",
-            None,
+            span_of_node(path, construct),
         ))
     }
 }
@@ -56,7 +56,7 @@ pub(super) fn lower_always_construct(
         }
         AlwaysKeyword::AlwaysLatch(_) => Err(unsupported(
             "`always_latch` blocks are not supported yet",
-            None,
+            span_of_node(path, construct),
         )),
         AlwaysKeyword::AlwaysFf(_) => {
             let (clock, async_reset, body) =
@@ -83,21 +83,21 @@ pub(super) fn lower_always_generic(
     if statement.nodes.0.is_some() {
         return Err(unsupported(
             "named procedural blocks are not supported yet",
-            None,
+            span_of_node(path, statement),
         ));
     }
 
     let StatementItem::ProceduralTimingControlStatement(timing_stmt) = &statement.nodes.2 else {
         return Err(unsupported(
             "`always` blocks must have a sensitivity list (e.g. `always @*` or `always @(posedge clk)`)",
-            None,
+            span_of_node(path, statement),
         ));
     };
 
     let sv_parser::ProceduralTimingControl::EventControl(control) = &timing_stmt.nodes.0 else {
         return Err(unsupported(
             "`always` blocks only support event controls, not delays or cycle delays",
-            None,
+            span_of_node(path, statement),
         ));
     };
 
@@ -124,7 +124,7 @@ pub(super) fn lower_always_generic(
         }
         _ => Err(unsupported(
             "`always` blocks only support `@*`, `@(posedge <clock>)`, or `@(posedge <clock> or posedge <reset>)` sensitivity lists",
-            None,
+            span_of_node(path, statement),
         )),
     }
 }
@@ -138,14 +138,14 @@ pub(super) fn lower_always_ff_statement(
     if statement.nodes.0.is_some() {
         return Err(unsupported(
             "named procedural blocks are not supported yet",
-            None,
+            span_of_node(path, statement),
         ));
     }
 
     let StatementItem::ProceduralTimingControlStatement(statement) = &statement.nodes.2 else {
         return Err(unsupported(
             "`always_ff` blocks must use a single event control statement",
-            None,
+            span_of_node(path, statement),
         ));
     };
 
@@ -156,7 +156,7 @@ pub(super) fn lower_always_ff_statement(
         _ => {
             return Err(unsupported(
                 "`always_ff` blocks only support event controls",
-                None,
+                span_of_node(path, &**statement),
             ));
         }
     };
@@ -176,7 +176,7 @@ pub(super) fn lower_always_ff_event_control(
         }
         _ => Err(unsupported(
             "`always_ff` blocks must use `@(posedge <clock>)` or `@(posedge <clock> or posedge <reset>)`",
-            None,
+            span_of_node(path, control),
         )),
     }
 }
@@ -202,7 +202,7 @@ pub(super) fn lower_always_ff_event_expression(
         }
         _ => Err(unsupported(
             "`always_ff` blocks currently support one clock edge and an optional async reset edge",
-            None,
+            span_of_node(path, expr),
         )),
     }
 }
@@ -219,7 +219,7 @@ pub(super) fn collect_always_ff_event_signals(
             if !matches!(expr.nodes.0, Some(sv_parser::EdgeIdentifier::Posedge(_))) {
                 return Err(unsupported(
                     "`always_ff` blocks currently require `posedge` event controls",
-                    None,
+                    span_of_node(path, &**expr),
                 ));
             }
             if expr.nodes.2.is_some() {
@@ -233,7 +233,7 @@ pub(super) fn collect_always_ff_event_signals(
             else {
                 return Err(unsupported(
                     "`always_ff` event expressions must name local signals",
-                    None,
+                    span_of_node(path, &**expr),
                 ));
             };
             out.push(signal);
@@ -252,7 +252,7 @@ pub(super) fn collect_always_ff_event_signals(
         }
         _ => Err(unsupported(
             "`always_ff` blocks only support edge-triggered signal event expressions",
-            None,
+            span_of_node(path, expr),
         )),
     }
 }
@@ -272,7 +272,7 @@ pub(super) fn lower_statement(
     if statement.nodes.0.is_some() {
         return Err(unsupported(
             "named procedural blocks are not supported yet",
-            None,
+            span_of_node(path, statement),
         ));
     }
 
@@ -294,11 +294,11 @@ pub(super) fn lower_statement(
             lower_loop_statement(syntax_tree, statement, module, path)
         }
         StatementItem::SubroutineCallStatement(statement) => {
-            lower_subroutine_call_statement(syntax_tree, statement)
+            lower_subroutine_call_statement(syntax_tree, statement, path)
         }
         _ => Err(unsupported(
             "statement is outside the current executable subset",
-            None,
+            span_of_node(path, statement),
         )),
     }
 }
@@ -320,6 +320,7 @@ pub(super) fn lower_statement_or_null(
 pub(super) fn lower_subroutine_call_statement(
     syntax_tree: &SyntaxTree,
     statement: &sv_parser::SubroutineCallStatement,
+    path: &Path,
 ) -> LowerResult<Stmt> {
     match statement {
         sv_parser::SubroutineCallStatement::SubroutineCall(call) => {
@@ -328,13 +329,13 @@ pub(super) fn lower_subroutine_call_statement(
             } else {
                 Err(unsupported(
                     "subroutine call statements are not supported yet",
-                    None,
+                    span_of_node(path, statement),
                 ))
             }
         }
         sv_parser::SubroutineCallStatement::Function(_) => Err(unsupported(
             "subroutine call statements are not supported yet",
-            None,
+            span_of_node(path, statement),
         )),
     }
 }
@@ -422,7 +423,7 @@ pub(super) fn lower_blocking_assignment(
             if symbol_text(syntax_tree, &assignment.nodes.1.nodes.0)? != "=" {
                 return Err(unsupported(
                     "compound blocking assignments are not supported yet",
-                    None,
+                    span_of_node(path, &**assignment),
                 ));
             }
             Ok(Stmt::Assign {
@@ -433,7 +434,7 @@ pub(super) fn lower_blocking_assignment(
         }
         sv_parser::BlockingAssignment::Variable(_) => Err(unsupported(
             "blocking assignments with timing controls are not supported yet",
-            None,
+            span_of_node(path, assignment),
         )),
         _ => Err(unsupported(
             "blocking assignment is outside the current executable subset",
@@ -451,7 +452,7 @@ pub(super) fn lower_nonblocking_assignment(
     if assignment.nodes.2.is_some() {
         return Err(unsupported(
             "nonblocking assignments with timing controls are not supported yet",
-            None,
+            span_of_node(path, assignment),
         ));
     }
     if symbol_text(syntax_tree, &assignment.nodes.1)? != "<=" {
@@ -477,7 +478,7 @@ pub(super) fn lower_seq_block(
     if block.nodes.1.is_some() || block.nodes.5.is_some() {
         return Err(unsupported(
             "named begin/end blocks are not supported yet",
-            None,
+            span_of_node(path, block),
         ));
     }
 
@@ -511,14 +512,14 @@ pub(super) fn lower_block_item_declaration_stmt(
     let sv_parser::BlockItemDeclaration::Data(declaration) = declaration else {
         return Err(unsupported(
             "procedural blocks with local declarations are not supported yet",
-            None,
+            span_of_node(path, declaration),
         ));
     };
 
     let DataDeclaration::Variable(declaration) = &declaration.nodes.1 else {
         return Err(unsupported(
             "procedural blocks with local declarations are not supported yet",
-            None,
+            span_of_node(path, &**declaration),
         ));
     };
 
@@ -526,7 +527,7 @@ pub(super) fn lower_block_item_declaration_stmt(
     let [assignment] = assignments.as_slice() else {
         return Err(unsupported(
             "procedural blocks with local declarations are not supported yet",
-            None,
+            span_of_node(path, &**declaration),
         ));
     };
     let VariableDeclAssignment::Variable(assignment) = assignment else {
@@ -543,7 +544,12 @@ pub(super) fn lower_block_item_declaration_stmt(
     }
 
     let (name, locate) = identifier_name_from_node(syntax_tree, RefNode::from(&assignment.nodes.0))
-        .ok_or_else(|| unsupported("failed to determine procedural declaration name", None))?;
+        .ok_or_else(|| {
+            unsupported(
+                "failed to determine procedural declaration name",
+                span_of_node(path, &**declaration),
+            )
+        })?;
     if name == "empty_statement" && assignment.nodes.2.is_none() {
         return Ok(Stmt::Empty);
     }
@@ -557,7 +563,7 @@ pub(super) fn lower_block_item_declaration_stmt(
     let Some((_, expr)) = assignment.nodes.2.as_ref() else {
         return Err(unsupported(
             "procedural blocks with local declarations are not supported yet",
-            None,
+            span_of_node(path, &**declaration),
         ));
     };
 
@@ -577,7 +583,7 @@ pub(super) fn lower_conditional_statement(
     if statement.nodes.0.is_some() {
         return Err(unsupported(
             "`unique`/`priority` procedural conditionals are not supported yet",
-            None,
+            span_of_node(path, statement),
         ));
     }
 
@@ -672,7 +678,7 @@ pub(super) fn lower_case_statement(
         CaseStatement::Matches(_) | CaseStatement::Inside(_) => {
             return Err(unsupported(
                 "only plain `case` statements are supported yet",
-                None,
+                span_of_node(path, statement),
             ));
         }
     };
@@ -680,7 +686,10 @@ pub(super) fn lower_case_statement(
     match keyword {
         sv_parser::CaseKeyword::Case(_) => {}
         sv_parser::CaseKeyword::Casez(_) | sv_parser::CaseKeyword::Casex(_) => {
-            return Err(unsupported("`casez`/`casex` are not supported yet", None));
+            return Err(unsupported(
+                "`casez`/`casex` are not supported yet",
+                span_of_node(path, statement),
+            ));
         }
     }
 
@@ -728,7 +737,7 @@ pub(super) fn lower_case_item(
             if default.is_some() {
                 return Err(unsupported(
                     "multiple default case items are not supported",
-                    None,
+                    span_of_node(path, &**item),
                 ));
             }
             *default = Some(Box::new(lower_statement_or_null(

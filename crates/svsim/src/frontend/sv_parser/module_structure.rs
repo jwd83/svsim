@@ -333,19 +333,24 @@ pub(super) fn lower_param_assignment(
     path: &Path,
 ) -> LowerResult<ParameterDecl> {
     let (name, locate) = identifier_name_from_node(syntax_tree, RefNode::from(&assignment.nodes.0))
-        .ok_or_else(|| unsupported("failed to determine parameter name", None))?;
+        .ok_or_else(|| {
+            unsupported(
+                "failed to determine parameter name",
+                span_of_node(path, assignment),
+            )
+        })?;
 
     if !assignment.nodes.1.is_empty() {
         return Err(unsupported(
             "parameter declarations with unpacked dimensions are not supported yet",
-            None,
+            span_of_node(path, assignment),
         ));
     }
 
     let (_, const_param_expr) = assignment.nodes.2.as_ref().ok_or_else(|| {
         unsupported(
             "parameter declarations without a default value are not supported yet",
-            None,
+            span_of_node(path, assignment),
         )
     })?;
 
@@ -582,22 +587,35 @@ pub(super) fn lower_ansi_port_declaration(
                         }
                     }
                     sv_parser::NetPortHeaderOrInterfacePortHeader::InterfacePortHeader(_) => {
-                        return Err(unsupported("interface ports are not supported yet", None));
+                        return Err(unsupported(
+                            "interface ports are not supported yet",
+                            span_of_node(path, &**decl),
+                        ));
                     }
                 }
             } else {
-                inherited
-                    .ok_or_else(|| unsupported("ports must declare an explicit direction", None))?
+                inherited.ok_or_else(|| {
+                    unsupported(
+                        "ports must declare an explicit direction",
+                        span_of_node(path, &**decl),
+                    )
+                })?
             };
             if !decl.nodes.2.is_empty() || decl.nodes.3.is_some() {
                 return Err(unsupported(
                     "ANSI ports with unpacked dimensions or default values are not supported yet",
-                    None,
+                    span_of_node(path, &**decl),
                 ));
             }
             let (name, locate) =
-                identifier_name_from_node(syntax_tree, RefNode::from(&decl.nodes.1))
-                    .ok_or_else(|| unsupported("failed to determine ANSI port name", None))?;
+                identifier_name_from_node(syntax_tree, RefNode::from(&decl.nodes.1)).ok_or_else(
+                    || {
+                        unsupported(
+                            "failed to determine ANSI port name",
+                            span_of_node(path, &**decl),
+                        )
+                    },
+                )?;
             Ok((
                 PortDecl {
                     name,
@@ -617,18 +635,28 @@ pub(super) fn lower_ansi_port_declaration(
                     range: lower_variable_port_range(syntax_tree, &header.nodes.1, path, params)?,
                 }
             } else {
-                inherited
-                    .ok_or_else(|| unsupported("ports must declare an explicit direction", None))?
+                inherited.ok_or_else(|| {
+                    unsupported(
+                        "ports must declare an explicit direction",
+                        span_of_node(path, &**decl),
+                    )
+                })?
             };
             if !decl.nodes.2.is_empty() || decl.nodes.3.is_some() {
                 return Err(unsupported(
                     "ANSI ports with unpacked dimensions or default values are not supported yet",
-                    None,
+                    span_of_node(path, &**decl),
                 ));
             }
             let (name, locate) =
-                identifier_name_from_node(syntax_tree, RefNode::from(&decl.nodes.1))
-                    .ok_or_else(|| unsupported("failed to determine ANSI port name", None))?;
+                identifier_name_from_node(syntax_tree, RefNode::from(&decl.nodes.1)).ok_or_else(
+                    || {
+                        unsupported(
+                            "failed to determine ANSI port name",
+                            span_of_node(path, &**decl),
+                        )
+                    },
+                )?;
             Ok((
                 PortDecl {
                     name,
@@ -676,7 +704,10 @@ pub(super) fn lower_net_port_range(
         sv_parser::NetPortType::DataType(data_type) => {
             lower_data_type_or_implicit_range(syntax_tree, &data_type.nodes.1, path, params)
         }
-        _ => Err(unsupported("unsupported net port type", None)),
+        _ => Err(unsupported(
+            "unsupported net port type",
+            span_of_node(path, port_type),
+        )),
     }
 }
 
@@ -747,7 +778,7 @@ pub(super) fn lower_data_declaration(
                 let sv_parser::VariableDeclAssignment::Variable(assignment) = assignment else {
                     return Err(unsupported(
                         "complex variable declarations are not supported yet",
-                        None,
+                        span_of_node(path, &**decl),
                     ));
                 };
                 if assignment.nodes.2.is_some() {
@@ -759,7 +790,10 @@ pub(super) fn lower_data_declaration(
                 let (name, locate) =
                     identifier_name_from_node(syntax_tree, RefNode::from(&assignment.nodes.0))
                         .ok_or_else(|| {
-                            unsupported("failed to determine variable declaration name", None)
+                            unsupported(
+                                "failed to determine variable declaration name",
+                                span_of_node(path, &**decl),
+                            )
                         })?;
                 let span = Some(span_from_locate(path, locate));
                 match lower_variable_dimensions(syntax_tree, &assignment.nodes.1, path, params)? {
@@ -780,7 +814,10 @@ pub(super) fn lower_data_declaration(
             }
             Ok(lowered)
         }
-        _ => Err(unsupported("data declaration is not supported yet", None)),
+        _ => Err(unsupported(
+            "data declaration is not supported yet",
+            span_of_node(path, decl),
+        )),
     }
 }
 
@@ -803,13 +840,16 @@ pub(super) fn lower_net_declaration(
                 if !assignment.nodes.1.is_empty() {
                     return Err(unsupported(
                         "net declarations with unpacked dimensions are not supported yet",
-                        None,
+                        span_of_node(path, &**decl),
                     ));
                 }
                 let (name, locate) =
                     identifier_name_from_node(syntax_tree, RefNode::from(&assignment.nodes.0))
                         .ok_or_else(|| {
-                            unsupported("failed to determine net declaration name", None)
+                            unsupported(
+                                "failed to determine net declaration name",
+                                span_of_node(path, &**decl),
+                            )
                         })?;
                 let signal = SignalDecl {
                     name,
@@ -831,7 +871,10 @@ pub(super) fn lower_net_declaration(
             }
             Ok(lowered)
         }
-        _ => Err(unsupported("net declaration is not supported yet", None)),
+        _ => Err(unsupported(
+            "net declaration is not supported yet",
+            span_of_node(path, decl),
+        )),
     }
 }
 
@@ -867,7 +910,7 @@ pub(super) fn lower_data_type_range(
         }
         _ => Err(unsupported(
             "data type is outside the current executable subset",
-            None,
+            span_of_node(path, data_type),
         )),
     }
 }
@@ -914,13 +957,15 @@ pub(super) fn lower_unpacked_dimensions(
             "an unpacked dimension",
         )
         .map(Some),
-        [UnpackedDimension::Expression(_)] => Err(unsupported(
+        [UnpackedDimension::Expression(dimension)] => Err(unsupported(
             "unsized unpacked dimensions are not supported yet",
-            None,
+            span_of_node(path, &**dimension),
         )),
         _ => Err(unsupported(
             "multiple unpacked dimensions are not supported yet",
-            None,
+            unpacked_dimensions
+                .first()
+                .and_then(|dimension| span_of_node(path, dimension)),
         )),
     }
 }
@@ -943,11 +988,15 @@ pub(super) fn lower_variable_dimensions(
         | [VariableDimension::AssociativeDimension(_)]
         | [VariableDimension::QueueDimension(_)] => Err(unsupported(
             "only fixed-size unpacked dimensions are supported today",
-            None,
+            dimensions
+                .first()
+                .and_then(|dimension| span_of_node(path, dimension)),
         )),
         _ => Err(unsupported(
             "multiple unpacked dimensions are not supported yet",
-            None,
+            dimensions
+                .first()
+                .and_then(|dimension| span_of_node(path, dimension)),
         )),
     }
 }
@@ -970,7 +1019,9 @@ pub(super) fn lower_packed_dimensions(
         .map(Some),
         _ => Err(unsupported(
             "multiple packed dimensions are not supported yet",
-            None,
+            packed_dimensions
+                .first()
+                .and_then(|dimension| span_of_node(path, dimension)),
         )),
     }
 }
@@ -1019,14 +1070,20 @@ pub(super) fn lower_module_instantiation(
     path: &Path,
 ) -> LowerResult<Vec<ModuleInstanceSummary>> {
     let (module_name, _) =
-        identifier_name_from_node(syntax_tree, RefNode::from(&instantiation.nodes.0))
-            .ok_or_else(|| unsupported("failed to determine instantiated module name", None))?;
+        identifier_name_from_node(syntax_tree, RefNode::from(&instantiation.nodes.0)).ok_or_else(
+            || {
+                unsupported(
+                    "failed to determine instantiated module name",
+                    span_of_node(path, instantiation),
+                )
+            },
+        )?;
     let mut parameter_overrides = Vec::new();
     if let Some(parameter_value_assignment) = &instantiation.nodes.1 {
         let Some(assignments) = parameter_value_assignment.nodes.1.nodes.1.as_ref() else {
             return Err(unsupported(
                 "empty parameter override lists are not supported yet",
-                None,
+                span_of_node(path, instantiation),
             ));
         };
         let ListOfParameterAssignments::Named(assignments) = assignments else {
@@ -1039,7 +1096,12 @@ pub(super) fn lower_module_instantiation(
         for assignment in assignments.nodes.0.contents() {
             let (parameter_name, locate) =
                 identifier_name_from_node(syntax_tree, RefNode::from(&assignment.nodes.1))
-                    .ok_or_else(|| unsupported("failed to determine parameter name", None))?;
+                    .ok_or_else(|| {
+                        unsupported(
+                            "failed to determine parameter name",
+                            span_of_node(path, instantiation),
+                        )
+                    })?;
             let expr = assignment
                 .nodes
                 .2
@@ -1047,7 +1109,10 @@ pub(super) fn lower_module_instantiation(
                 .1
                 .as_ref()
                 .ok_or_else(|| {
-                    unsupported("named parameter overrides must provide an expression", None)
+                    unsupported(
+                        "named parameter overrides must provide an expression",
+                        span_of_node(path, instantiation),
+                    )
                 })
                 .and_then(|expr| lower_param_expression(syntax_tree, expr, module, path))?;
             parameter_overrides.push(HirNamedParameterAssign {
@@ -1062,11 +1127,16 @@ pub(super) fn lower_module_instantiation(
     for instance in instantiation.nodes.2.contents() {
         let (instance_name, locate) =
             identifier_name_from_node(syntax_tree, RefNode::from(&instance.nodes.0.nodes.0))
-                .ok_or_else(|| unsupported("failed to determine instance name", None))?;
+                .ok_or_else(|| {
+                    unsupported(
+                        "failed to determine instance name",
+                        span_of_node(path, instantiation),
+                    )
+                })?;
         let Some(port_connections) = instance.nodes.1.nodes.1.as_ref() else {
             return Err(unsupported(
                 "module instantiations must use explicit named port connections",
-                None,
+                span_of_node(path, instantiation),
             ));
         };
         let ListOfPortConnections::Named(connections) = port_connections else {
@@ -1081,19 +1151,27 @@ pub(super) fn lower_module_instantiation(
             let NamedPortConnection::Identifier(connection) = connection else {
                 return Err(unsupported(
                     "wildcard port connections are not supported yet",
-                    None,
+                    span_of_node(path, instantiation),
                 ));
             };
             let (port_name, port_locate) =
                 identifier_name_from_node(syntax_tree, RefNode::from(&connection.nodes.2))
-                    .ok_or_else(|| unsupported("failed to determine connected port name", None))?;
+                    .ok_or_else(|| {
+                        unsupported(
+                            "failed to determine connected port name",
+                            span_of_node(path, instantiation),
+                        )
+                    })?;
             let expr = connection
                 .nodes
                 .3
                 .as_ref()
                 .and_then(|paren| paren.nodes.1.as_ref())
                 .ok_or_else(|| {
-                    unsupported("named port connections must provide an expression", None)
+                    unsupported(
+                        "named port connections must provide an expression",
+                        span_of_node(path, instantiation),
+                    )
                 })
                 .and_then(|expr| lower_expression(syntax_tree, expr, module, path))?;
             lowered_connections.push(HirNamedPortConnection {
@@ -1127,7 +1205,7 @@ pub(super) fn lower_param_expression(
         }
         _ => Err(unsupported(
             "parameter override expression is outside the supported subset",
-            None,
+            span_of_node(path, expr),
         )),
     }
 }

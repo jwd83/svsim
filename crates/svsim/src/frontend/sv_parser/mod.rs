@@ -121,6 +121,18 @@ fn unsupported(message: impl Into<String>, span: Option<SourceSpan>) -> Diagnost
     }
 }
 
+/// Best-effort source span for any syntax node: the first `Locate` leaf in
+/// preorder. Lowering functions compute this once per construct so their
+/// `unsupported` diagnostics point at the offending source line.
+fn span_of_node<'a>(path: &Path, node: impl Into<RefNode<'a>>) -> Option<SourceSpan> {
+    for sub in node.into() {
+        if let RefNode::Locate(locate) = sub {
+            return Some(span_from_locate(path, *locate));
+        }
+    }
+    None
+}
+
 fn identifier_name_from_node(
     syntax_tree: &SyntaxTree,
     node: RefNode<'_>,
