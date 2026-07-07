@@ -192,6 +192,16 @@ impl LogicValue {
         Self::new(self.bits.clone(), width)
     }
 
+    /// By-value coercion: an equal-width coercion is a move, not a clone.
+    /// Use whenever the receiver is already owned (constructor and
+    /// write-path chains), where `coerced_to` would clone needlessly.
+    pub(crate) fn into_coerced(self, width: usize) -> Self {
+        if width.max(1) == self.width {
+            return self;
+        }
+        Self::new(self.bits, width)
+    }
+
     pub fn to_bit_value_checked(&self) -> Option<BitValue> {
         self.bits
             .to_bit_value_checked()

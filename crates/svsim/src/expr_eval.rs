@@ -42,13 +42,15 @@ impl Value {
     }
 
     pub(crate) fn from_logic(logic: LogicValue, width: usize) -> Self {
-        Self::from_logic_with_signed(logic.coerced_to(width), false)
+        Self::from_logic_with_signed(logic.into_coerced(width), false)
     }
 
     pub(crate) fn from_logic_with_signed(logic: LogicValue, signed: bool) -> Self {
-        let width = logic.width().max(1);
+        // `LogicValue::new` clamps widths to at least 1, so `logic` is
+        // already canonical — take it by move.
+        let width = logic.width();
         Self {
-            logic: logic.coerced_to(width),
+            logic,
             width,
             signed,
         }
@@ -56,12 +58,23 @@ impl Value {
 
     pub(crate) fn coerced_to(&self, width: usize) -> Self {
         let width = width.max(1);
+        if width == self.width {
+            return self.clone();
+        }
         let logic = if self.signed {
             logic_sign_extend(&self.logic, self.width, width)
         } else {
             self.logic.coerced_to(width)
         };
         Self::from_logic_with_signed(logic, self.signed)
+    }
+
+    /// By-value coercion: equal widths move instead of cloning.
+    pub(crate) fn into_coerced(self, width: usize) -> Self {
+        if width.max(1) == self.width {
+            return self;
+        }
+        self.coerced_to(width)
     }
 
     pub(crate) fn zero(width: usize) -> Self {
@@ -328,7 +341,7 @@ impl MemoryState {
             .words
             .get_mut(offset)
             .expect("memory offset is guaranteed to be in range");
-        let coerced = value.coerced_to(current.width);
+        let coerced = value.into_coerced(current.width);
         let next = Value::from_logic(coerced.logic, current.width);
         let changed = *current != next;
         *current = next;

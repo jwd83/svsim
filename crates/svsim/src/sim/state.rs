@@ -507,7 +507,7 @@ pub(super) fn write_binding(
     values: &mut [ObjectValue],
     object_layouts: &[RuntimeObjectLayout],
 ) -> Result<bool> {
-    let logic = value.coerced_to(binding.view_width).logic;
+    let logic = value.into_coerced(binding.view_width).logic;
     write_binding_logic(binding, logic, values, object_layouts)
 }
 
@@ -531,8 +531,8 @@ pub(super) fn write_binding_logic(
     })?;
     let next = ObjectValue::from_logic(
         value
-            .coerced_to(binding.view_width)
-            .coerced_to(object.width),
+            .into_coerced(binding.view_width)
+            .into_coerced(object.width),
     );
     let changed = *current != next;
     *current = next;
@@ -783,9 +783,9 @@ pub(super) fn replace_whole_signal_driver(
         ))
     })?;
     let logic = value
-        .coerced_to(binding.view_width)
+        .into_coerced(binding.view_width)
         .logic
-        .coerced_to(object.width);
+        .into_coerced(object.width);
     replace_object_driver(binding.object_id, logic, net_drivers);
     Ok(())
 }

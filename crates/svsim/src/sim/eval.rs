@@ -448,7 +448,7 @@ pub(super) fn stage_whole_signal_driver(
     object_layouts: &[RuntimeObjectLayout],
     net_drivers: &mut NetDriverTable,
 ) -> Result<()> {
-    let logic = value.coerced_to(binding.view_width).logic;
+    let logic = value.into_coerced(binding.view_width).logic;
     stage_whole_signal_logic_driver(binding, logic, object_layouts, net_drivers)
 }
 
@@ -465,8 +465,8 @@ pub(super) fn stage_whole_signal_logic_driver(
         ))
     })?;
     let logic = value
-        .coerced_to(binding.view_width)
-        .coerced_to(object.width);
+        .into_coerced(binding.view_width)
+        .into_coerced(object.width);
     stage_object_driver(binding.object_id, logic, net_drivers);
     Ok(())
 }
@@ -479,7 +479,7 @@ pub(super) fn stage_partial_signal_driver(
     object_layouts: &[RuntimeObjectLayout],
     net_drivers: &mut NetDriverTable,
 ) -> Result<()> {
-    let logic = value.coerced_to(width).logic;
+    let logic = value.into_coerced(width).logic;
     stage_partial_signal_logic_driver(binding, low, width, logic, object_layouts, net_drivers)
 }
 
@@ -498,7 +498,7 @@ pub(super) fn stage_partial_signal_logic_driver(
         ))
     })?;
     let mut bits = LogicBits::filled(object.width, LogicBit::Z);
-    let value = value.coerced_to(width);
+    let value = value.into_coerced(width);
     for offset in 0..width {
         bits.set_bit(low + offset, value.bit(offset));
     }

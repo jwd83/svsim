@@ -651,9 +651,9 @@ fn apply_fixed_binding_drive(
         ))
     })?;
     let logic = value
-        .coerced_to(binding.view_width)
+        .into_coerced(binding.view_width)
         .logic
-        .coerced_to(object.width);
+        .into_coerced(object.width);
     if object.storage.is_net() {
         stage_object_driver(binding.object_id, logic, net_drivers);
         return Ok(false);
