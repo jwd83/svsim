@@ -297,9 +297,15 @@ fn settle_module(
     inputs: Option<&BTreeMap<String, LogicValue>>,
     stack: &mut Vec<String>,
 ) -> Result<()> {
-    let max_iterations = settle_iteration_budget(hir, state)?.max(1) * 8;
+    // One confirming pass on top of the budget (the last productive pass
+    // still reports a change), with a floor for degenerate tiny modules
+    // whose element count under-counts four-state settling (an undriven
+    // pulled net changes once before it can be confirmed stable).
+    let max_iterations = (settle_iteration_budget(hir, state)? + 1).max(16);
     let mut converged = false;
+    let mut iterations_used = 0usize;
     for _ in 0..max_iterations {
+        iterations_used += 1;
         let mut net_drivers = NetDriverTable::new();
         let pass_changed = settle_module_pass(
             hir,
@@ -318,6 +324,14 @@ fn settle_module(
             break;
         }
     }
+    // Re-measure with `SVSIM_SETTLE_STATS=1` when the corpus grows; see
+    // `settle_iteration_budget` for the last measured headroom.
+    if std::env::var_os("SVSIM_SETTLE_STATS").is_some() {
+        eprintln!(
+            "SETTLE_STATS module={} used={} budget={}",
+            module.name, iterations_used, max_iterations
+        );
+    }
 
     if !converged {
         return Err(Error::Unsupported(format!(
@@ -329,6 +343,15 @@ fn settle_module(
     Ok(())
 }
 
+/// Upper bound on productive settle iterations: the recursive sum of
+/// assigns, proc blocks, children, and signals — a generous
+/// over-approximation of the longest combinational dependency chain.
+/// Measured 2026-07-06 across 48,069 settle calls over the full corpus
+/// (`SVSIM_SETTLE_STATS=1`), the deepest design (`adder_cs_64bit`)
+/// converged in 12 iterations against a budget of 69,860; the historical
+/// ×8 multiplier on top of this sum was dropped as unfounded. Converging
+/// designs exit early, so the budget only bounds how long an oscillating
+/// design runs before erroring.
 fn settle_iteration_budget(hir: &HirDesign, state: &ModuleState) -> Result<usize> {
     let module = resolve_supported_module(hir, &state.module_name)?;
     let mut budget = module.continuous_assignments.len()
