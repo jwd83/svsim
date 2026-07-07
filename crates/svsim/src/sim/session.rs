@@ -2,6 +2,36 @@
 
 use super::*;
 
+/// A live instance of a compiled design: settle combinational logic with
+/// [`eval_once`](Self::eval_once), or advance sequential logic with
+/// [`step`](Self::step) (rising clock edges fire `always_ff` blocks).
+///
+/// # Example
+///
+/// ```
+/// use std::collections::BTreeMap;
+/// use svsim::{BitValue, Compiler};
+///
+/// let design = Compiler::new()
+///     .compile_str(
+///         "counter.sv",
+///         "module counter(input clk, output logic [3:0] q);
+///              always_ff @(posedge clk) q <= q + 1;
+///          endmodule",
+///     )
+///     .expect("compile");
+///
+/// let mut sim = design.instantiate_top().expect("instantiate");
+/// let mut outputs = BTreeMap::new();
+/// for _ in 0..3 {
+///     sim.step_2state(BTreeMap::from([("clk".to_string(), BitValue::zero())]))
+///         .expect("clk low");
+///     outputs = sim
+///         .step_2state(BTreeMap::from([("clk".to_string(), BitValue::one())]))
+///         .expect("clk high");
+/// }
+/// assert_eq!(outputs["q"], BitValue::from(3_u64));
+/// ```
 #[derive(Debug, Clone)]
 pub struct SimulationSession {
     pub(super) design: CompiledDesign,

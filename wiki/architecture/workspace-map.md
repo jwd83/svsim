@@ -31,7 +31,7 @@ The workspace is intentionally small. Most of the simulator lives in one core cr
 | [`../../crates/svsim/src/sim/`](../../crates/svsim/src/sim/) | Structural runtime, split by responsibility: `session.rs` (public API + settle/step scheduler), `eval.rs` (expression/lvalue evaluation, driver staging), `state.rs` (hierarchical module state, bindings), `memory.rs` (memory files), `legacy_rom.rs` (documented `rom_*` compatibility shim), `value.rs` (runtime object values and public-bits boundary). |
 | [`../../crates/svsim/src/test.rs`](../../crates/svsim/src/test.rs) | JSON suite parsing, execution, tracing, and report types. |
 | [`../../crates/svsim/src/diag.rs`](../../crates/svsim/src/diag.rs) | Diagnostics and top-level error types. |
-| [`../../crates/svsim/src/width.rs`](../../crates/svsim/src/width.rs) | Width inference plus shared shift/sign-extension helpers. |
+| [`../../crates/svsim/src/width.rs`](../../crates/svsim/src/width.rs) | Expression width inference over HIR. |
 | [`../../crates/svsim/src/bit_value.rs`](../../crates/svsim/src/bit_value.rs) | Limb-backed bit-vector type used by validation and simulation. |
 | [`../../crates/svsim/tests/corpus_gate.rs`](../../crates/svsim/tests/corpus_gate.rs) | Green-corpus gate: one test per green `parts/` directory; `cargo test` fails if any regression suite fails. |
 

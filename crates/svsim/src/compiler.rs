@@ -61,6 +61,32 @@ pub struct CompileDirectoryRunReport {
     pub report: CompileDirectoryReport,
 }
 
+/// Entry point for compiling SystemVerilog into a [`CompiledDesign`].
+///
+/// # Example
+///
+/// ```
+/// use std::collections::BTreeMap;
+/// use svsim::{BitValue, Compiler};
+///
+/// let design = Compiler::new()
+///     .compile_str(
+///         "adder.sv",
+///         "module adder(input [3:0] a, input [3:0] b, output [4:0] y);
+///              assign y = a + b;
+///          endmodule",
+///     )
+///     .expect("compile");
+///
+/// let mut sim = design.instantiate_top().expect("instantiate");
+/// let outputs = sim
+///     .eval_once_2state(BTreeMap::from([
+///         ("a".to_string(), BitValue::from(3_u64)),
+///         ("b".to_string(), BitValue::from(4_u64)),
+///     ]))
+///     .expect("eval");
+/// assert_eq!(outputs["y"], BitValue::from(7_u64));
+/// ```
 #[derive(Debug, Clone, Default)]
 pub struct Compiler {
     search_paths: Vec<PathBuf>,
