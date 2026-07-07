@@ -380,6 +380,25 @@ incremental, and each converted call site is immediately useful.
    `unsupported()` sites in the (now split) frontend; prefix evaluator/width
    `Resolve` errors with module and construct context. Verify diagnostic
    texts against the gated negative corpus.
+
+   *Done 2026-07-07*, in 3 commits:
+   - `4593197`: `span_of_node` (first `Locate` leaf, evaluated only on the
+     error path) threads spans through every `unsupported()` in
+     `module_structure.rs` and `statements.rs`; slice-typed dimension sites
+     use their first element.
+   - `75a2724`: `expressions.rs` and the leaf helpers without source
+     context (literal parsing, operator tables, identifier helpers,
+     const-eval funnels) — the latter via `with_fallback_span`, which
+     attaches spans at call-site boundaries so one wrap covers a whole
+     family. Regression test pins that an unsupported construct's
+     diagnostic carries its source line.
+   - `2ee60ce`: `eval_expr`/`expr_width` `Resolve` errors name their module
+     (and memory), covering the runtime side.
+
+   Result: full suite 207/207 (new span regression test); gated
+   negative-corpus fragments unaffected. Residual `span: None` sites are
+   the lowered-`Expr`-level const-eval internals with no syntax node in
+   scope — their errors now gain spans at the funnel boundaries instead.
 7. **Truth-up and close.** Fix the stale `width.rs` row in the workspace map,
    add a root `README.md` pointing at `AGENTS.md`/wiki, add doc examples to
    `Compiler` and `SimulationSession`, re-run `./test.sh` to refresh committed

@@ -228,7 +228,12 @@ incrementally useful.</p>
       <code>const_eval.rs</code>, since the funnels serve ranges/selects too. Largest production file in
       the crate is now 1,151 lines (was 3,731).</div></li>
   <li><strong>Thread spans through diagnostics.</strong> Convert the ~58 span-less <code>unsupported()</code> sites;
-      prefix evaluator/width errors with module + construct; verify against the gated negative corpus.</li>
+      prefix evaluator/width errors with module + construct; verify against the gated negative corpus.
+      <div class="note"><strong>Done 2026-07-07</strong> — <code>4593197</code>, <code>75a2724</code>,
+      <code>2ee60ce</code>. <code>span_of_node</code> (first Locate leaf, error-path only) covers the
+      frontend; <code>with_fallback_span</code> attaches spans at call-site boundaries for leaf helpers
+      (literals, operators, const-eval funnels); evaluator/width errors name their module. Suite
+      207/207 with a new span regression test; negative-corpus fragments unaffected.</div></li>
   <li><strong>Truth-up and close.</strong> Fix the stale <code>width.rs</code> wiki row, add a root
       <code>README.md</code>, add doc examples to <code>Compiler</code>/<code>SimulationSession</code>, refresh
       <code>./test.sh</code> reports (capturing new <code>step_hz</code>), move this review to <code>plans/completed/</code>.</li>
