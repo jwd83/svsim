@@ -6,19 +6,19 @@ use super::*;
 #[derive(Debug, Clone)]
 pub(super) struct ModuleState {
     pub(super) module_name: String,
-    pub(super) parameter_values: HashMap<String, Value>,
-    pub(super) signals: HashMap<String, SignalBinding>,
-    pub(super) memories: HashMap<String, MemoryState>,
-    pub(super) previous_clocks: HashMap<String, bool>,
+    pub(super) parameter_values: FxHashMap<String, Value>,
+    pub(super) signals: FxHashMap<String, SignalBinding>,
+    pub(super) memories: FxHashMap<String, MemoryState>,
+    pub(super) previous_clocks: FxHashMap<String, bool>,
     pub(super) legacy_rom: Option<LegacyRomState>,
     pub(super) children: Vec<ChildState>,
     /// Signals on net-storage runtime objects that need their driver
     /// refreshed every settle pass (see `NetSpecialAction`); precomputed so
     /// the per-pass commit only walks dirty names plus this set.
-    pub(super) net_specials: HashMap<String, (SignalBinding, NetSpecialAction)>,
+    pub(super) net_specials: FxHashMap<String, (SignalBinding, NetSpecialAction)>,
     /// Signals whose whole value is driven by a child instance's output
     /// sink; the module's own commit skips them (the child drive wins).
-    pub(super) child_output_driven: HashSet<String>,
+    pub(super) child_output_driven: FxHashSet<String>,
 }
 
 /// Per-pass driver refresh policy for a signal on a net-storage object.
@@ -75,7 +75,7 @@ pub(super) struct PortSink {
     pub(super) target: LValue,
 }
 
-pub(super) type NetDriverTable = HashMap<usize, Vec<NetDriver>>;
+pub(super) type NetDriverTable = FxHashMap<usize, Vec<NetDriver>>;
 
 pub(super) fn top_module<'a>(hir: &'a HirDesign, module_name: &str) -> Result<&'a ModuleSummary> {
     resolve_supported_module(hir, module_name)
@@ -84,7 +84,7 @@ pub(super) fn top_module<'a>(hir: &'a HirDesign, module_name: &str) -> Result<&'
 pub(super) fn instantiate_module_state(
     hir: &HirDesign,
     elaborated: &ElaboratedInstance,
-    provided_ports: HashMap<String, SignalBinding>,
+    provided_ports: FxHashMap<String, SignalBinding>,
     objects: &mut Vec<RuntimeObjectLayout>,
     stack: &mut Vec<String>,
 ) -> Result<ModuleState> {
@@ -101,7 +101,7 @@ pub(super) fn instantiate_module_state(
 
     stack.push(elaborated.module_name.clone());
 
-    let mut signals = HashMap::new();
+    let mut signals = FxHashMap::default();
     for port in &elaborated.ports {
         let width = runtime_bits_width(port.shape)?;
         let binding = provided_ports
@@ -129,7 +129,7 @@ pub(super) fn instantiate_module_state(
 
     let mut children = Vec::with_capacity(elaborated.children.len());
     for child in &elaborated.children {
-        let mut child_ports = HashMap::new();
+        let mut child_ports = FxHashMap::default();
         let mut input_drivers = Vec::new();
         let mut output_sinks = Vec::new();
 
@@ -226,10 +226,10 @@ pub(super) fn instantiate_module_state(
 
 fn build_net_special_table(
     module: &ModuleSummary,
-    signals: &HashMap<String, SignalBinding>,
+    signals: &FxHashMap<String, SignalBinding>,
     objects: &[RuntimeObjectLayout],
-) -> HashMap<String, (SignalBinding, NetSpecialAction)> {
-    let mut specials = HashMap::new();
+) -> FxHashMap<String, (SignalBinding, NetSpecialAction)> {
+    let mut specials = FxHashMap::default();
 
     for port in &module.ports {
         let Some(binding) = signals.get(&port.name).copied() else {
@@ -280,8 +280,8 @@ fn build_net_special_table(
     specials
 }
 
-fn build_child_output_driven_table(children: &[ChildState]) -> HashSet<String> {
-    let mut driven = HashSet::new();
+fn build_child_output_driven_table(children: &[ChildState]) -> FxHashSet<String> {
+    let mut driven = FxHashSet::default();
     for child in children {
         for sink in &child.output_sinks {
             if let LValue::Signal(name) = &sink.target {
@@ -301,7 +301,7 @@ fn build_child_output_driven_table(children: &[ChildState]) -> HashSet<String> {
 /// semantics).
 pub(super) fn commit_overlay_to_frame(
     state: &ModuleState,
-    overlay: &HashMap<String, Value>,
+    overlay: &FxHashMap<String, Value>,
     frame: &mut [ObjectValue],
     object_layouts: &[RuntimeObjectLayout],
     net_drivers: &mut NetDriverTable,
@@ -466,7 +466,7 @@ pub(super) struct OverlayValues<'a> {
     pub(super) module: &'a ModuleSummary,
     pub(super) state: &'a ModuleState,
     pub(super) frame: &'a [ObjectValue],
-    pub(super) overlay: &'a HashMap<String, Value>,
+    pub(super) overlay: &'a FxHashMap<String, Value>,
 }
 
 impl ValueReader for OverlayValues<'_> {
@@ -563,8 +563,8 @@ pub(super) fn build_instance_value_table(
     module: &ModuleSummary,
     state: &ModuleState,
     frame: &[ObjectValue],
-) -> Result<HashMap<String, Value>> {
-    let mut values = HashMap::new();
+) -> Result<FxHashMap<String, Value>> {
+    let mut values = FxHashMap::default();
 
     for port in &module.ports {
         let binding = state.signals.get(&port.name).copied().ok_or_else(|| {
@@ -602,7 +602,7 @@ pub(super) fn build_instance_value_table(
 pub(super) fn sync_instance_values_to_frame(
     module: &ModuleSummary,
     state: &ModuleState,
-    values: &HashMap<String, Value>,
+    values: &FxHashMap<String, Value>,
     frame: &mut [ObjectValue],
     object_layouts: &[RuntimeObjectLayout],
     net_drivers: &mut NetDriverTable,
@@ -790,8 +790,8 @@ pub(super) fn replace_whole_signal_driver(
     Ok(())
 }
 
-pub(super) fn build_clock_state_table(module: &ModuleSummary) -> HashMap<String, bool> {
-    let mut clocks = HashMap::new();
+pub(super) fn build_clock_state_table(module: &ModuleSummary) -> FxHashMap<String, bool> {
+    let mut clocks = FxHashMap::default();
 
     for block in &module.proc_blocks {
         if let ProcBlockKind::AlwaysFf { clock, async_reset } = &block.kind {

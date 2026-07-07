@@ -98,7 +98,7 @@ pub(super) fn build_legacy_rom_state(
 
 pub(super) fn apply_legacy_rom_outputs(
     module: &ModuleSummary,
-    values: &mut HashMap<String, Value>,
+    values: &mut FxHashMap<String, Value>,
     legacy_rom: &LegacyRomState,
 ) -> Result<()> {
     let addr = values

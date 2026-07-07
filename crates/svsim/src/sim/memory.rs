@@ -117,8 +117,8 @@ pub(super) fn parse_prefixed_value(raw: &str) -> std::result::Result<BitValue, P
     }
 }
 
-pub(super) fn build_memory_table(module: &ModuleSummary) -> HashMap<String, MemoryState> {
-    let mut memories = HashMap::new();
+pub(super) fn build_memory_table(module: &ModuleSummary) -> FxHashMap<String, MemoryState> {
+    let mut memories = FxHashMap::default();
 
     for memory in &module.memories {
         memories.insert(

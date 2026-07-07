@@ -47,7 +47,7 @@ pub(super) fn resolve_lvalue(
     lvalue: &LValue,
     module: &ModuleSummary,
     values: &impl ValueReader,
-    memories: &HashMap<String, MemoryState>,
+    memories: &FxHashMap<String, MemoryState>,
 ) -> Result<ResolvedLValue> {
     match lvalue {
         LValue::Signal(name) => {
@@ -160,8 +160,8 @@ pub(super) fn apply_resolved_lvalue(
     lvalue: &ResolvedLValue,
     value: Value,
     module: &ModuleSummary,
-    values: &mut HashMap<String, Value>,
-    memories: &mut HashMap<String, MemoryState>,
+    values: &mut FxHashMap<String, Value>,
+    memories: &mut FxHashMap<String, MemoryState>,
 ) -> Result<bool> {
     match lvalue {
         ResolvedLValue::Signal(name) => {
@@ -259,7 +259,7 @@ pub(super) fn seed_overlay_for_lvalue(
     module: &ModuleSummary,
     state: &ModuleState,
     frame: &[ObjectValue],
-    overlay: &mut HashMap<String, Value>,
+    overlay: &mut FxHashMap<String, Value>,
 ) {
     match lvalue {
         ResolvedLValue::Signal(name)
@@ -515,8 +515,8 @@ pub(super) fn apply_or_stage_resolved_lvalue(
     value: Value,
     module: &ModuleSummary,
     state: &ModuleState,
-    values: &mut HashMap<String, Value>,
-    memories: &mut HashMap<String, MemoryState>,
+    values: &mut FxHashMap<String, Value>,
+    memories: &mut FxHashMap<String, MemoryState>,
     object_layouts: &[RuntimeObjectLayout],
     net_drivers: &mut NetDriverTable,
 ) -> Result<bool> {

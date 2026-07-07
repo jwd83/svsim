@@ -4,6 +4,7 @@ pub mod design;
 pub mod diag;
 pub mod elaborate;
 mod expr_eval;
+mod fast_hash;
 pub mod frontend;
 pub mod hir;
 mod logic_ops;

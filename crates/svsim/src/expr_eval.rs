@@ -343,17 +343,17 @@ pub(crate) trait ValueReader {
     fn read_value(&self, name: &str) -> Option<Value>;
 }
 
-impl ValueReader for HashMap<String, Value> {
+impl<S: std::hash::BuildHasher> ValueReader for HashMap<String, Value, S> {
     fn read_value(&self, name: &str) -> Option<Value> {
         self.get(name).cloned()
     }
 }
 
-pub(crate) fn eval_expr(
+pub(crate) fn eval_expr<S: std::hash::BuildHasher>(
     expr: &Expr,
     module: &ModuleSummary,
     values: &impl ValueReader,
-    memories: &HashMap<String, MemoryState>,
+    memories: &HashMap<String, MemoryState, S>,
 ) -> Result<Value> {
     match expr {
         Expr::Ident(name) => values.read_value(name).ok_or_else(|| {

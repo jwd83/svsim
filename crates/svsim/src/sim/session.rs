@@ -48,7 +48,7 @@ impl SimulationSession {
         let state = instantiate_module_state(
             design.hir(),
             &elaborated.top,
-            HashMap::new(),
+            FxHashMap::default(),
             &mut objects,
             &mut stack,
         )?;
@@ -336,7 +336,7 @@ fn settle_module(
     let mut iterations_used = 0usize;
     for _ in 0..max_iterations {
         iterations_used += 1;
-        let mut net_drivers = NetDriverTable::new();
+        let mut net_drivers = NetDriverTable::default();
         let pass_changed = settle_module_pass(
             hir,
             module,
@@ -450,7 +450,7 @@ fn settle_module_pass(
         return Ok(changed);
     }
 
-    let mut overlay: HashMap<String, Value> = HashMap::new();
+    let mut overlay: FxHashMap<String, Value> = FxHashMap::default();
 
     for assign in &module.continuous_assignments {
         let (value, target) = {
@@ -470,7 +470,7 @@ fn settle_module_pass(
             ));
         }
         seed_overlay_for_lvalue(&target, module, state, frame, &mut overlay);
-        let mut no_memories = HashMap::new();
+        let mut no_memories = FxHashMap::default();
         // Overlay-level change flags are transient: a default-then-override
         // sequence reports "changed" on every pass even at steady state.
         // Convergence listens to `commit_overlay_to_frame` below, which
@@ -621,7 +621,7 @@ fn step_module(
         }
     }
 
-    let mut no_net_drivers = NetDriverTable::new();
+    let mut no_net_drivers = NetDriverTable::default();
     sync_instance_values_to_frame(
         module,
         state,
@@ -703,7 +703,7 @@ fn drive_child_inputs(
     parent_module: &ModuleSummary,
     parent_state: &ModuleState,
     child_state: &ChildState,
-    parent_memories: &HashMap<String, MemoryState>,
+    parent_memories: &FxHashMap<String, MemoryState>,
     frame: &mut [ObjectValue],
     object_layouts: &[RuntimeObjectLayout],
     net_drivers: &mut NetDriverTable,
@@ -738,7 +738,7 @@ fn apply_child_output_sinks(
     parent_module: &ModuleSummary,
     parent_state: &ModuleState,
     child_state: &ChildState,
-    parent_memories: &HashMap<String, MemoryState>,
+    parent_memories: &FxHashMap<String, MemoryState>,
     frame: &mut [ObjectValue],
     object_layouts: &[RuntimeObjectLayout],
     net_drivers: &mut NetDriverTable,
@@ -786,8 +786,8 @@ fn execute_proc_block(
     module: &ModuleSummary,
     state: &ModuleState,
     frame: &[ObjectValue],
-    overlay: &mut HashMap<String, Value>,
-    memories: &HashMap<String, MemoryState>,
+    overlay: &mut FxHashMap<String, Value>,
+    memories: &FxHashMap<String, MemoryState>,
 ) -> Result<bool> {
     match kind {
         ProcBlockKind::AlwaysComb => {
@@ -802,8 +802,8 @@ fn execute_comb_stmt(
     module: &ModuleSummary,
     state: &ModuleState,
     frame: &[ObjectValue],
-    overlay: &mut HashMap<String, Value>,
-    memories: &HashMap<String, MemoryState>,
+    overlay: &mut FxHashMap<String, Value>,
+    memories: &FxHashMap<String, MemoryState>,
 ) -> Result<bool> {
     match stmt {
         Stmt::Empty => Ok(false),
@@ -834,7 +834,7 @@ fn execute_comb_stmt(
                     ));
                 }
                 seed_overlay_for_lvalue(&target, module, state, frame, overlay);
-                let mut no_memories = HashMap::new();
+                let mut no_memories = FxHashMap::default();
                 apply_resolved_lvalue(&target, value, module, overlay, &mut no_memories)
             }
             AssignmentKind::Nonblocking => Err(Error::Unsupported(
@@ -907,10 +907,10 @@ fn execute_comb_stmt(
 fn execute_sequential_stmt(
     stmt: &Stmt,
     module: &ModuleSummary,
-    current_values: &mut HashMap<String, Value>,
-    memories: &mut HashMap<String, MemoryState>,
-    staged_values: &mut HashMap<String, Value>,
-    staged_memories: &mut HashMap<String, MemoryState>,
+    current_values: &mut FxHashMap<String, Value>,
+    memories: &mut FxHashMap<String, MemoryState>,
+    staged_values: &mut FxHashMap<String, Value>,
+    staged_memories: &mut FxHashMap<String, MemoryState>,
 ) -> Result<()> {
     match stmt {
         Stmt::Empty => Ok(()),

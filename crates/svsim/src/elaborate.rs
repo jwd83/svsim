@@ -1,9 +1,8 @@
-use std::collections::HashMap;
-
 use serde::Serialize;
 
 use crate::diag::{Error, Result, SourceSpan};
 use crate::expr_eval::{Value, eval_expr, resolve_parameter_defaults};
+use crate::fast_hash::FxHashMap;
 use crate::hir::{
     Expr, HirDesign, LValue, MemoryDecl, ModuleInstanceSummary, ModuleSummary, PackedRange,
     ParameterDecl, PortDecl, PortDirection, SignalDecl, StorageKind, expr_to_lvalue,
@@ -36,7 +35,7 @@ pub struct ElaboratedInstance {
     /// Parameter values resolved against instance overrides, used to seed the
     /// simulation runtime. Internal: not part of the serialized design.
     #[serde(skip)]
-    pub(crate) parameter_values: HashMap<String, Value>,
+    pub(crate) parameter_values: FxHashMap<String, Value>,
     pub ports: Vec<ElaboratedPort>,
     pub nets: Vec<ElaboratedNet>,
     pub variables: Vec<ElaboratedVariable>,
@@ -119,7 +118,7 @@ fn elaborate_instance(
     instance_name: Option<String>,
     path: Vec<String>,
     instance_summary: Option<&ModuleInstanceSummary>,
-    parent: Option<(&ModuleSummary, &HashMap<String, Value>)>,
+    parent: Option<(&ModuleSummary, &FxHashMap<String, Value>)>,
     stack: &mut Vec<String>,
 ) -> Result<ElaboratedInstance> {
     if stack.iter().any(|name| name == module_name) {
@@ -186,11 +185,11 @@ fn elaborate_instance(
 
 fn elaborate_module_parameters(
     module: &ModuleSummary,
-    parent: Option<(&ModuleSummary, &HashMap<String, Value>)>,
+    parent: Option<(&ModuleSummary, &FxHashMap<String, Value>)>,
     instance: Option<&ModuleInstanceSummary>,
-) -> Result<HashMap<String, Value>> {
-    let empty_memories = HashMap::new();
-    let mut values = HashMap::new();
+) -> Result<FxHashMap<String, Value>> {
+    let empty_memories = FxHashMap::default();
+    let mut values = FxHashMap::default();
 
     for param in &module.parameters {
         let value = if let Some(override_expr) = instance.and_then(|instance| {

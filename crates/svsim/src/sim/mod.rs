@@ -6,7 +6,7 @@
 //! (hierarchical module state and bindings), `memory` (memory files and the
 //! legacy ROM shim), `session` (public API and scheduler).
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
@@ -15,6 +15,7 @@ use crate::design::CompiledDesign;
 use crate::diag::{Error, Result};
 use crate::elaborate::{ElaboratedInstance, RuntimeObjectShape};
 use crate::expr_eval::{LogicTruth, MemoryState, Value, ValueReader, eval_expr, values_case_equal};
+use crate::fast_hash::{FxHashMap, FxHashSet};
 use crate::hir::{
     AssignmentKind, Expr, HirDesign, LValue, ModuleSummary, PortDirection, ProcBlockKind, Stmt,
     StorageKind,
