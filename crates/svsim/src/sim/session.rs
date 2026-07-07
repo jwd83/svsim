@@ -300,9 +300,8 @@ fn settle_module(
     let max_iterations = settle_iteration_budget(hir, state)?.max(1) * 8;
     let mut converged = false;
     for _ in 0..max_iterations {
-        let frame_before_iteration = frame.to_vec();
         let mut net_drivers = NetDriverTable::new();
-        let _changed = settle_module_pass(
+        let pass_changed = settle_module_pass(
             hir,
             module,
             state,
@@ -312,10 +311,9 @@ fn settle_module(
             &mut net_drivers,
             stack,
         )?;
-        resolve_staged_nets(frame, object_layouts, &net_drivers)?;
-        let changed = *frame != frame_before_iteration;
+        let nets_changed = resolve_staged_nets(frame, object_layouts, &net_drivers)?;
 
-        if !changed {
+        if !(pass_changed || nets_changed) {
             converged = true;
             break;
         }
@@ -420,7 +418,11 @@ fn settle_module_pass(
         }
         seed_overlay_for_lvalue(&target, module, state, frame, &mut overlay);
         let mut no_memories = HashMap::new();
-        changed |= apply_or_stage_resolved_lvalue(
+        // Overlay-level change flags are transient: a default-then-override
+        // sequence reports "changed" on every pass even at steady state.
+        // Convergence listens to `commit_overlay_to_frame` below, which
+        // compares each dirty name's final value against the frame.
+        apply_or_stage_resolved_lvalue(
             &target,
             value,
             module,
@@ -433,7 +435,7 @@ fn settle_module_pass(
     }
 
     for block in &module.proc_blocks {
-        changed |= execute_proc_block(
+        execute_proc_block(
             &block.kind,
             &block.body,
             module,
