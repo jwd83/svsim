@@ -319,6 +319,36 @@ incremental, and each converted call site is immediately useful.
    iteration counts. Corpus gate (positive and now negative) is the oracle;
    expect this plus step 3 to move the slowest suites by an order of
    magnitude.
+
+   *Done 2026-07-06*, in 3 commits:
+   - `b8db4ff`: convergence is now `pass_changed | nets_changed` — no more
+     per-iteration frame clone and deep compare. Key soundness point: the
+     overlay-level flags from assigns and proc blocks are deliberately
+     *discarded*, because a default-then-override sequence (`s = 0;
+     s[i] = x;`) reports "changed" on every pass even at steady state;
+     the sound signal is `commit_overlay_to_frame`'s comparison of each
+     dirty name's final value against the frame.
+   - `9e1a2c1`: measured the budget with an env-gated hook
+     (`SVSIM_SETTLE_STATS=1`, kept for re-measurement): across 48,069
+     settle calls, the deepest design converged in 12 iterations against
+     budgets up to 558,880. The unfounded ×8 multiplier is gone; the bound
+     is now budget + 1 confirming pass, floored at 16. The floor is
+     load-bearing: an undriven pulled net (`tri1`) changes once before it
+     can be confirmed stable — dropping the multiplier without it broke two
+     tri-net unit tests, proof the ×8 had been silently covering a real
+     +1-confirmation requirement.
+   - (annotation commit): regenerated reports, review/wiki sync.
+
+   Result: full suite 206/206. Release corpus 16.7 s → 15.5 s for step 4
+   alone (after step 3 removed the table churn, the frame clone was no
+   longer dominant). Combined steps 3+4 against the review baseline:
+   54.4 s → 15.5 s (3.5×); `regfile_8x8` 4 → 19 step/s, `adder_cs_64bit`
+   1 → 6, sap1 395 → 1,633, picorv32 93 → ~250. Honest shortfall: the
+   predicted order-of-magnitude did not fully materialize — the slowest
+   suites moved 4–6×, and the remaining cost is expression interpretation
+   itself (per-operation `LogicValue` allocation), which is the runtime
+   value-representation work this review deliberately left for a future
+   campaign.
 5. **Split `frontend/sv_parser.rs`** into a module directory using the `sim/`
    pattern — `module_structure.rs`, `statements.rs`, `expressions.rs`,
    `literals.rs`, `loop_unroll.rs` — naming the unroller for what it is and

@@ -209,7 +209,16 @@ incrementally useful.</p>
       sap3 298→1,316, picorv32 93→285. Remaining cost: clone-and-compare convergence (step 4).</div></li>
   <li><strong>Replace clone-and-compare convergence.</strong> Use the change tracking the pass already
       computes; revisit the ×8 budget with measured counts. Expect steps 3+4 to move the slowest
-      suites by an order of magnitude.</li>
+      suites by an order of magnitude.
+      <div class="note"><strong>Done 2026-07-06</strong> — <code>b8db4ff</code> converges on
+      <code>pass_changed | nets_changed</code>; overlay-level flags are deliberately discarded
+      (default-then-override reports "changed" forever at steady state — the commit's dirty-name
+      comparison is the sound signal). <code>9e1a2c1</code>: measured 48,069 settle calls — deepest
+      convergence 12 iterations vs budgets up to 558,880; ×8 multiplier dropped, bound now
+      budget+1 floored at 16 (the floor caught the <code>tri1</code> undriven-net case). Suite 206/206.
+      Steps 3+4 combined: release corpus 54.4 s → 15.5 s (3.5×), regfile_8x8 4→19 step/s,
+      adder_cs_64bit 1→6, sap1 395→1,633 — a 4–6× move, short of the predicted 10×; the residual
+      is per-operation value allocation, deferred to a future value-representation campaign.</div></li>
   <li><strong>Split <code>frontend/sv_parser.rs</code></strong> into <code>module_structure.rs</code>, <code>statements.rs</code>,
       <code>expressions.rs</code>, <code>literals.rs</code>, <code>loop_unroll.rs</code> using the <code>sim/</code> pattern.</li>
   <li><strong>Thread spans through diagnostics.</strong> Convert the ~58 span-less <code>unsupported()</code> sites;

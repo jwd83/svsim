@@ -33,11 +33,14 @@ Snapshot date: 2026-07-06
   at elaboration with a construct-naming diagnostic
   (`ModuleSummary::frozen_parameters`); runtime-only and default-equal
   overrides are unaffected.
-- Since the second review's step 3, the settle loop evaluates directly over
-  the indexed runtime frame (`ValueReader` seam, `FrameValues`/`OverlayValues`
-  readers, dirty-name commit) instead of rebuilding string-keyed value tables
-  per pass. Release-corpus runtime dropped ~3.3× (54.4 s → 16.7 s); e.g.
-  `regfile_8x8` 4 → 16 steps/s, sap2 programs ~300 → ~1,400 steps/s.
+- Since the second review's steps 3–4, the settle loop evaluates directly
+  over the indexed runtime frame (`ValueReader` seam,
+  `FrameValues`/`OverlayValues` readers, dirty-name commit) and converges on
+  tracked changes instead of cloning and deep-comparing the frame each
+  iteration; the iteration budget is measured (deepest observed convergence:
+  12 iterations; re-measure with `SVSIM_SETTLE_STATS=1`). Release-corpus
+  runtime dropped 3.5× (54.4 s → 15.5 s); e.g. `regfile_8x8` 4 → 19 steps/s,
+  sap programs ~300 → ~1,500 steps/s, picorv32 ~250 steps/s.
 - The workspace `Cargo.toml` builds the `svsim` package at `opt-level = 2`
   even in dev/test profiles; unoptimized simulation is ~9x slower and made
   the full suite impractical (unit tests dropped from ~130s to ~32s).
