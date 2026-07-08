@@ -9,11 +9,11 @@
         "source_path": "parts/sap1/sap1.sv",
         "json_path": "parts/sap1/sap1_add3to42.json",
         "top_module": "machine",
-        "duration_ms": 931,
+        "duration_ms": 930,
         "passed": true,
         "report": {
-          "duration_ms": 895,
-          "step_hz": 2983,
+          "duration_ms": 878,
+          "step_hz": 3041,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -32,11 +32,11 @@
         "source_path": "parts/sap1/sap1.sv",
         "json_path": "parts/sap1/sap1_fib.json",
         "top_module": "machine",
-        "duration_ms": 166,
+        "duration_ms": 178,
         "passed": true,
         "report": {
-          "duration_ms": 138,
-          "step_hz": 2007,
+          "duration_ms": 136,
+          "step_hz": 2036,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -55,11 +55,11 @@
         "source_path": "parts/sap1/sap1.sv",
         "json_path": "parts/sap1/sap1_memory_traffic.json",
         "top_module": "machine",
-        "duration_ms": 107,
+        "duration_ms": 122,
         "passed": true,
         "report": {
-          "duration_ms": 67,
-          "step_hz": 1701,
+          "duration_ms": 74,
+          "step_hz": 1540,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -78,11 +78,11 @@
         "source_path": "parts/sap1/sap1.sv",
         "json_path": "parts/sap1/sap1_multiply.json",
         "top_module": "machine",
-        "duration_ms": 164,
+        "duration_ms": 155,
         "passed": true,
         "report": {
-          "duration_ms": 129,
-          "step_hz": 1914,
+          "duration_ms": 128,
+          "step_hz": 1929,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -101,11 +101,11 @@
         "source_path": "parts/sap1/sap1.sv",
         "json_path": "parts/sap1/sap1_self_modify_fetch.json",
         "top_module": "machine",
-        "duration_ms": 45,
+        "duration_ms": 49,
         "passed": true,
         "report": {
-          "duration_ms": 18,
-          "step_hz": 1277,
+          "duration_ms": 13,
+          "step_hz": 1769,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -127,8 +127,8 @@
         "duration_ms": 119,
         "passed": true,
         "report": {
-          "duration_ms": 83,
-          "step_hz": 1590,
+          "duration_ms": 73,
+          "step_hz": 1808,
           "passed": 1,
           "total": 1,
           "cases": [
