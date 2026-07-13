@@ -1,7 +1,7 @@
 {
   "directory": "parts/testing",
   "report": {
-    "duration_ms": 55,
+    "duration": 0.054073291,
     "passed": 55,
     "total": 55,
     "suites": [
@@ -9,11 +9,11 @@
         "source_path": "parts/testing/001-GettingStarted.sv",
         "json_path": "parts/testing/001-GettingStarted.json",
         "top_module": "top_module",
-        "duration_ms": 0,
+        "duration": 0.002582583,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 1000,
+          "duration": 0.00001,
+          "step_hz": 100000,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -32,11 +32,11 @@
         "source_path": "parts/testing/002-OutputZero.sv",
         "json_path": "parts/testing/002-OutputZero.json",
         "top_module": "top_module",
-        "duration_ms": 1,
+        "duration": 0.000419916,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 1000,
+          "duration": 6.167e-6,
+          "step_hz": 162153,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -55,11 +55,11 @@
         "source_path": "parts/testing/003-Wire.sv",
         "json_path": "parts/testing/003-Wire.json",
         "top_module": "top_module",
-        "duration_ms": 1,
+        "duration": 0.000401959,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 2000,
+          "duration": 8e-6,
+          "step_hz": 250000,
           "passed": 2,
           "total": 2,
           "cases": [
@@ -85,11 +85,11 @@
         "source_path": "parts/testing/004-Wire4.sv",
         "json_path": "parts/testing/004-Wire4.json",
         "top_module": "top_module",
-        "duration_ms": 1,
+        "duration": 0.000887791,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 6000,
+          "duration": 0.000063291,
+          "step_hz": 94800,
           "passed": 6,
           "total": 6,
           "cases": [
@@ -143,11 +143,11 @@
         "source_path": "parts/testing/005-Notgate.sv",
         "json_path": "parts/testing/005-Notgate.json",
         "top_module": "top_module",
-        "duration_ms": 0,
+        "duration": 0.000441833,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 2000,
+          "duration": 8.958e-6,
+          "step_hz": 223264,
           "passed": 2,
           "total": 2,
           "cases": [
@@ -173,11 +173,11 @@
         "source_path": "parts/testing/006-Andgate.sv",
         "json_path": "parts/testing/006-Andgate.json",
         "top_module": "top_module",
-        "duration_ms": 0,
+        "duration": 0.00063175,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 4000,
+          "duration": 0.000072292,
+          "step_hz": 55331,
           "passed": 4,
           "total": 4,
           "cases": [
@@ -217,11 +217,11 @@
         "source_path": "parts/testing/007-Norgate.sv",
         "json_path": "parts/testing/007-Norgate.json",
         "top_module": "top_module",
-        "duration_ms": 1,
+        "duration": 0.001976625,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 4000,
+          "duration": 0.000049291,
+          "step_hz": 81150,
           "passed": 4,
           "total": 4,
           "cases": [
@@ -261,11 +261,11 @@
         "source_path": "parts/testing/008-Xnorgate.sv",
         "json_path": "parts/testing/008-Xnorgate.json",
         "top_module": "top_module",
-        "duration_ms": 1,
+        "duration": 0.002540834,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 4000,
+          "duration": 0.000030625,
+          "step_hz": 130612,
           "passed": 4,
           "total": 4,
           "cases": [
@@ -305,11 +305,11 @@
         "source_path": "parts/testing/009-DeclaringWires.sv",
         "json_path": "parts/testing/009-DeclaringWires.json",
         "top_module": "top_module",
-        "duration_ms": 2,
+        "duration": 0.002934542,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 8000,
+          "duration": 0.000151416,
+          "step_hz": 52834,
           "passed": 8,
           "total": 8,
           "cases": [
@@ -377,11 +377,11 @@
         "source_path": "parts/testing/010-7458.sv",
         "json_path": "parts/testing/010-7458.json",
         "top_module": "top_module",
-        "duration_ms": 2,
+        "duration": 0.005772083,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 5000,
+          "duration": 0.000096416,
+          "step_hz": 51858,
           "passed": 5,
           "total": 5,
           "cases": [
@@ -428,11 +428,11 @@
         "source_path": "parts/testing/011-Vector0.sv",
         "json_path": "parts/testing/011-Vector0.json",
         "top_module": "top_module",
-        "duration_ms": 1,
+        "duration": 0.003042459,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 8000,
+          "duration": 0.000059542,
+          "step_hz": 134358,
           "passed": 8,
           "total": 8,
           "cases": [
@@ -500,11 +500,11 @@
         "source_path": "parts/testing/012-Vector1.sv",
         "json_path": "parts/testing/012-Vector1.json",
         "top_module": "top_module",
-        "duration_ms": 2,
+        "duration": 0.001479,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 8000,
+          "duration": 0.0000845,
+          "step_hz": 94674,
           "passed": 8,
           "total": 8,
           "cases": [
@@ -572,11 +572,11 @@
         "source_path": "parts/testing/013-Vector2.sv",
         "json_path": "parts/testing/013-Vector2.json",
         "top_module": "top_module",
-        "duration_ms": 3,
+        "duration": 0.002351834,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 10000,
+          "duration": 0.000723667,
+          "step_hz": 13818,
           "passed": 10,
           "total": 10,
           "cases": [
@@ -658,11 +658,11 @@
         "source_path": "parts/testing/014-VectorGates.sv",
         "json_path": "parts/testing/014-VectorGates.json",
         "top_module": "top_module",
-        "duration_ms": 2,
+        "duration": 0.00626275,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 8000,
+          "duration": 0.00025675,
+          "step_hz": 31158,
           "passed": 8,
           "total": 8,
           "cases": [
@@ -730,11 +730,11 @@
         "source_path": "parts/testing/015-Gates4.sv",
         "json_path": "parts/testing/015-Gates4.json",
         "top_module": "top_module",
-        "duration_ms": 3,
+        "duration": 0.004111416,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 8000,
+          "duration": 0.0000835,
+          "step_hz": 95808,
           "passed": 8,
           "total": 8,
           "cases": [
@@ -802,11 +802,11 @@
         "source_path": "parts/testing/016-Vector3.sv",
         "json_path": "parts/testing/016-Vector3.json",
         "top_module": "top_module",
-        "duration_ms": 2,
+        "duration": 0.001507,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 8000,
+          "duration": 0.000158792,
+          "step_hz": 50380,
           "passed": 8,
           "total": 8,
           "cases": [
@@ -874,11 +874,11 @@
         "source_path": "parts/testing/017-Vectorr.sv",
         "json_path": "parts/testing/017-Vectorr.json",
         "top_module": "top_module",
-        "duration_ms": 4,
+        "duration": 0.007107291,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 10000,
+          "duration": 0.000053375,
+          "step_hz": 187353,
           "passed": 10,
           "total": 10,
           "cases": [
@@ -960,11 +960,11 @@
         "source_path": "parts/testing/018-Vector4SignExtension.sv",
         "json_path": "parts/testing/018-Vector4SignExtension.json",
         "top_module": "top_module",
-        "duration_ms": 1,
+        "duration": 0.001252542,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 8000,
+          "duration": 0.000060417,
+          "step_hz": 132413,
           "passed": 8,
           "total": 8,
           "cases": [
@@ -1032,11 +1032,11 @@
         "source_path": "parts/testing/019-Vector5.sv",
         "json_path": "parts/testing/019-Vector5.json",
         "top_module": "top_module",
-        "duration_ms": 7,
+        "duration": 0.010755625,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 7000,
+          "duration": 0.000199916,
+          "step_hz": 35014,
           "passed": 7,
           "total": 7,
           "cases": [
@@ -1097,11 +1097,11 @@
         "source_path": "parts/testing/020-WidthCoercion.sv",
         "json_path": "parts/testing/020-WidthCoercion.json",
         "top_module": "top_module",
-        "duration_ms": 3,
+        "duration": 0.00530025,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 3000,
+          "duration": 0.000049459,
+          "step_hz": 60656,
           "passed": 3,
           "total": 3,
           "cases": [
@@ -1134,11 +1134,11 @@
         "source_path": "parts/testing/021-ShiftOps.sv",
         "json_path": "parts/testing/021-ShiftOps.json",
         "top_module": "top_module",
-        "duration_ms": 1,
+        "duration": 0.003484792,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 3000,
+          "duration": 0.000097292,
+          "step_hz": 30835,
           "passed": 3,
           "total": 3,
           "cases": [
@@ -1171,11 +1171,11 @@
         "source_path": "parts/testing/022-FourStateControl.sv",
         "json_path": "parts/testing/022-FourStateControl.json",
         "top_module": "top",
-        "duration_ms": 6,
+        "duration": 0.007078666,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 1000,
+          "duration": 0.000023375,
+          "step_hz": 42780,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -1194,11 +1194,11 @@
         "source_path": "parts/testing/023-FourStateBoundary.sv",
         "json_path": "parts/testing/023-FourStateBoundary.json",
         "top_module": "top",
-        "duration_ms": 1,
+        "duration": 0.001227709,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 1000,
+          "duration": 0.000013,
+          "step_hz": 76923,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -1217,11 +1217,11 @@
         "source_path": "parts/testing/024-FourStateLiterals.sv",
         "json_path": "parts/testing/024-FourStateLiterals.json",
         "top_module": "top",
-        "duration_ms": 5,
+        "duration": 0.00280175,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 1000,
+          "duration": 0.000014,
+          "step_hz": 71428,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -1240,11 +1240,11 @@
         "source_path": "parts/testing/025-TopLevelInout.sv",
         "json_path": "parts/testing/025-TopLevelInout.json",
         "top_module": "top",
-        "duration_ms": 0,
+        "duration": 0.000749084,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 8000,
+          "duration": 0.000023,
+          "step_hz": 347826,
           "passed": 8,
           "total": 8,
           "cases": [
@@ -1312,11 +1312,11 @@
         "source_path": "parts/testing/adder_16bit.sv",
         "json_path": "parts/testing/adder_16bit.json",
         "top_module": "adder_16bit",
-        "duration_ms": 18,
+        "duration": 0.033719958,
         "passed": true,
         "report": {
-          "duration_ms": 7,
-          "step_hz": 1142,
+          "duration": 0.012018167,
+          "step_hz": 665,
           "passed": 8,
           "total": 8,
           "cases": [
@@ -1384,11 +1384,11 @@
         "source_path": "parts/testing/adder_4bit.sv",
         "json_path": "parts/testing/adder_4bit.json",
         "top_module": "adder_4bit",
-        "duration_ms": 10,
+        "duration": 0.009184958,
         "passed": true,
         "report": {
-          "duration_ms": 1,
-          "step_hz": 10000,
+          "duration": 0.001779333,
+          "step_hz": 5620,
           "passed": 10,
           "total": 10,
           "cases": [
@@ -1470,11 +1470,11 @@
         "source_path": "parts/testing/adder_8bit.sv",
         "json_path": "parts/testing/adder_8bit.json",
         "top_module": "adder_8bit",
-        "duration_ms": 23,
+        "duration": 0.035697541,
         "passed": true,
         "report": {
-          "duration_ms": 9,
-          "step_hz": 1111,
+          "duration": 0.012126875,
+          "step_hz": 824,
           "passed": 10,
           "total": 10,
           "cases": [
@@ -1556,11 +1556,11 @@
         "source_path": "parts/testing/always_posedge_ff.sv",
         "json_path": "parts/testing/always_posedge_ff.json",
         "top_module": "always_posedge_ff",
-        "duration_ms": 1,
+        "duration": 0.002448375,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 5000,
+          "duration": 0.00035825,
+          "step_hz": 13956,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -1579,11 +1579,11 @@
         "source_path": "parts/testing/always_star_comb.sv",
         "json_path": "parts/testing/always_star_comb.json",
         "top_module": "always_star_comb",
-        "duration_ms": 1,
+        "duration": 0.002113875,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 4000,
+          "duration": 0.000027541,
+          "step_hz": 145238,
           "passed": 4,
           "total": 4,
           "cases": [
@@ -1623,11 +1623,11 @@
         "source_path": "parts/testing/and_gate.sv",
         "json_path": "parts/testing/and_gate.json",
         "top_module": "and_gate",
-        "duration_ms": 2,
+        "duration": 0.003437583,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 4000,
+          "duration": 0.000031209,
+          "step_hz": 128168,
           "passed": 4,
           "total": 4,
           "cases": [
@@ -1667,11 +1667,11 @@
         "source_path": "parts/testing/and_gate_8bit.sv",
         "json_path": "parts/testing/and_gate_8bit.json",
         "top_module": "and_gate_8bit",
-        "duration_ms": 6,
+        "duration": 0.011082791,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 12000,
+          "duration": 0.000684458,
+          "step_hz": 17532,
           "passed": 12,
           "total": 12,
           "cases": [
@@ -1767,11 +1767,11 @@
         "source_path": "parts/testing/full_adder.sv",
         "json_path": "parts/testing/full_adder.json",
         "top_module": "full_adder",
-        "duration_ms": 7,
+        "duration": 0.00629725,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 8000,
+          "duration": 0.001408292,
+          "step_hz": 5680,
           "passed": 8,
           "total": 8,
           "cases": [
@@ -1839,11 +1839,11 @@
         "source_path": "parts/testing/half_adder.sv",
         "json_path": "parts/testing/half_adder.json",
         "top_module": "half_adder",
-        "duration_ms": 4,
+        "duration": 0.00241175,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 4000,
+          "duration": 0.000080792,
+          "step_hz": 49509,
           "passed": 4,
           "total": 4,
           "cases": [
@@ -1883,11 +1883,11 @@
         "source_path": "parts/testing/localparam_constants.sv",
         "json_path": "parts/testing/localparam_constants.json",
         "top_module": "localparam_constants",
-        "duration_ms": 7,
+        "duration": 0.003294709,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 5000,
+          "duration": 0.000087625,
+          "step_hz": 57061,
           "passed": 5,
           "total": 5,
           "cases": [
@@ -1934,11 +1934,11 @@
         "source_path": "parts/testing/memory_cpu_stub.sv",
         "json_path": "parts/testing/memory_cpu_stub.json",
         "top_module": "memory_cpu_stub",
-        "duration_ms": 9,
+        "duration": 0.012977833,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 5000,
+          "duration": 0.000280875,
+          "step_hz": 17801,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -1957,11 +1957,11 @@
         "source_path": "parts/testing/multiply.sv",
         "json_path": "parts/testing/multiply.json",
         "top_module": "multiply",
-        "duration_ms": 1,
+        "duration": 0.00295325,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 7000,
+          "duration": 0.000038791,
+          "step_hz": 180454,
           "passed": 7,
           "total": 7,
           "cases": [
@@ -2022,11 +2022,11 @@
         "source_path": "parts/testing/nand_gate.sv",
         "json_path": "parts/testing/nand_gate.json",
         "top_module": "nand_gate",
-        "duration_ms": 0,
+        "duration": 0.000715875,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 4000,
+          "duration": 0.000015666,
+          "step_hz": 255330,
           "passed": 4,
           "total": 4,
           "cases": [
@@ -2066,11 +2066,11 @@
         "source_path": "parts/testing/nand_gate_8bit.sv",
         "json_path": "parts/testing/nand_gate_8bit.json",
         "top_module": "nand_gate_8bit",
-        "duration_ms": 10,
+        "duration": 0.004455,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 12000,
+          "duration": 0.000602,
+          "step_hz": 19933,
           "passed": 12,
           "total": 12,
           "cases": [
@@ -2166,11 +2166,11 @@
         "source_path": "parts/testing/nor_gate.sv",
         "json_path": "parts/testing/nor_gate.json",
         "top_module": "nor_gate",
-        "duration_ms": 3,
+        "duration": 0.00224225,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 4000,
+          "duration": 0.000061667,
+          "step_hz": 64864,
           "passed": 4,
           "total": 4,
           "cases": [
@@ -2210,11 +2210,11 @@
         "source_path": "parts/testing/nor_gate_8bit.sv",
         "json_path": "parts/testing/nor_gate_8bit.json",
         "top_module": "nor_gate_8bit",
-        "duration_ms": 11,
+        "duration": 0.006540958,
         "passed": true,
         "report": {
-          "duration_ms": 1,
-          "step_hz": 12000,
+          "duration": 0.001674583,
+          "step_hz": 7165,
           "passed": 12,
           "total": 12,
           "cases": [
@@ -2310,11 +2310,11 @@
         "source_path": "parts/testing/not_gate.sv",
         "json_path": "parts/testing/not_gate.json",
         "top_module": "not_gate",
-        "duration_ms": 3,
+        "duration": 0.002555416,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 2000,
+          "duration": 0.000017,
+          "step_hz": 117647,
           "passed": 2,
           "total": 2,
           "cases": [
@@ -2340,11 +2340,11 @@
         "source_path": "parts/testing/not_gate_8bit.sv",
         "json_path": "parts/testing/not_gate_8bit.json",
         "top_module": "not_gate_8bit",
-        "duration_ms": 6,
+        "duration": 0.010132959,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 8000,
+          "duration": 0.001709458,
+          "step_hz": 4679,
           "passed": 8,
           "total": 8,
           "cases": [
@@ -2412,11 +2412,11 @@
         "source_path": "parts/testing/or_gate.sv",
         "json_path": "parts/testing/or_gate.json",
         "top_module": "or_gate",
-        "duration_ms": 3,
+        "duration": 0.003712292,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 4000,
+          "duration": 0.0001265,
+          "step_hz": 31620,
           "passed": 4,
           "total": 4,
           "cases": [
@@ -2456,11 +2456,11 @@
         "source_path": "parts/testing/or_gate_8bit.sv",
         "json_path": "parts/testing/or_gate_8bit.json",
         "top_module": "or_gate_8bit",
-        "duration_ms": 15,
+        "duration": 0.012031583,
         "passed": true,
         "report": {
-          "duration_ms": 1,
-          "step_hz": 12000,
+          "duration": 0.002539917,
+          "step_hz": 4724,
           "passed": 12,
           "total": 12,
           "cases": [
@@ -2556,11 +2556,11 @@
         "source_path": "parts/testing/overture_cpu_8bit_math_sequence.sv",
         "json_path": "parts/testing/overture_cpu_8bit_math_sequence.json",
         "top_module": "overture_cpu_8bit_math_sequence",
-        "duration_ms": 20,
+        "duration": 0.01933675,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 9000,
+          "duration": 0.000213,
+          "step_hz": 42253,
           "passed": 2,
           "total": 2,
           "cases": [
@@ -2586,11 +2586,11 @@
         "source_path": "parts/testing/param_cross_ref.sv",
         "json_path": "parts/testing/param_cross_ref.json",
         "top_module": "param_cross_ref",
-        "duration_ms": 1,
+        "duration": 0.00106025,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 3000,
+          "duration": 0.000030042,
+          "step_hz": 99860,
           "passed": 3,
           "total": 3,
           "cases": [
@@ -2623,11 +2623,11 @@
         "source_path": "parts/testing/param_expr_range.sv",
         "json_path": "parts/testing/param_expr_range.json",
         "top_module": "param_expr_range",
-        "duration_ms": 0,
+        "duration": 0.000782791,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 4000,
+          "duration": 0.000016084,
+          "step_hz": 248694,
           "passed": 4,
           "total": 4,
           "cases": [
@@ -2667,11 +2667,11 @@
         "source_path": "parts/testing/param_override_ok.sv",
         "json_path": "parts/testing/param_override_ok.json",
         "top_module": "param_override_ok",
-        "duration_ms": 5,
+        "duration": 0.002382625,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 3000,
+          "duration": 0.000030375,
+          "step_hz": 98765,
           "passed": 3,
           "total": 3,
           "cases": [
@@ -2704,11 +2704,11 @@
         "source_path": "parts/testing/parameter_defaults.sv",
         "json_path": "parts/testing/parameter_defaults.json",
         "top_module": "parameter_defaults",
-        "duration_ms": 1,
+        "duration": 0.001211625,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 5000,
+          "duration": 0.000041959,
+          "step_hz": 119163,
           "passed": 5,
           "total": 5,
           "cases": [
@@ -2755,11 +2755,11 @@
         "source_path": "parts/testing/reduction_ops.sv",
         "json_path": "parts/testing/reduction_ops.json",
         "top_module": "reduction_ops",
-        "duration_ms": 1,
+        "duration": 0.000831875,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 8000,
+          "duration": 0.000049042,
+          "step_hz": 163125,
           "passed": 8,
           "total": 8,
           "cases": [
@@ -2827,11 +2827,11 @@
         "source_path": "parts/testing/xnor_gate.sv",
         "json_path": "parts/testing/xnor_gate.json",
         "top_module": "xnor_gate",
-        "duration_ms": 2,
+        "duration": 0.002137083,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 4000,
+          "duration": 0.000084083,
+          "step_hz": 47572,
           "passed": 4,
           "total": 4,
           "cases": [
@@ -2871,11 +2871,11 @@
         "source_path": "parts/testing/xnor_gate_8bit.sv",
         "json_path": "parts/testing/xnor_gate_8bit.json",
         "top_module": "xnor_gate_8bit",
-        "duration_ms": 12,
+        "duration": 0.01074075,
         "passed": true,
         "report": {
-          "duration_ms": 1,
-          "step_hz": 12000,
+          "duration": 0.001807917,
+          "step_hz": 6637,
           "passed": 12,
           "total": 12,
           "cases": [
@@ -2971,11 +2971,11 @@
         "source_path": "parts/testing/xor_gate.sv",
         "json_path": "parts/testing/xor_gate.json",
         "top_module": "xor_gate",
-        "duration_ms": 1,
+        "duration": 0.002958542,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 4000,
+          "duration": 0.000048292,
+          "step_hz": 82829,
           "passed": 4,
           "total": 4,
           "cases": [
@@ -3015,11 +3015,11 @@
         "source_path": "parts/testing/xor_gate_8bit.sv",
         "json_path": "parts/testing/xor_gate_8bit.json",
         "top_module": "xor_gate_8bit",
-        "duration_ms": 9,
+        "duration": 0.010856,
         "passed": true,
         "report": {
-          "duration_ms": 1,
-          "step_hz": 12000,
+          "duration": 0.001276459,
+          "step_hz": 9401,
           "passed": 12,
           "total": 12,
           "cases": [

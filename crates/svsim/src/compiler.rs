@@ -16,20 +16,20 @@ use crate::test::{
 };
 use crate::validate::validate_design;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct CompileFileReport {
     pub source_path: PathBuf,
     pub top_module: Option<String>,
     pub module_count: usize,
-    pub duration_ms: u64,
+    pub duration: f64,
     pub passed: bool,
     pub diagnostics: Vec<Diagnostic>,
     pub error: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct CompileDirectoryReport {
-    pub duration_ms: u64,
+    pub duration: f64,
     pub passed: usize,
     pub total: usize,
     pub files: Vec<CompileFileReport>,
@@ -41,9 +41,9 @@ impl CompileDirectoryReport {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct CompileCorpusReport {
-    pub duration_ms: u64,
+    pub duration: f64,
     pub passed: usize,
     pub total: usize,
     pub directories: Vec<CompileDirectoryRunReport>,
@@ -55,7 +55,7 @@ impl CompileCorpusReport {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct CompileDirectoryRunReport {
     pub directory: PathBuf,
     pub report: CompileDirectoryReport,
@@ -222,7 +222,7 @@ impl Compiler {
                             source_path: suite.source_path,
                             json_path: suite.json_path,
                             top_module,
-                            duration_ms: elapsed_millis(started_at),
+                            duration: started_at.elapsed().as_secs_f64(),
                             passed,
                             report: Some(report),
                             error: None,
@@ -232,7 +232,7 @@ impl Compiler {
                         source_path: suite.source_path,
                         json_path: suite.json_path,
                         top_module,
-                        duration_ms: elapsed_millis(started_at),
+                        duration: started_at.elapsed().as_secs_f64(),
                         passed: false,
                         report: None,
                         error: Some(error.to_string()),
@@ -243,7 +243,7 @@ impl Compiler {
                 source_path: suite.source_path,
                 json_path: suite.json_path,
                 top_module: None,
-                duration_ms: elapsed_millis(started_at),
+                duration: started_at.elapsed().as_secs_f64(),
                 passed: false,
                 report: None,
                 error: Some(error.to_string()),
@@ -261,7 +261,7 @@ impl Compiler {
                     source_path,
                     top_module: design.top_module().map(str::to_owned),
                     module_count: design.hir().module_count(),
-                    duration_ms: elapsed_millis(started_at),
+                    duration: started_at.elapsed().as_secs_f64(),
                     passed,
                     diagnostics,
                     error: None,
@@ -271,7 +271,7 @@ impl Compiler {
                 source_path,
                 top_module: None,
                 module_count: 0,
-                duration_ms: elapsed_millis(started_at),
+                duration: started_at.elapsed().as_secs_f64(),
                 passed: false,
                 diagnostics: Vec::new(),
                 error: Some(error.to_string()),
@@ -439,10 +439,6 @@ struct JsonTestSuiteSourceMetadata {
     source: Option<PathBuf>,
 }
 
-fn elapsed_millis(started_at: Instant) -> u64 {
-    u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX)
-}
-
 fn build_compile_directory_report(
     files: Vec<CompileFileReport>,
     duration: std::time::Duration,
@@ -450,7 +446,7 @@ fn build_compile_directory_report(
     let passed = files.iter().filter(|file| file.passed).count();
     let total = files.len();
     CompileDirectoryReport {
-        duration_ms: u64::try_from(duration.as_millis()).unwrap_or(u64::MAX),
+        duration: duration.as_secs_f64(),
         passed,
         total,
         files,
@@ -470,7 +466,7 @@ fn build_compile_corpus_report(
         .map(|directory| directory.report.total)
         .sum();
     CompileCorpusReport {
-        duration_ms: u64::try_from(duration.as_millis()).unwrap_or(u64::MAX),
+        duration: duration.as_secs_f64(),
         passed,
         total,
         directories,

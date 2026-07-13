@@ -53,7 +53,7 @@ fn cli_runs_json_regression_suite() {
 
     let json: Value = serde_json::from_slice(&output.stdout).expect("parse stdout json");
     assert_eq!(json["top_module"], "full_adder");
-    assert!(json["report"]["duration_ms"].is_u64());
+    assert!(json["report"]["duration"].is_f64());
     assert!(json["report"]["step_hz"].is_u64());
     assert_eq!(json["report"]["passed"], 8);
     assert_eq!(json["report"]["total"], 8);
@@ -126,11 +126,11 @@ fn cli_runs_json_regression_directory() {
     );
 
     let json: Value = serde_json::from_slice(&output.stdout).expect("parse stdout json");
-    assert!(json["report"]["duration_ms"].is_u64());
+    assert!(json["report"]["duration"].is_f64());
     assert_eq!(json["report"]["passed"], 1);
     assert_eq!(json["report"]["total"], 1);
-    assert!(json["report"]["suites"][0]["duration_ms"].is_u64());
-    assert!(json["report"]["suites"][0]["report"]["duration_ms"].is_u64());
+    assert!(json["report"]["suites"][0]["duration"].is_f64());
+    assert!(json["report"]["suites"][0]["report"]["duration"].is_f64());
     assert!(json["report"]["suites"][0]["report"]["step_hz"].is_u64());
     assert_eq!(json["report"]["suites"][0]["top_module"], "pass");
 }
@@ -189,7 +189,7 @@ fn cli_runs_compile_directory() {
     );
 
     let json: Value = serde_json::from_slice(&output.stdout).expect("parse stdout json");
-    assert!(json["report"]["duration_ms"].is_u64());
+    assert!(json["report"]["duration"].is_f64());
     assert_eq!(json["report"]["passed"], 2);
     assert_eq!(json["report"]["total"], 2);
     assert_eq!(json["report"]["files"][0]["top_module"], "pass");
@@ -245,7 +245,7 @@ fn cli_runs_multiple_compile_directories() {
     );
 
     let json: Value = serde_json::from_slice(&output.stdout).expect("parse stdout json");
-    assert!(json["report"]["duration_ms"].is_u64());
+    assert!(json["report"]["duration"].is_f64());
     assert_eq!(json["report"]["passed"], 2);
     assert_eq!(json["report"]["total"], 2);
     assert_eq!(
@@ -305,20 +305,20 @@ fn cli_runs_multiple_json_regression_directories() {
     );
 
     let json: Value = serde_json::from_slice(&output.stdout).expect("parse stdout json");
-    assert!(json["report"]["duration_ms"].is_u64());
+    assert!(json["report"]["duration"].is_f64());
     assert_eq!(json["report"]["passed"], 2);
     assert_eq!(json["report"]["total"], 2);
     assert_eq!(
         json["report"]["directories"][0]["directory"],
         left_dir.display().to_string()
     );
-    assert!(json["report"]["directories"][0]["report"]["duration_ms"].is_u64());
+    assert!(json["report"]["directories"][0]["report"]["duration"].is_f64());
     assert_eq!(json["report"]["directories"][0]["report"]["passed"], 1);
     assert_eq!(
         json["report"]["directories"][1]["directory"],
         right_dir.display().to_string()
     );
-    assert!(json["report"]["directories"][1]["report"]["duration_ms"].is_u64());
+    assert!(json["report"]["directories"][1]["report"]["duration"].is_f64());
     assert_eq!(json["report"]["directories"][1]["report"]["passed"], 1);
 }
 

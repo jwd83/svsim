@@ -1,7 +1,7 @@
 {
   "directory": "parts/sap3",
   "report": {
-    "duration_ms": 1104,
+    "duration": 1.404833792,
     "passed": 4,
     "total": 4,
     "suites": [
@@ -9,11 +9,11 @@
         "source_path": "parts/sap3/sap3.sv",
         "json_path": "parts/sap3/sap3_add3to42.json",
         "top_module": "machine",
-        "duration_ms": 1102,
+        "duration": 1.402781709,
         "passed": true,
         "report": {
-          "duration_ms": 1065,
-          "step_hz": 2734,
+          "duration": 1.36167825,
+          "step_hz": 2138,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -32,11 +32,11 @@
         "source_path": "parts/sap3/sap3.sv",
         "json_path": "parts/sap3/sap3_fib.json",
         "top_module": "machine",
-        "duration_ms": 161,
+        "duration": 0.17733825,
         "passed": true,
         "report": {
-          "duration_ms": 128,
-          "step_hz": 2273,
+          "duration": 0.131026375,
+          "step_hz": 2220,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -55,11 +55,11 @@
         "source_path": "parts/sap3/sap3.sv",
         "json_path": "parts/sap3/sap3_logic_mask.json",
         "top_module": "machine",
-        "duration_ms": 60,
+        "duration": 0.067602959,
         "passed": true,
         "report": {
-          "duration_ms": 29,
-          "step_hz": 1482,
+          "duration": 0.025914084,
+          "step_hz": 1659,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -78,11 +78,11 @@
         "source_path": "parts/sap3/sap3.sv",
         "json_path": "parts/sap3/sap3_parity.json",
         "top_module": "machine",
-        "duration_ms": 51,
+        "duration": 0.047930958,
         "passed": true,
         "report": {
-          "duration_ms": 14,
-          "step_hz": 1571,
+          "duration": 0.013541167,
+          "step_hz": 1624,
           "passed": 1,
           "total": 1,
           "cases": [

@@ -9,9 +9,9 @@ use crate::design::{CompiledDesign, DesignHierarchy, InstanceHierarchy};
 use crate::diag::{Error, Result};
 use crate::logic_value::{LogicPattern, LogicValue};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct JsonTestReport {
-    pub duration_ms: u64,
+    pub duration: f64,
     pub step_hz: u64,
     pub passed: usize,
     pub total: usize,
@@ -24,9 +24,9 @@ impl JsonTestReport {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct JsonTestDirectoryReport {
-    pub duration_ms: u64,
+    pub duration: f64,
     pub passed: usize,
     pub total: usize,
     pub suites: Vec<JsonTestSuiteRunReport>,
@@ -38,9 +38,9 @@ impl JsonTestDirectoryReport {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct JsonTestCorpusReport {
-    pub duration_ms: u64,
+    pub duration: f64,
     pub passed: usize,
     pub total: usize,
     pub directories: Vec<JsonTestDirectoryRunReport>,
@@ -52,18 +52,18 @@ impl JsonTestCorpusReport {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct JsonTestDirectoryRunReport {
     pub directory: PathBuf,
     pub report: JsonTestDirectoryReport,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct JsonTestSuiteRunReport {
     pub source_path: PathBuf,
     pub json_path: PathBuf,
     pub top_module: Option<String>,
-    pub duration_ms: u64,
+    pub duration: f64,
     pub passed: bool,
     pub report: Option<JsonTestReport>,
     pub error: Option<String>,
@@ -577,20 +577,27 @@ fn lower_runtime_inputs(
 }
 
 fn build_report(cases: Vec<JsonTestCaseReport>, duration: std::time::Duration) -> JsonTestReport {
-    let duration_ms = duration_millis(duration);
-    let effective_duration_ms = duration_ms.max(1);
     let total_steps: u128 = cases.iter().map(|case| case.steps as u128).sum();
-    let steps_per_second = total_steps.saturating_mul(1000) / u128::from(effective_duration_ms);
-    let step_hz = u64::try_from(steps_per_second).unwrap_or(u64::MAX);
+    let step_hz = steps_per_second(total_steps, duration);
     let passed = cases.iter().filter(|case| case.passed).count();
     let total = cases.len();
     JsonTestReport {
-        duration_ms,
+        duration: duration.as_secs_f64(),
         step_hz,
         passed,
         total,
         cases,
     }
+}
+
+fn steps_per_second(total_steps: u128, duration: std::time::Duration) -> u64 {
+    let duration_ns = duration.as_nanos();
+    if duration_ns == 0 {
+        return 0;
+    }
+
+    let steps_per_second = total_steps.saturating_mul(1_000_000_000) / duration_ns;
+    u64::try_from(steps_per_second).unwrap_or(u64::MAX)
 }
 
 pub(crate) fn build_directory_report(
@@ -600,7 +607,7 @@ pub(crate) fn build_directory_report(
     let passed = suites.iter().filter(|suite| suite.passed).count();
     let total = suites.len();
     JsonTestDirectoryReport {
-        duration_ms: duration_millis(duration),
+        duration: duration.as_secs_f64(),
         passed,
         total,
         suites,
@@ -620,15 +627,11 @@ pub(crate) fn build_corpus_report(
         .map(|directory| directory.report.total)
         .sum();
     JsonTestCorpusReport {
-        duration_ms: duration_millis(duration),
+        duration: duration.as_secs_f64(),
         passed,
         total,
         directories,
     }
-}
-
-fn duration_millis(duration: std::time::Duration) -> u64 {
-    u64::try_from(duration.as_millis()).unwrap_or(u64::MAX)
 }
 
 #[derive(Debug, Deserialize)]
@@ -1370,12 +1373,12 @@ mod tests {
         ];
         let report = build_report(cases, Duration::from_millis(2000));
 
-        assert_eq!(report.duration_ms, 2000);
+        assert_eq!(report.duration, 2.0);
         assert_eq!(report.step_hz, 2);
     }
 
     #[test]
-    fn build_report_clamps_zero_duration_to_one_millisecond_for_step_hz() {
+    fn build_report_uses_sub_millisecond_duration_for_step_hz() {
         let cases = vec![JsonTestCaseReport {
             name: "single".to_owned(),
             description: None,
@@ -1384,10 +1387,26 @@ mod tests {
             failures: Vec::new(),
             trace: None,
         }];
-        let report = build_report(cases, Duration::from_millis(0));
+        let report = build_report(cases, Duration::from_micros(400));
 
-        assert_eq!(report.duration_ms, 0);
-        assert_eq!(report.step_hz, 5000);
+        assert_eq!(report.duration, 0.0004);
+        assert_eq!(report.step_hz, 12_500);
+    }
+
+    #[test]
+    fn build_report_does_not_invent_a_rate_for_zero_duration() {
+        let cases = vec![JsonTestCaseReport {
+            name: "single".to_owned(),
+            description: None,
+            steps: 5,
+            passed: true,
+            failures: Vec::new(),
+            trace: None,
+        }];
+        let report = build_report(cases, Duration::ZERO);
+
+        assert_eq!(report.duration, 0.0);
+        assert_eq!(report.step_hz, 0);
     }
 
     fn unique_temp_dir(name: &str) -> PathBuf {

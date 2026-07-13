@@ -1,7 +1,7 @@
 {
   "directory": "parts/sap2",
   "report": {
-    "duration_ms": 981,
+    "duration": 1.017590417,
     "passed": 9,
     "total": 9,
     "suites": [
@@ -9,11 +9,11 @@
         "source_path": "parts/sap2/sap2.sv",
         "json_path": "parts/sap2/sap2_add3to42.json",
         "top_module": "machine",
-        "duration_ms": 978,
+        "duration": 1.014763084,
         "passed": true,
         "report": {
-          "duration_ms": 925,
-          "step_hz": 2886,
+          "duration": 0.964980792,
+          "step_hz": 2766,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -32,11 +32,11 @@
         "source_path": "parts/sap2/sap2.sv",
         "json_path": "parts/sap2/sap2_fib.json",
         "top_module": "machine",
-        "duration_ms": 179,
+        "duration": 0.187004375,
         "passed": true,
         "report": {
-          "duration_ms": 152,
-          "step_hz": 1822,
+          "duration": 0.145626167,
+          "step_hz": 1902,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -55,11 +55,11 @@
         "source_path": "parts/sap2/sap2.sv",
         "json_path": "parts/sap2/sap2_memory_traffic.json",
         "top_module": "machine",
-        "duration_ms": 112,
+        "duration": 0.136071416,
         "passed": true,
         "report": {
-          "duration_ms": 77,
-          "step_hz": 1480,
+          "duration": 0.081135583,
+          "step_hz": 1405,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -78,11 +78,11 @@
         "source_path": "parts/sap2/sap2.sv",
         "json_path": "parts/sap2/sap2_multiply.json",
         "top_module": "machine",
-        "duration_ms": 168,
+        "duration": 0.196956667,
         "passed": true,
         "report": {
-          "duration_ms": 138,
-          "step_hz": 1789,
+          "duration": 0.134667708,
+          "step_hz": 1834,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -101,11 +101,11 @@
         "source_path": "parts/sap2/sap2.sv",
         "json_path": "parts/sap2/sap2_self_modify_fetch.json",
         "top_module": "machine",
-        "duration_ms": 62,
+        "duration": 0.056095458,
         "passed": true,
         "report": {
-          "duration_ms": 21,
-          "step_hz": 1095,
+          "duration": 0.020737792,
+          "step_hz": 1109,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -124,11 +124,11 @@
         "source_path": "parts/sap2/sap2.sv",
         "json_path": "parts/sap2/sap2_test_jumps.json",
         "top_module": "machine",
-        "duration_ms": 124,
+        "duration": 0.1217115,
         "passed": true,
         "report": {
-          "duration_ms": 80,
-          "step_hz": 1650,
+          "duration": 0.087784792,
+          "step_hz": 1503,
           "passed": 1,
           "total": 1,
           "cases": [
@@ -147,11 +147,11 @@
         "source_path": "parts/sap2/sap2_bus_semantics.sv",
         "json_path": "parts/sap2/sap2_bus_semantics.json",
         "top_module": "sap2_bus_semantics",
-        "duration_ms": 3,
+        "duration": 0.004101542,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 4000,
+          "duration": 0.000085791,
+          "step_hz": 46624,
           "passed": 4,
           "total": 4,
           "cases": [
@@ -191,11 +191,11 @@
         "source_path": "parts/sap2/sap2_inout_top.sv",
         "json_path": "parts/sap2/sap2_inout_top.json",
         "top_module": "sap2_inout_top",
-        "duration_ms": 8,
+        "duration": 0.011656791,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 9000,
+          "duration": 0.000452083,
+          "step_hz": 19907,
           "passed": 3,
           "total": 3,
           "cases": [
@@ -228,11 +228,11 @@
         "source_path": "parts/sap2/sap2_register_tile.sv",
         "json_path": "parts/sap2/sap2_register_tile.json",
         "top_module": "sap2_register_tile",
-        "duration_ms": 4,
+        "duration": 0.007885333,
         "passed": true,
         "report": {
-          "duration_ms": 0,
-          "step_hz": 8000,
+          "duration": 0.000471833,
+          "step_hz": 16955,
           "passed": 3,
           "total": 3,
           "cases": [
